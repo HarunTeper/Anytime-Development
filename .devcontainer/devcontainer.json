@@ -1,0 +1,29 @@
+// For format details, see https://aka.ms/devcontainer.json.
+{
+	// Configure container
+	"name": "ROS2-Anytime",
+	"build": {
+		"context": "..",
+		"dockerfile": "Dockerfile",
+		"args": { "VARIANT": "jammy" }
+	},
+
+	// Configure container user
+	"remoteUser": "vscode",
+
+	// Configure workspace mount point
+	"workspaceMount": "source=${localWorkspaceFolder},target=/home/vscode/workspace,type=bind,consistency=cached",
+	"workspaceFolder": "/home/vscode/workspace",
+
+	// Configure runtime settings
+	"runArgs": [
+		"--network=host"
+	],
+
+	// Configure VS Code extensions
+	"customizations": {
+		"extensions": [
+			"llvm-vs-code-extensions.vscode-clangd"
+		]
+	}
+}
