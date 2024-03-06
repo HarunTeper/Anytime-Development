@@ -10,8 +10,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-list(APPEND CMAKE_PREFIX_PATH /home/ls12-gpuhost/libtorch)
-# list(APPEND CMAKE_PREFIX_PATH ~/.local/lib/python3.8/site-packages/torch)
+list(APPEND CMAKE_PREFIX_PATH /home/vscode/libraries/libtorch)
 
 # Find dependencies
 find_package(ament_cmake REQUIRED)

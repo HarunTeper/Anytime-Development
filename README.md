@@ -6,6 +6,10 @@ Install [Docker Engine](https://docs.docker.com/engine/install/)
 
 Install [Visual Studio Code](https://code.visualstudio.com/)
 
+## GPU Setup
+
+Follow the instructions for the [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+
 ## Start the Container with Visual Studio Code
 
 In Visual Studio Code, install the **Docker** and **Dev Containers** extensions.
@@ -20,4 +24,4 @@ Run the following command in a terminal that is in the current folder's director
 
 Start the container using the following command:
 
-> docker run --network host -it -v .:/home/vscode/workspace ros2-anytime
+> docker run --gpus all --network host -it -v .:/home/vscode/workspace ros2-anytime
