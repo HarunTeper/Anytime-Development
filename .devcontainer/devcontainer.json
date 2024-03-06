@@ -17,13 +17,17 @@
 
 	// Configure runtime settings
 	"runArgs": [
-		"--network=host"
+		"--network=host",
+		"--gpus", "all"
 	],
 
 	// Configure VS Code extensions
 	"customizations": {
-		"extensions": [
-			"llvm-vs-code-extensions.vscode-clangd"
-		]
+		"vscode": {
+			"extensions": [
+				"ms-vscode.cmake-tools",
+				"llvm-vs-code-extensions.vscode-clangd"
+			]
+		}
 	}
 }
