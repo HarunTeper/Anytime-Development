@@ -38,6 +38,8 @@ RUN apt-get -y install python3-pip python3-colcon-common-extensions
 # install json library
 RUN apt-get -y install nlohmann-json3-dev ros-humble-vision-msgs ros-humble-realsense2*
 
+RUN pip install pandas requests tqdm seaborn
+
 # --- Install Torch ---
 
 # install libtorch
@@ -47,7 +49,9 @@ RUN mkdir /home/vscode/libraries && \
     unzip libtorch-cxx11-abi-shared-with-deps-2.2.1+cu121.zip && \
     rm libtorch-cxx11-abi-shared-with-deps-2.2.1+cu121.zip
 
-# install CUDA
+RUN pip install torch torchvision
+
+# --- Install CUDA ---
 
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
