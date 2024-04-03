@@ -10,9 +10,23 @@
             "problemMatcher": []
         },
         {
-            "label": "ROS2-Run-Cpp-Yolo",
+            "label": "ROS2-Run-Cpp-Anytime-Single-Threaded",
             "type": "shell",
-            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch yolo_rt yolocpp.launch.py",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_examples anytime.launch.py threading_type:=single",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "ROS2-Run-Cpp-Anytime-Multi-Threaded",
+            "type": "shell",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_examples anytime.launch.py threading_type:=multi",
             "problemMatcher": [],
             "presentation": {
                 "echo": true,
