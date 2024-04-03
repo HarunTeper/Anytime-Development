@@ -1,3 +1,0 @@
-[submodule "packages/src/detection_visualizer"]
-	path = packages/src/detection_visualizer
-	url = https://github.com/ros2/detection_visualizer.git
