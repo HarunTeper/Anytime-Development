@@ -7,7 +7,7 @@
 class AnytimeActionClient : public rclcpp::Node
 {
     public:
-        AnytimeActionClient();
+        AnytimeActionClient(const rclcpp::NodeOptions & options);
         ~AnytimeActionClient();
 
         using Anytime = anytime_interfaces::action::Anytime;
@@ -21,4 +21,8 @@ class AnytimeActionClient : public rclcpp::Node
         void feedback_callback(AnytimeGoalHandle::SharedPtr, const std::shared_ptr<const Anytime::Feedback> feedback);
         void result_callback(const AnytimeGoalHandle::WrappedResult & result);
 
+        rclcpp::TimerBase::SharedPtr timer_;
+
 };
+
+RCLCPP_COMPONENTS_REGISTER_NODE(AnytimeActionClient)

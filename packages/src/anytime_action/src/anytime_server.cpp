@@ -1,7 +1,8 @@
 #include "anytime_action/anytime_server.hpp"
 
-AnytimeActionServer::AnytimeActionServer() : Node("anytime_action_server")
+AnytimeActionServer::AnytimeActionServer(const rclcpp::NodeOptions & options) : Node("anytime_action_server", options)
 {
+    RCLCPP_INFO(this->get_logger(), "Starting Anytime action server");
     action_server_ = rclcpp_action::create_server<anytime_interfaces::action::Anytime>(
         this,
         "anytime",
@@ -43,12 +44,4 @@ void AnytimeActionServer::execute(const std::shared_ptr<AnytimeGoalHandle> goal_
 
 void AnytimeActionServer::handle_accepted(const std::shared_ptr<AnytimeGoalHandle> goal_handle){
     std::thread{std::bind(&AnytimeActionServer::execute, this, goal_handle)}.detach();
-}
-
-int main(int argc, char ** argv)
-{
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<AnytimeActionServer>());
-    rclcpp::shutdown();
-    return 0;
 }

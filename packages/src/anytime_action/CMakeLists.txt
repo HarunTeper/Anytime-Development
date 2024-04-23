@@ -20,7 +20,6 @@ find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(rclcpp_components REQUIRED)
-
 find_package(anytime_interfaces REQUIRED)
 
 # Include Cpp "include" directory
@@ -31,16 +30,14 @@ include_directories(include)
 
 
 
-
-
+set(anytime_dependencies "anytime_interfaces" "rclcpp" "rclcpp_action" "rclcpp_components")
 
 add_library(anytime_client SHARED src/anytime_client.cpp)
 target_include_directories(anytime_client PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-set(anytime_dependencies "anytime_interfaces" "rclcpp" "rclcpp_action" "rclcpp_components")
 ament_target_dependencies(anytime_client ${anytime_dependencies})
-rclcpp_components_register_node(anytime_client PLUGIN "anytime_action::AnytimeActionClient" EXECUTABLE anytime_action_client)
+rclcpp_components_register_node(anytime_client PLUGIN "AnytimeActionClient" EXECUTABLE anytime_action_client)
 install(TARGETS
   anytime_client
   ARCHIVE DESTINATION lib
@@ -48,13 +45,12 @@ install(TARGETS
   RUNTIME DESTINATION bin
 )
 
-add_library(anytime_server SHARED
-  src/anytime_server.cpp)
+add_library(anytime_server SHARED src/anytime_server.cpp)
 target_include_directories(anytime_server PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(anytime_server ${anytime_dependencies})
-rclcpp_components_register_node(anytime_server PLUGIN "anytime_action::AnytimeActionServer" EXECUTABLE anytime_action_server)
+rclcpp_components_register_node(anytime_server PLUGIN "AnytimeActionServer" EXECUTABLE anytime_action_server)
 install(TARGETS
   anytime_server
   ARCHIVE DESTINATION lib
@@ -90,10 +86,10 @@ install(TARGETS
 # # Link libraries
 # target_link_libraries(anytime anytime_node)
 
-# install(DIRECTORY
-#   launch
-#   DESTINATION share/${PROJECT_NAME}
-# )
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 # # Install Cpp executables
 # install(TARGETS

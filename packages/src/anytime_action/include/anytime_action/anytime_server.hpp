@@ -7,7 +7,7 @@
 class AnytimeActionServer : public rclcpp::Node
 {
     public:
-        AnytimeActionServer();
+        AnytimeActionServer(const rclcpp::NodeOptions & options);
         ~AnytimeActionServer();
 
         using Anytime = anytime_interfaces::action::Anytime;
@@ -27,3 +27,5 @@ class AnytimeActionServer : public rclcpp::Node
 
         void handle_accepted(const std::shared_ptr<AnytimeGoalHandle> goal_handle);
 };
+
+RCLCPP_COMPONENTS_REGISTER_NODE(AnytimeActionServer)

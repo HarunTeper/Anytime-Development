@@ -1,8 +1,12 @@
 #include "anytime_action/anytime_client.hpp"
 
-AnytimeActionClient::AnytimeActionClient() : Node("anytime_action_client")
+AnytimeActionClient::AnytimeActionClient(const rclcpp::NodeOptions & options) : Node("anytime_action_client", options)
 {
+    RCLCPP_INFO(this->get_logger(), "Starting Anytime action client");
     action_client_ = rclcpp_action::create_client<anytime_interfaces::action::Anytime>(this, "anytime");
+
+    timer_ = this->create_wall_timer(std::chrono::seconds(1), [this]() {this->send_goal();});
+
 }
 
 AnytimeActionClient::~AnytimeActionClient()
@@ -11,6 +15,9 @@ AnytimeActionClient::~AnytimeActionClient()
 
 void AnytimeActionClient::send_goal()
 {
+    RCLCPP_INFO(this->get_logger(), "Sending goal");
+    this->timer_->cancel();
+
     auto goal_msg = anytime_interfaces::action::Anytime::Goal();
     goal_msg.goal = 1;
 
@@ -27,6 +34,7 @@ void AnytimeActionClient::goal_response_callback(AnytimeGoalHandle::SharedPtr go
     if (!goal_handle)
     {
         RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
+        this->timer_.reset();
     }
     else
     {
@@ -57,14 +65,3 @@ void AnytimeActionClient::result_callback(const AnytimeGoalHandle::WrappedResult
             break;
     }
 }
-
-int main(int argc, char ** argv)
-{
-    rclcpp::init(argc, argv);
-    auto action_client = std::make_shared<AnytimeActionClient>();
-    action_client->send_goal();
-    rclcpp::spin(action_client);
-    rclcpp::shutdown();
-    return 0;
-}
-

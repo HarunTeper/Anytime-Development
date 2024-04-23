@@ -12,6 +12,9 @@
 
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
+  <depend>rclcpp_action</depend>
+  <depend>rclcpp_components</depend>
+  <depend>anytime_interfaces</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
