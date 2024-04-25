@@ -34,12 +34,47 @@ rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
 void AnytimeActionServer::execute(const std::shared_ptr<AnytimeGoalHandle> goal_handle){
     RCLCPP_INFO(this->get_logger(), "Executing goal");
     auto feedback = std::make_shared<anytime_interfaces::action::Anytime::Feedback>();
-    auto & sequence = feedback->feedback;
-    sequence = 0;
+    auto & feedback_value = feedback->feedback;
+    feedback_value = 0;
     auto result = std::make_shared<anytime_interfaces::action::Anytime::Result>();
     result->result = 0;
+
+    int count_total = 0;
+    int count_inside = 0;
+    int count_outside = 0;
+
+    float_t x = 0.0;
+    float_t y = 0.0;
+
+    for (int i = 1; i <= goal_handle->get_goal()->goal; i++){
+        if (goal_handle->is_canceling()){
+            RCLCPP_INFO(this->get_logger(), "Goal was canceled");
+            result->result = feedback_value;
+            goal_handle->canceled(result);
+            return;
+        }
+         // sample x and y between 0 and 1, and if the length of the vector is greater than one, add count to count_outside, otherwise add to count_inside
+        x = (float_t)rand() / RAND_MAX;
+        y = (float_t)rand() / RAND_MAX;
+
+        if (sqrt(pow(x, 2) + pow(y, 2)) <= 1){
+            count_inside++;
+        } else {
+            count_outside++;
+        }
+        count_total++;
+
+        feedback_value = 4 * (float_t)count_inside / count_total;
+
+        goal_handle->publish_feedback(feedback);
+
+    }
+
+    result->result = feedback_value;
+
     goal_handle->succeed(result);
-    goal_handle->publish_feedback(feedback);
+
+    RCLCPP_INFO(this->get_logger(), "Goal was completed");
 }
 
 void AnytimeActionServer::handle_accepted(const std::shared_ptr<AnytimeGoalHandle> goal_handle){

@@ -17,8 +17,7 @@
 
 	// Configure runtime settings
 	"runArgs": [
-		"--network=host",
-		"--gpus", "all"
+		"--network=host"
 	],
 
 	// Configure VS Code extensions

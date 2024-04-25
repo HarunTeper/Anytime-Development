@@ -33,43 +33,6 @@ RUN apt-get update && \
 # install ROS2 development tools
 RUN apt-get -y install python3-pip python3-colcon-common-extensions
 
-# --- Install ROS~2 Anytime dependencies ---
-
-# install json library
-RUN apt-get -y install nlohmann-json3-dev ros-humble-vision-msgs ros-humble-realsense2*
-
-RUN pip install pandas requests tqdm seaborn
-
-# --- Install Torch ---
-
-# install libtorch
-RUN mkdir /home/vscode/libraries && \
-    cd /home/vscode/libraries && \
-    wget https://download.pytorch.org/libtorch/cu121/libtorch-cxx11-abi-shared-with-deps-2.2.1%2Bcu121.zip && \
-    unzip libtorch-cxx11-abi-shared-with-deps-2.2.1+cu121.zip && \
-    rm libtorch-cxx11-abi-shared-with-deps-2.2.1+cu121.zip
-
-RUN pip install torch torchvision
-
-# --- Install CUDA ---
-
-RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
-
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin && \
-    sudo mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
-    wget https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda-repo-ubuntu2204-12-1-local_12.1.0-530.30.02-1_amd64.deb && \
-    sudo dpkg -i cuda-repo-ubuntu2204-12-1-local_12.1.0-530.30.02-1_amd64.deb && \
-    sudo cp /var/cuda-repo-ubuntu2204-12-1-local/cuda-*-keyring.gpg /usr/share/keyrings/ && \
-    sudo apt-get update && \
-    sudo apt-get -y install cuda
-
-ENV PATH=/usr/local/cuda-12.1/bin${PATH:+:${PATH}}
-ENV LD_LIBRARY_PATH=/usr/local/cuda-12.1/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
-ENV CUDACXX=/usr/local/cuda-12.1/bin/nvcc
-ENV CUDA_NVRTC_LIB=/usr/local/cuda-12.1/lib64/libnvrtc.so
-
-RUN apt-get install -y python-is-python3
-
 # --- Set up user ---
 
 # set user

@@ -19,7 +19,7 @@ void AnytimeActionClient::send_goal()
     this->timer_->cancel();
 
     auto goal_msg = anytime_interfaces::action::Anytime::Goal();
-    goal_msg.goal = 1;
+    goal_msg.goal = 5000000;
 
     auto send_goal_options = rclcpp_action::Client<anytime_interfaces::action::Anytime>::SendGoalOptions();
     send_goal_options.goal_response_callback = [this](AnytimeGoalHandle::SharedPtr goal_handle) {this->goal_response_callback(goal_handle);};
@@ -44,7 +44,7 @@ void AnytimeActionClient::goal_response_callback(AnytimeGoalHandle::SharedPtr go
 
 void AnytimeActionClient::feedback_callback(AnytimeGoalHandle::SharedPtr, const std::shared_ptr<const anytime_interfaces::action::Anytime::Feedback> feedback)
 {
-    RCLCPP_INFO(this->get_logger(), "Next number in the sequence: %d", feedback->feedback);
+    RCLCPP_INFO(this->get_logger(), "Next number in the sequence: %f", feedback->feedback);
 }
 
 void AnytimeActionClient::result_callback(const AnytimeGoalHandle::WrappedResult & result)
@@ -52,7 +52,7 @@ void AnytimeActionClient::result_callback(const AnytimeGoalHandle::WrappedResult
     switch (result.code)
     {
         case rclcpp_action::ResultCode::SUCCEEDED:
-            RCLCPP_INFO(this->get_logger(), "Result received: %d", result.result->result);
+            RCLCPP_INFO(this->get_logger(), "Result received: %f", result.result->result);
             break;
         case rclcpp_action::ResultCode::ABORTED:
             RCLCPP_ERROR(this->get_logger(), "Goal was aborted");

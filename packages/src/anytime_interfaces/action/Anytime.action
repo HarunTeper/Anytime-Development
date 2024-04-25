@@ -1,5 +1,5 @@
 int32 goal
 ---
-int32 result
+float32 result
 ---
-int32 feedback
+float32 feedback
