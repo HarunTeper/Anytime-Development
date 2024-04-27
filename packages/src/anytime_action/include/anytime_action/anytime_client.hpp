@@ -23,6 +23,7 @@ class AnytimeActionClient : public rclcpp::Node
         void receive_goal_handle();
         void receive_result();
         void cancel_goal();
+        void cancel_timeout_callback();
 
         //cancel response with cancel callback
         // create a std::function<void (typename CancelResponse::SharedPtr)> for the cancel callback (with CancelResponse = typename ActionT::Impl::CancelGoalService::Response)
@@ -32,6 +33,7 @@ class AnytimeActionClient : public rclcpp::Node
         rclcpp::TimerBase::SharedPtr goal_handle_timer_ = nullptr;
         rclcpp::TimerBase::SharedPtr result_timer_ = nullptr;
         rclcpp::TimerBase::SharedPtr cancel_timer_ = nullptr;
+        rclcpp::TimerBase::SharedPtr cancel_timeout_timer_ = nullptr;
 
         AnytimeGoalHandle::SharedPtr goal_handle_ = nullptr;
 

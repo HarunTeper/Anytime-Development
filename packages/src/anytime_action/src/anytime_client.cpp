@@ -5,13 +5,15 @@ AnytimeActionClient::AnytimeActionClient(const rclcpp::NodeOptions & options) : 
     RCLCPP_INFO(this->get_logger(), "Starting Anytime action client");
     action_client_ = rclcpp_action::create_client<anytime_interfaces::action::Anytime>(this, "anytime");
 
-    timer_ = this->create_wall_timer(std::chrono::seconds(1), [this]() {this->send_goal();});
+    timer_ = this->create_wall_timer(std::chrono::seconds(5), [this]() {this->send_goal();});
     goal_handle_timer_ = this->create_wall_timer(std::chrono::seconds(0), [this]() {this->receive_goal_handle();});
     goal_handle_timer_->cancel();
     result_timer_ = this->create_wall_timer(std::chrono::seconds(0), [this]() {this->receive_result();});
     result_timer_->cancel();
     cancel_timer_ = this->create_wall_timer(std::chrono::seconds(0), [this]() {this->cancel_goal();});
     cancel_timer_->cancel();
+    cancel_timeout_timer_ = this->create_wall_timer(std::chrono::seconds(3), [this]() {this->cancel_timeout_callback();});
+    cancel_timeout_timer_->cancel();
 
     timeout_ = 3;
 }
@@ -54,14 +56,30 @@ void AnytimeActionClient::receive_goal_handle()
 
         RCLCPP_INFO(this->get_logger(), "Goal accepted by server, sending result request");
 
-        result_future_ = action_client_->async_get_result(goal_handle_);
+        cancel_timeout_timer_->reset();
 
-        RCLCPP_INFO(this->get_logger(), "Send result request");
-        result_timer_->reset();
-        start_time_ = this->now();
+        // result_future_ = action_client_->async_get_result(goal_handle_);
+
+        // RCLCPP_INFO(this->get_logger(), "Send result request");
+        // result_timer_->reset();
+        // start_time_ = this->now();
     }
 }
 
+void AnytimeActionClient::cancel_timeout_callback()
+{
+    RCLCPP_INFO(this->get_logger(), "Timeout reached, canceling goal");
+
+    cancel_timeout_timer_->cancel();
+
+    cancel_future_ = action_client_->async_cancel_goal(goal_handle_);
+
+    RCLCPP_INFO(this->get_logger(), "Send cancel request");
+
+    timer_->reset();
+}
+
+// NOT USED ANYMORE
 void AnytimeActionClient::receive_result()
 {
     RCLCPP_INFO(this->get_logger(), "Waiting for result");
@@ -100,6 +118,7 @@ void AnytimeActionClient::receive_result()
     }
 }
 
+// NOT USED ANYMORE
 void AnytimeActionClient::cancel_response_callback(std::shared_ptr<action_msgs::srv::CancelGoal::Response> cancel_result)
 {
     if(cancel_result->return_code == action_msgs::srv::CancelGoal::Response::ERROR_REJECTED)
@@ -109,6 +128,7 @@ void AnytimeActionClient::cancel_response_callback(std::shared_ptr<action_msgs::
     else
     {
         RCLCPP_INFO(this->get_logger(), "Goal canceled");
+
         rclcpp_action::ClientGoalHandle<anytime_interfaces::action::Anytime>::WrappedResult wrapped_result = result_future_.get();
         switch(wrapped_result.code)
         {
@@ -129,7 +149,7 @@ void AnytimeActionClient::cancel_response_callback(std::shared_ptr<action_msgs::
     }
 }
 
-
+// NOT USED ANYMORE
 void AnytimeActionClient::cancel_goal()
 {
     RCLCPP_INFO(this->get_logger(), "Cancelling goal");
@@ -175,6 +195,7 @@ void AnytimeActionClient::result_callback(const AnytimeGoalHandle::WrappedResult
             break;
         case rclcpp_action::ResultCode::CANCELED:
             RCLCPP_ERROR(this->get_logger(), "Goal was canceled");
+            RCLCPP_INFO(this->get_logger(), "Result after cancel callback: %f", result.result->result);
             break;
         default:
             RCLCPP_ERROR(this->get_logger(), "Unknown result code");
