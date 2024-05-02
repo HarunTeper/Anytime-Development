@@ -37,7 +37,7 @@ void AnytimeActionClient::send_goal()
 
     goal_handle_future_ = action_client_->async_send_goal(goal_msg, send_goal_options);
 
-    goal_handle_timer_->reset();
+    // goal_handle_timer_->reset();
     return;
 }
 
@@ -175,6 +175,8 @@ void AnytimeActionClient::goal_response_callback(AnytimeGoalHandle::SharedPtr go
     else
     {
         RCLCPP_INFO(this->get_logger(), "Goal accepted by server, waiting for result");
+        goal_handle_ = goal_handle;
+        cancel_timeout_timer_->reset();
     }
 }
 
