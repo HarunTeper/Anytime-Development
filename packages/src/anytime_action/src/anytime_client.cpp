@@ -5,7 +5,7 @@ AnytimeActionClient::AnytimeActionClient(const rclcpp::NodeOptions & options) : 
     RCLCPP_INFO(this->get_logger(), "Starting Anytime action client");
     action_client_ = rclcpp_action::create_client<anytime_interfaces::action::Anytime>(this, "anytime");
 
-    timer_ = this->create_wall_timer(std::chrono::seconds(5), [this]() {this->send_goal();});
+    timer_ = this->create_wall_timer(std::chrono::seconds(1), [this]() {this->send_goal();});
     goal_handle_timer_ = this->create_wall_timer(std::chrono::seconds(0), [this]() {this->receive_goal_handle();});
     goal_handle_timer_->cancel();
     result_timer_ = this->create_wall_timer(std::chrono::seconds(0), [this]() {this->receive_result();});
@@ -15,7 +15,7 @@ AnytimeActionClient::AnytimeActionClient(const rclcpp::NodeOptions & options) : 
     cancel_timeout_timer_ = this->create_wall_timer(std::chrono::seconds(3), [this]() {this->cancel_timeout_callback();});
     cancel_timeout_timer_->cancel();
 
-    timeout_ = 3;
+    timeout_ = 1;
 }
 
 AnytimeActionClient::~AnytimeActionClient()
@@ -24,7 +24,7 @@ AnytimeActionClient::~AnytimeActionClient()
 
 void AnytimeActionClient::send_goal()
 {
-    timer_->cancel();
+    // timer_->cancel();
     RCLCPP_INFO(this->get_logger(), "Sending goal");
 
     auto goal_msg = anytime_interfaces::action::Anytime::Goal();
@@ -175,8 +175,8 @@ void AnytimeActionClient::goal_response_callback(AnytimeGoalHandle::SharedPtr go
     else
     {
         RCLCPP_INFO(this->get_logger(), "Goal accepted by server, waiting for result");
-        goal_handle_ = goal_handle;
-        cancel_timeout_timer_->reset();
+        // goal_handle_ = goal_handle;
+        // cancel_timeout_timer_->reset();
     }
 }
 
