@@ -31,7 +31,7 @@ rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
     return rclcpp_action::CancelResponse::ACCEPT;
 }
 
-void AnytimeActionServer::execute(const std::shared_ptr<AnytimeGoalHandle> goal_handle){
+void AnytimeActionServer::execute(const std::shared_ptr<AnytimeGoalHandle> goal_handle, std::shared_ptr<rclcpp::TimerBase> timer){
     RCLCPP_INFO(this->get_logger(), "Executing goal");
     auto feedback = std::make_shared<anytime_interfaces::action::Anytime::Feedback>();
     auto & feedback_value = feedback->feedback;
@@ -66,7 +66,7 @@ void AnytimeActionServer::execute(const std::shared_ptr<AnytimeGoalHandle> goal_
 
         feedback_value = 4 * (float_t)count_inside / count_total;
 
-        goal_handle->publish_feedback(feedback);
+        // goal_handle->publish_feedback(feedback);
 
     }
 
@@ -75,8 +75,18 @@ void AnytimeActionServer::execute(const std::shared_ptr<AnytimeGoalHandle> goal_
     goal_handle->succeed(result);
 
     RCLCPP_INFO(this->get_logger(), "Goal was completed");
+
+    timer->cancel();
 }
 
 void AnytimeActionServer::handle_accepted(const std::shared_ptr<AnytimeGoalHandle> goal_handle){
-    std::thread{std::bind(&AnytimeActionServer::execute, this, goal_handle)}.detach();
+    // std::thread{std::bind(&AnytimeActionServer::execute, this, goal_handle, nullptr)}.detach();
+
+    // create a timer and insert it into the vector 
+    std::shared_ptr<rclcpp::TimerBase> timer;
+    timer = this->create_wall_timer(std::chrono::seconds(1), [this, timer, goal_handle](){
+        this->execute(goal_handle, timer);
+    });
+    timers_.push_back(timer);
+
 }

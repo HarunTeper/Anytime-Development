@@ -23,9 +23,12 @@ class AnytimeActionServer : public rclcpp::Node
         rclcpp_action::CancelResponse handle_cancel(
             const std::shared_ptr<AnytimeGoalHandle> goal_handle);
 
-        void execute(const std::shared_ptr<AnytimeGoalHandle> goal_handle);
+        void execute(const std::shared_ptr<AnytimeGoalHandle> goal_handle, std::shared_ptr<rclcpp::TimerBase> timer);
 
         void handle_accepted(const std::shared_ptr<AnytimeGoalHandle> goal_handle);
+
+        // vector of timers
+        std::vector<rclcpp::TimerBase::SharedPtr> timers_;
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(AnytimeActionServer)
