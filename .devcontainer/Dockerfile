@@ -34,7 +34,27 @@ RUN apt-get update && \
 RUN apt-get -y install python3-pip python3-colcon-common-extensions
 
 # install json library
-RUN apt-get -y install nlohmann-json3-dev ros-humble-vision-msgs ros-humble-realsense2*
+RUN apt-get update && apt-get -y install nlohmann-json3-dev ros-humble-vision-msgs ros-humble-realsense2*
+
+# Install Tracing
+
+RUN apt-get install -y lttng-tools liblttng-ust-dev && \
+    apt-get install -y python3-babeltrace python3-lttng && \
+    apt-get install -y lttng-modules-dkms
+
+# set up user for tracing
+RUN groupadd -f -r tracing && \
+    usermod -a -G tracing vscode
+
+RUN mkdir -p /home/vscode/ros2_tracing_ws/src/ros2_tracing && \
+    git clone -b humble https://gitlab.com/ros-tracing/ros2_tracing.git /home/vscode/ros2_tracing_ws/src/ros2_tracing
+
+# build ROS2 tracing
+RUN cd /home/vscode/ros2_tracing_ws &&\
+    . /opt/ros/humble/setup.sh &&\
+    colcon build --symlink-install --allow-overriding tracetools
+
+# Install CUDA and LibTorch
 
 # install libtorch
 RUN mkdir /home/vscode/libraries && \
@@ -44,21 +64,20 @@ RUN mkdir /home/vscode/libraries && \
     rm libtorch-cxx11-abi-shared-with-deps-2.2.1+cu121.zip
 
 # install CUDA
-
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin && \
-    sudo mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
-    wget https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda-repo-ubuntu2204-12-1-local_12.1.0-530.30.02-1_amd64.deb && \
-    sudo dpkg -i cuda-repo-ubuntu2204-12-1-local_12.1.0-530.30.02-1_amd64.deb && \
-    sudo cp /var/cuda-repo-ubuntu2204-12-1-local/cuda-*-keyring.gpg /usr/share/keyrings/ && \
-    sudo apt-get update && \
-    sudo apt-get -y install cuda
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin
+RUN mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600
+RUN wget https://developer.download.nvidia.com/compute/cuda/12.5.0/local_installers/cuda-repo-ubuntu2204-12-5-local_12.5.0-555.42.02-1_amd64.deb
+RUN dpkg -i cuda-repo-ubuntu2204-12-5-local_12.5.0-555.42.02-1_amd64.deb
+RUN cp /var/cuda-repo-ubuntu2204-12-5-local/cuda-*-keyring.gpg /usr/share/keyrings/
+RUN apt-get update
+RUN apt-get -y install cuda-toolkit-12-5
 
-ENV PATH=/usr/local/cuda-12.1/bin${PATH:+:${PATH}}
-ENV LD_LIBRARY_PATH=/usr/local/cuda-12.1/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
-ENV CUDACXX=/usr/local/cuda-12.1/bin/nvcc
-ENV CUDA_NVRTC_LIB=/usr/local/cuda-12.1/lib64/libnvrtc.so
+ENV PATH=/usr/local/cuda-12.5/bin${PATH:+:${PATH}}
+ENV LD_LIBRARY_PATH=/usr/local/cuda-12.5/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+ENV CUDACXX=/usr/local/cuda-12.5/bin/nvcc
+ENV CUDA_NVRTC_LIB=/usr/local/cuda-12.5/lib64/libnvrtc.so
 
 RUN apt-get install -y python-is-python3
 
@@ -70,11 +89,13 @@ USER vscode
 # source ROS2 setup file
 RUN echo '. /opt/ros/humble/setup.sh' >> /home/vscode/.bashrc
 
+# set up ROS2 tracing
+RUN echo '. /home/vscode/ros2_tracing_ws/install/setup.sh' >> /home/vscode/.bashrc
+
 # configure environment variables
 ENV DISPLAY=unix:1
 ENV ROS_LOCALHOST_ONLY=0
 ENV ROS_DOMAIN_ID=0
-# ENV TORCH_CUDA_ARCH_LIST="8.0 8.6 8.9 9.0"
 
 # --- Set up entrypoint ---
 
