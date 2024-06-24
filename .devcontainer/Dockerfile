@@ -36,7 +36,7 @@ RUN apt-get -y install python3-pip python3-colcon-common-extensions
 # install json library
 RUN apt-get update && apt-get -y install nlohmann-json3-dev ros-humble-vision-msgs ros-humble-realsense2*
 
-# Install Tracing
+# --- Install ROS2 Tracing ---
 
 RUN apt-get install -y lttng-tools liblttng-ust-dev && \
     apt-get install -y python3-babeltrace python3-lttng && \
@@ -54,7 +54,7 @@ RUN cd /home/vscode/ros2_tracing_ws &&\
     . /opt/ros/humble/setup.sh &&\
     colcon build --symlink-install --allow-overriding tracetools
 
-# Install CUDA and LibTorch
+# --- Install CUDA and LibTorch ---
 
 # install libtorch
 RUN mkdir /home/vscode/libraries && \
