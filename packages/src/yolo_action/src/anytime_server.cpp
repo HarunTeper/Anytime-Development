@@ -122,6 +122,9 @@ void AnytimeActionServer::execute(){
         end_time = this->now();
         // //print time difference
         RCLCPP_INFO(this->get_logger(), "Time difference: %f", (end_time - start_time).seconds());
+        auto result = std::make_shared<anytime_interfaces::action::Anytime::Result>();
+        result->result = 1;
+        goal_handle_->succeed(result);
         timer_->cancel();
     }
 }
@@ -146,6 +149,8 @@ void AnytimeActionServer::handle_accepted(const std::shared_ptr<AnytimeGoalHandl
     //     this->execute(goal_handle, timer);
     // });
     // timers_.push_back(timer);
+
+    goal_handle_ = goal_handle;
 
     if (timer_->is_canceled()){
         tensor_ = torch::randn({1, 3, 640, 640}).cuda().to(torch::kHalf);

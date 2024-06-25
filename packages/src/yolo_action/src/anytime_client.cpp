@@ -36,9 +36,6 @@ void AnytimeActionClient::send_goal()
     send_goal_options.result_callback = [this](const AnytimeGoalHandle::WrappedResult & result) {this->result_callback(result);};
 
     goal_handle_future_ = action_client_->async_send_goal(goal_msg, send_goal_options);
-
-    // goal_handle_timer_->reset();
-    return;
 }
 
 void AnytimeActionClient::receive_goal_handle()
