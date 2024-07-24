@@ -30,6 +30,7 @@ def include_launch_description(context: LaunchContext):
         namespace='',
         package='rclcpp_components',
         executable=executable,
+        parameters=[{'thread_num': 2}],
         composable_node_descriptions=[
             ComposableNode(
                 package='yolo_action',
