@@ -4,31 +4,31 @@
 
 #include "anytime_interfaces/action/anytime.hpp"
 
-class AnytimeActionServer : public rclcpp::Node
-{
-    public:
-        AnytimeActionServer(const rclcpp::NodeOptions & options);
-        ~AnytimeActionServer();
+class AnytimeActionServer : public rclcpp::Node {
+ public:
+  AnytimeActionServer(const rclcpp::NodeOptions& options);
+  ~AnytimeActionServer();
 
-        using Anytime = anytime_interfaces::action::Anytime;
-        using AnytimeGoalHandle = rclcpp_action::ServerGoalHandle<Anytime>;
+  using Anytime = anytime_interfaces::action::Anytime;
+  using AnytimeGoalHandle = rclcpp_action::ServerGoalHandle<Anytime>;
 
-    private:
-        rclcpp_action::Server<Anytime>::SharedPtr action_server_;
+ private:
+  rclcpp_action::Server<Anytime>::SharedPtr action_server_;
 
-        rclcpp_action::GoalResponse handle_goal(
-            const rclcpp_action::GoalUUID & uuid,
-            std::shared_ptr<const Anytime::Goal> goal);
+  rclcpp_action::GoalResponse handle_goal(
+      const rclcpp_action::GoalUUID& uuid,
+      std::shared_ptr<const Anytime::Goal> goal);
 
-        rclcpp_action::CancelResponse handle_cancel(
-            const std::shared_ptr<AnytimeGoalHandle> goal_handle);
+  rclcpp_action::CancelResponse handle_cancel(
+      const std::shared_ptr<AnytimeGoalHandle> goal_handle);
 
-        void execute(const std::shared_ptr<AnytimeGoalHandle> goal_handle, std::shared_ptr<rclcpp::TimerBase> timer);
+  void execute(const std::shared_ptr<AnytimeGoalHandle> goal_handle,
+               std::shared_ptr<rclcpp::TimerBase> timer);
 
-        void handle_accepted(const std::shared_ptr<AnytimeGoalHandle> goal_handle);
+  void handle_accepted(const std::shared_ptr<AnytimeGoalHandle> goal_handle);
 
-        // vector of timers
-        std::vector<rclcpp::TimerBase::SharedPtr> timers_;
+  // vector of timers
+  std::vector<rclcpp::TimerBase::SharedPtr> timers_;
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(AnytimeActionServer)

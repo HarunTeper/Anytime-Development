@@ -11,26 +11,26 @@ from launch.launch_context import LaunchContext
 def include_launch_description(context: LaunchContext):
     """Include launch description"""
 
-    if context.launch_configurations['threading_type'] == 'single':
-        executable = 'component_container'
-    elif context.launch_configurations['threading_type'] == 'multi':
-        executable = 'component_container_mt'
+    if context.launch_configurations["threading_type"] == "single":
+        executable = "component_container"
+    elif context.launch_configurations["threading_type"] == "multi":
+        executable = "component_container_mt"
     else:
-        raise ValueError('Invalid threading type')
-    
+        raise ValueError("Invalid threading type")
+
     anytime_cmd = ComposableNodeContainer(
-        name='anytime_server_component_container',
-        namespace='',
-        package='rclcpp_components',
+        name="anytime_server_component_container",
+        namespace="",
+        package="rclcpp_components",
         executable=executable,
-        parameters=[{'thread_num': 2}],
+        parameters=[{"thread_num": 2}],
         composable_node_descriptions=[
             ComposableNode(
-                package='anytime_action',
-                plugin='AnytimeActionServer',
-                name='anytime_server'
+                package="anytime_action",
+                plugin="AnytimeActionServer",
+                name="anytime_server",
             )
-        ]
+        ],
     )
 
     cmds = []
@@ -39,13 +39,12 @@ def include_launch_description(context: LaunchContext):
 
     return cmds
 
+
 def generate_launch_description():
     """Return launch description"""
 
     threading_type_arg = DeclareLaunchArgument(
-        'threading_type',
-        default_value='single',
-        description='Threading type'
+        "threading_type", default_value="single", description="Threading type"
     )
 
     # Launch Description

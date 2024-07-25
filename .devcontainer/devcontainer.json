@@ -5,28 +5,32 @@
 	"build": {
 		"context": "..",
 		"dockerfile": "Dockerfile",
-		"args": { "VARIANT": "jammy" }
+		"args": {
+			"VARIANT": "jammy"
+		}
 	},
-
 	// Configure container user
 	"remoteUser": "vscode",
-
 	// Configure workspace mount point
 	"workspaceMount": "source=${localWorkspaceFolder},target=/home/vscode/workspace,type=bind,consistency=cached",
 	"workspaceFolder": "/home/vscode/workspace",
-
 	// Configure runtime settings
 	"runArgs": [
 		"--network=host",
 		"--gpus=all"
 	],
-
 	// Configure VS Code extensions
 	"customizations": {
 		"vscode": {
 			"extensions": [
 				"ms-vscode.cmake-tools",
-				"llvm-vs-code-extensions.vscode-clangd"
+				"llvm-vs-code-extensions.vscode-clangd",
+				"xaver.clang-format",
+				"ms-python.python",
+				"donjayamanne.python-extension-pack",
+				"donjayamanne.python-environment-manager",
+				"ms-azuretools.vscode-docker",
+				"ms-python.autopep8"
 			]
 		}
 	}

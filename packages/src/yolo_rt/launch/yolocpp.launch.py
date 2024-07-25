@@ -9,6 +9,7 @@ from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition
 
+
 def generate_launch_description():
     """Return launch description"""
 
@@ -49,28 +50,28 @@ def generate_launch_description():
     # realsense cmd with ifcondition to enable camera
     realsense_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(realsense_pkd_dir, 'launch', 'rs_launch.py')),
-            condition=IfCondition(enable_camera),
-            launch_arguments={
-                'enable_depth': 'true',
-                'enable_color': 'true',
-                'enable_infra1': 'false',
-                'enable_infra2': 'false',
-                'infra_rgb': 'false',
-                'enable_fisheye1': 'true',
-                'enable_fisheye2': 'true',
-                'enable_confidence': 'true',
-                'enable_gyro': 'false',
-                'enable_accel': 'false',
-                'enable_pose': 'true',
-                'pointcloud.enable': 'false',
-                'enable_sync': 'false',
-                'align_depth.enable': 'false',
-                'colorizer.enable': 'false',
-                'initial_reset': 'false',
-                'allow_no_texture_points': 'false',
-                'ordered_pc': 'false',
-                'decimation_filter.enable': 'false',
-            }.items()
+        condition=IfCondition(enable_camera),
+        launch_arguments={
+            'enable_depth': 'true',
+            'enable_color': 'true',
+            'enable_infra1': 'false',
+            'enable_infra2': 'false',
+            'infra_rgb': 'false',
+            'enable_fisheye1': 'true',
+            'enable_fisheye2': 'true',
+            'enable_confidence': 'true',
+            'enable_gyro': 'false',
+            'enable_accel': 'false',
+            'enable_pose': 'true',
+            'pointcloud.enable': 'false',
+            'enable_sync': 'false',
+            'align_depth.enable': 'false',
+            'colorizer.enable': 'false',
+            'initial_reset': 'false',
+            'allow_no_texture_points': 'false',
+            'ordered_pc': 'false',
+            'decimation_filter.enable': 'false',
+        }.items()
     )
 
     # Launch Description

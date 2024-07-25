@@ -10,7 +10,7 @@
             "problemMatcher": []
         },
         {
-            "label": "ROS2-Run-Cpp-Anytime-Single-Threaded",
+            "label": "ROS2-YOLO-Custom-Single-Threaded",
             "type": "shell",
             "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch yolo_rt yolocpp.launch.py threading_type:=single",
             "problemMatcher": [],
@@ -24,7 +24,7 @@
             }
         },
         {
-            "label": "ROS2-Run-Cpp-Anytime-Multi-Threaded",
+            "label": "ROS2-YOLO-Custom-Multi-Threaded",
             "type": "shell",
             "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch yolo_rt yolocpp.launch.py threading_type:=multi",
             "problemMatcher": [],
@@ -38,7 +38,35 @@
             }
         },
         {
-            "label": "ROS2-Launch-Anytime-Action-Server-Single",
+            "label": "ROS2-Monte-Carlo-Custom-Single-Threaded",
+            "type": "shell",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_custom anytime_custom.launch.py threading_type:=single",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "ROS2-Monte-Carlo-Custom-Multi-Threaded",
+            "type": "shell",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_custom anytime_custom.launch.py threading_type:=multi",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "ROS2-Monte-Carlon-Action-Server-Single",
             "type": "shell",
             "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_action action_server.launch.py threading_type:=single",
             "problemMatcher": [],
@@ -52,7 +80,7 @@
             }
         },
         {
-            "label": "ROS2-Launch-Anytime-Action-Server-Multi",
+            "label": "ROS2-Monte-Carlon-Action-Server-Multi",
             "type": "shell",
             "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_action action_server.launch.py threading_type:=multi",
             "problemMatcher": [],
@@ -66,7 +94,7 @@
             }
         },
         {
-            "label": "ROS2-Launch-Anytime-Action-Client-Single",
+            "label": "ROS2-Monte-Carlon-Action-Client-Single",
             "type": "shell",
             "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_action action_client.launch.py threading_type:=single",
             "problemMatcher": [],
@@ -80,7 +108,7 @@
             }
         },
         {
-            "label": "ROS2-Launch-YOLO-Anytime-Action-Server-Single",
+            "label": "ROS2-YOLO-Action-Server-Single",
             "type": "shell",
             "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch yolo_action action_server.launch.py threading_type:=single",
             "problemMatcher": [],
@@ -94,7 +122,7 @@
             }
         },
         {
-            "label": "ROS2-Launch-YOLO-Anytime-Action-Server-Multi",
+            "label": "ROS2-YOLO-Action-Server-Multi",
             "type": "shell",
             "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch yolo_action action_server.launch.py threading_type:=multi",
             "problemMatcher": [],
@@ -108,7 +136,7 @@
             }
         },
         {
-            "label": "ROS2-Launch-YOLO-Anytime-Action-Client",
+            "label": "ROS2-YOLO-Action-Client",
             "type": "shell",
             "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch yolo_action action_client.launch.py",
             "problemMatcher": [],

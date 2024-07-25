@@ -29,7 +29,7 @@ RUN apt-get update && \
 # install ROS2
 RUN apt-get update && \
     apt-get install -y ros-humble-desktop
-    
+
 # install ROS2 development tools
 RUN apt-get -y install python3-pip python3-colcon-common-extensions
 
@@ -80,6 +80,15 @@ ENV CUDACXX=/usr/local/cuda-12.5/bin/nvcc
 ENV CUDA_NVRTC_LIB=/usr/local/cuda-12.5/lib64/libnvrtc.so
 
 RUN apt-get install -y python-is-python3
+
+# --- Anytime Dependencies ---
+
+RUN apt-get install -y ros-humble-ament-cmake-google-benchmark
+
+# --- Install DevTools ---
+
+    RUN apt-get -y install clangd clang-format clang-tidy cppcheck
+    RUN pip install pep8 pylint
 
 # --- Set up user ---
 

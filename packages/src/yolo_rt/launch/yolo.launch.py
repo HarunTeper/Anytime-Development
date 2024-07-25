@@ -28,30 +28,30 @@ def generate_launch_description():
         default_value='single',
         description='Threading type'
     )
-    
+
     realsense_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(realsense_pkd_dir, 'launch', 'rs_launch.py')),
-            launch_arguments={
-                'enable_depth': 'true',
-                'enable_color': 'true',
-                'enable_infra1': 'false',
-                'enable_infra2': 'false',
-                'infra_rgb': 'false',
-                'enable_fisheye1': 'true',
-                'enable_fisheye2': 'true',
-                'enable_confidence': 'true',
-                'enable_gyro': 'false',
-                'enable_accel': 'false',
-                'enable_pose': 'true',
-                'pointcloud.enable': 'false',
-                'enable_sync': 'false',
-                'align_depth.enable': 'false',
-                'colorizer.enable': 'false',
-                'initial_reset': 'false',
-                'allow_no_texture_points': 'false',
-                'ordered_pc': 'false',
-                'decimation_filter.enable': 'false',
-                }.items()
+        launch_arguments={
+            'enable_depth': 'true',
+            'enable_color': 'true',
+            'enable_infra1': 'false',
+            'enable_infra2': 'false',
+            'infra_rgb': 'false',
+            'enable_fisheye1': 'true',
+            'enable_fisheye2': 'true',
+            'enable_confidence': 'true',
+            'enable_gyro': 'false',
+            'enable_accel': 'false',
+            'enable_pose': 'true',
+            'pointcloud.enable': 'false',
+            'enable_sync': 'false',
+            'align_depth.enable': 'false',
+            'colorizer.enable': 'false',
+            'initial_reset': 'false',
+            'allow_no_texture_points': 'false',
+            'ordered_pc': 'false',
+            'decimation_filter.enable': 'false',
+        }.items()
     )
 
     yolo_cmd = Node(
@@ -61,9 +61,9 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'weights': weights_path
-            }],
+        }],
         # pass argument "multithreaded" to main
-        arguments = [threading_type]
+        arguments=[threading_type]
 
     )
 
@@ -76,7 +76,7 @@ def generate_launch_description():
     # {'name': 'json_file_path',               'default': "''", 'description': 'allows advanced configuration'},
     # {'name': 'log_level',                    'default': 'info', 'description': 'debug log level [DEBUG|INFO|WARN|ERROR|FATAL]'},
     # {'name': 'output',                       'default': 'screen', 'description': 'pipe node output [screen|log]'},
-    # {'name': 'depth_module.profile',         'default': '0,0,0', 'description': 'depth module profile'},                           
+    # {'name': 'depth_module.profile',         'default': '0,0,0', 'description': 'depth module profile'},
     # {'name': 'enable_depth',                 'default': 'true', 'description': 'enable depth stream'},
     # {'name': 'rgb_camera.profile',           'default': '0,0,0', 'description': 'color image width'},
     # {'name': 'enable_color',                 'default': 'true', 'description': 'enable color stream'},
@@ -87,22 +87,22 @@ def generate_launch_description():
     # {'name': 'enable_fisheye1',              'default': 'true', 'description': 'enable fisheye1 stream'},
     # {'name': 'enable_fisheye2',              'default': 'true', 'description': 'enable fisheye2 stream'},
     # {'name': 'enable_confidence',            'default': 'true', 'description': 'enable depth stream'},
-    # {'name': 'gyro_fps',                     'default': '0', 'description': "''"},                           
-    # {'name': 'accel_fps',                    'default': '0', 'description': "''"},                           
-    # {'name': 'enable_gyro',                  'default': 'false', 'description': "''"},                           
-    # {'name': 'enable_accel',                 'default': 'false', 'description': "''"},                           
-    # {'name': 'enable_pose',                  'default': 'true', 'description': "''"},                           
-    # {'name': 'pose_fps',                     'default': '200', 'description': "''"},                           
-    # {'name': 'pointcloud.enable',            'default': 'false', 'description': ''}, 
+    # {'name': 'gyro_fps',                     'default': '0', 'description': "''"},
+    # {'name': 'accel_fps',                    'default': '0', 'description': "''"},
+    # {'name': 'enable_gyro',                  'default': 'false', 'description': "''"},
+    # {'name': 'enable_accel',                 'default': 'false', 'description': "''"},
+    # {'name': 'enable_pose',                  'default': 'true', 'description': "''"},
+    # {'name': 'pose_fps',                     'default': '200', 'description': "''"},
+    # {'name': 'pointcloud.enable',            'default': 'false', 'description': ''},
     # {'name': 'pointcloud.stream_filter',     'default': '2', 'description': 'texture stream for pointcloud'},
     # {'name': 'pointcloud.stream_index_filter','default': '0', 'description': 'texture stream index for pointcloud'},
-    # {'name': 'enable_sync',                  'default': 'false', 'description': "''"},                           
-    # {'name': 'align_depth.enable',           'default': 'false', 'description': "''"},                           
+    # {'name': 'enable_sync',                  'default': 'false', 'description': "''"},
+    # {'name': 'align_depth.enable',           'default': 'false', 'description': "''"},
     # {'name': 'colorizer.enable',             'default': 'false', 'description': "''"},
-    # {'name': 'clip_distance',                'default': '-2.', 'description': "''"},                           
-    # {'name': 'linear_accel_cov',             'default': '0.01', 'description': "''"},                           
-    # {'name': 'initial_reset',                'default': 'false', 'description': "''"},                           
-    # {'name': 'allow_no_texture_points',      'default': 'false', 'description': "''"},                           
+    # {'name': 'clip_distance',                'default': '-2.', 'description': "''"},
+    # {'name': 'linear_accel_cov',             'default': '0.01', 'description': "''"},
+    # {'name': 'initial_reset',                'default': 'false', 'description': "''"},
+    # {'name': 'allow_no_texture_points',      'default': 'false', 'description': "''"},
     # {'name': 'ordered_pc',                   'default': 'false', 'description': ''},
     # {'name': 'calib_odom_file',              'default': "''", 'description': "''"},
     # {'name': 'topic_odom_in',                'default': "''", 'description': 'topic for T265 wheel odometry'},

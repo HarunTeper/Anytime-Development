@@ -24,7 +24,7 @@ def include_launch_description(context: LaunchContext):
     pkg_dir = get_package_share_directory('yolo_action')
 
     weights_path = os.path.join(pkg_dir, 'weights')
-    
+
     anytime_cmd = ComposableNodeContainer(
         name='anytime_server_component_container',
         namespace='',
@@ -48,6 +48,7 @@ def include_launch_description(context: LaunchContext):
     cmds.append(anytime_cmd)
 
     return cmds
+
 
 def generate_launch_description():
     """Return launch description"""

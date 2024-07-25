@@ -17,7 +17,7 @@ def include_launch_description(context: LaunchContext):
         executable = 'component_container_mt'
     else:
         raise ValueError('Invalid threading type')
-    
+
     anytime_cmd = ComposableNodeContainer(
         name='anytime_client_component_container',
         namespace='',
@@ -37,6 +37,7 @@ def include_launch_description(context: LaunchContext):
     cmds.append(anytime_cmd)
 
     return cmds
+
 
 def generate_launch_description():
     """Return launch description"""

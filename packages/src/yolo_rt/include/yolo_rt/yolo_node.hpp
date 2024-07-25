@@ -1,78 +1,76 @@
 #include "rclcpp/rclcpp.hpp"
-#include "torch/torch.h"
-#include "torch/script.h"
-#include "yolo_rt/yolo_model.hpp"
 #include "sensor_msgs/msg/image.hpp"
+#include "torch/script.h"
+#include "torch/torch.h"
+#include "yolo_rt/yolo_model.hpp"
 
-class YOLONodeST : public rclcpp::Node
-{
-    public:
-        YOLONodeST();
-        
-        void initialize_forward(torch::Tensor x);
-        bool forward_one();
-        torch::IValue forward(torch::Tensor x);
+class YOLONodeST : public rclcpp::Node {
+ public:
+  YOLONodeST();
 
-    private:
-        YOLOModel model;
+  void initialize_forward(torch::Tensor x);
+  bool forward_one();
+  torch::IValue forward(torch::Tensor x);
 
-        rclcpp::TimerBase::SharedPtr timer_;
+ private:
+  YOLOModel model;
 
-        YOLOModelConfig create_config();
+  rclcpp::TimerBase::SharedPtr timer_;
 
-        void timer_forward_callback();
+  YOLOModelConfig create_config();
 
-        rclcpp::Time start_time;
-        rclcpp::Time end_time;
+  void timer_forward_callback();
 
-        rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_;
-        rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_;
-        void camera_callback(const sensor_msgs::msg::Image::SharedPtr msg);
+  rclcpp::Time start_time;
+  rclcpp::Time end_time;
 
-        sensor_msgs::msg::Image::SharedPtr subscription_msg;
-        sensor_msgs::msg::Image::SharedPtr yolo_msg;
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_;
+  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_;
+  void camera_callback(const sensor_msgs::msg::Image::SharedPtr msg);
+
+  sensor_msgs::msg::Image::SharedPtr subscription_msg;
+  sensor_msgs::msg::Image::SharedPtr yolo_msg;
 };
 
-class YOLONodeMT : public rclcpp::Node
-{
-    public:
-        YOLONodeMT();
-        
-        void initialize_forward(torch::Tensor x);
-        bool forward_one();
-        // torch::IValue forward(torch::Tensor x);
+class YOLONodeMT : public rclcpp::Node {
+ public:
+  YOLONodeMT();
 
-    private:
-        YOLOModel model;
+  void initialize_forward(torch::Tensor x);
+  bool forward_one();
+  // torch::IValue forward(torch::Tensor x);
 
-        rclcpp::TimerBase::SharedPtr timer_;
-        rclcpp::TimerBase::SharedPtr fake_sub;
+ private:
+  YOLOModel model;
 
-        YOLOModelConfig create_config();
+  rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::TimerBase::SharedPtr fake_sub;
 
-        void timer_forward_callback();
+  YOLOModelConfig create_config();
 
-        rclcpp::Time start_time;
-        rclcpp::Time end_time;
+  void timer_forward_callback();
 
-        // mutex
-        std::mutex mtx;
+  rclcpp::Time start_time;
+  rclcpp::Time end_time;
 
-        bool forwarding = false;
+  // mutex
+  std::mutex mtx;
 
-        bool start_queued = false;
-        bool cancel_queued = false;
+  bool forwarding = false;
 
-        torch::Tensor queued_tensor;
+  bool start_queued = false;
+  bool cancel_queued = false;
 
-        rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_;
-        // rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_;
-        // void camera_callback(const sensor_msgs::msg::Image::SharedPtr msg);
-        void camera_callback();
+  torch::Tensor queued_tensor;
 
-        rclcpp::CallbackGroup::SharedPtr callback_group1_;
-        rclcpp::CallbackGroup::SharedPtr callback_group2_;
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_;
+  // rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_;
+  // void camera_callback(const sensor_msgs::msg::Image::SharedPtr msg);
+  void camera_callback();
 
-        // sensor_msgs::msg::Image::SharedPtr subscription_msg;
-        // sensor_msgs::msg::Image::SharedPtr yolo_msg;
+  rclcpp::CallbackGroup::SharedPtr callback_group1_;
+  rclcpp::CallbackGroup::SharedPtr callback_group2_;
+
+  // sensor_msgs::msg::Image::SharedPtr subscription_msg;
+  // sensor_msgs::msg::Image::SharedPtr yolo_msg;
 };
