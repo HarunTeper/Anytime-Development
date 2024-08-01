@@ -29,12 +29,16 @@ class YOLOModel {
  public:
   std::vector<torch::IValue> outputs = {};
 
+  std::function<void()> callback;
+
+
   torch::IValue forward_full(torch::Tensor x);
   void forward_full_at_once(torch::Tensor x);
 
   void forward_init(torch::Tensor x);
   bool forward_one();
   bool forward_one_blocking();
+  bool forward_one_callback();
 
   YOLOModel(YOLOModelConfig config);
   ~YOLOModel() {}

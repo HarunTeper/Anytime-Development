@@ -3,6 +3,8 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <regex>
+#include <cuda_runtime.h>
+#include <c10/cuda/CUDAStream.h>
 
 using json = nlohmann::json;
 
@@ -90,6 +92,9 @@ YOLOModel::YOLOModel(YOLOModelConfig config) : stream(config.stream) {
   }
 
   std::cout << "Model loaded" << std::endl;
+
+  //set callback
+  this->callback = []() { std::cout << "Layer finished ;3" << std::endl; };
 }
 
 torch::IValue layer_forward(Layer& layer, std::vector<torch::IValue> outputs,
@@ -186,5 +191,30 @@ bool YOLOModel::forward_one_blocking() {
   if (this->outputs.size() % 6 == 0) {
     this->stream.synchronize();
   }
+  return false;
+}
+
+
+void CUDART_CB forward_finished_callback(void *userData) {
+    auto model = static_cast<YOLOModel*>(userData);
+    model->callback();
+}
+
+
+bool YOLOModel::forward_one_callback() {
+  if (this->outputs.size() == this->layers.size()) {
+    return true;
+  }
+  auto& layer = this->layers[this->outputs.size()];
+  auto output =
+      layer_forward(layer, this->outputs, this->previous_layer_output);
+  this->outputs.push_back(output);
+  this->previous_layer_output = output;
+
+
+  // convert stream to cudaStream_t
+  auto stream = this->stream;
+  auto cuda_stream = c10::cuda::CUDAStream(stream);
+  cudaLaunchHostFunc(cuda_stream, forward_finished_callback, this);
   return false;
 }

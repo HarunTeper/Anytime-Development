@@ -70,7 +70,7 @@ void YOLONodeST::initialize_forward(torch::Tensor x) { model.forward_init(x); }
 
 bool YOLONodeST::forward_one() {
   // RCLCPP_INFO(this->get_logger(), "Forward one");
-  return model.forward_one();
+  return model.forward_one_callback();
 }
 
 // subscription callback camera_callback
