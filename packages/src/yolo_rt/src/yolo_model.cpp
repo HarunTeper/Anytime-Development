@@ -1,10 +1,10 @@
 #include "yolo_rt/yolo_model.hpp"
 #include <ATen/core/interned_strings.h>
+#include <c10/cuda/CUDAStream.h>
+#include <cuda_runtime.h>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <regex>
-#include <cuda_runtime.h>
-#include <c10/cuda/CUDAStream.h>
 
 using json = nlohmann::json;
 
@@ -92,9 +92,18 @@ YOLOModel::YOLOModel(YOLOModelConfig config) : stream(config.stream) {
   }
 
   std::cout << "Model loaded" << std::endl;
+}
 
-  //set callback
-  this->callback = []() { std::cout << "Layer finished ;3" << std::endl; };
+void YOLOModel::set_waitable(std::shared_ptr<CudaWaitable> waitable) {
+  cuda_waitable_ = waitable;
+
+  this->callback = [this]() {
+    if (cuda_waitable_) {
+      cuda_waitable_->notify();
+    } else {
+      std::cout << "cuda_waitable_ is null" << std::endl;
+    }
+  };
 }
 
 torch::IValue layer_forward(Layer& layer, std::vector<torch::IValue> outputs,
@@ -194,12 +203,12 @@ bool YOLOModel::forward_one_blocking() {
   return false;
 }
 
-
-void CUDART_CB forward_finished_callback(void *userData) {
-    auto model = static_cast<YOLOModel*>(userData);
+void CUDART_CB forward_finished_callback(void* userData) {
+  auto model = static_cast<YOLOModel*>(userData);
+  if (model->callback) {
     model->callback();
+  }
 }
-
 
 bool YOLOModel::forward_one_callback() {
   if (this->outputs.size() == this->layers.size()) {
@@ -210,7 +219,6 @@ bool YOLOModel::forward_one_callback() {
       layer_forward(layer, this->outputs, this->previous_layer_output);
   this->outputs.push_back(output);
   this->previous_layer_output = output;
-
 
   // convert stream to cudaStream_t
   auto stream = this->stream;

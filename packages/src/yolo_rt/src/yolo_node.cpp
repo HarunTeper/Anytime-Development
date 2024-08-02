@@ -5,6 +5,7 @@
 
 // include for CUDAStream
 #include <c10/cuda/CUDAStream.h>
+#include <rclcpp/logging.hpp>
 
 YOLONodeST::YOLONodeST() : Node("yolo"), model(create_config()) {
   RCLCPP_INFO(this->get_logger(), "Initializing YOLONode");
@@ -12,45 +13,65 @@ YOLONodeST::YOLONodeST() : Node("yolo"), model(create_config()) {
   RCLCPP_INFO(this->get_logger(), "Initializing forward");
   this->initialize_forward(test_tensor);
   RCLCPP_INFO(this->get_logger(), "Forward initialized");
+
+  this->declare_parameter<bool>("use_waitable");
+  use_waitable_ = this->get_parameter("use_waitable").as_bool();
+
   // initialize timer
   timer_ = this->create_wall_timer(
-      std::chrono::milliseconds(0),
+      std::chrono::milliseconds(10),
       std::bind(&YOLONodeST::timer_forward_callback, this));
-  // set start time
-  start_time = this->now();
-  // for (int i = 0; i < 250; i++){
-  //     auto test_tensor = torch::randn({1, 3, 640,
-  //     640}).cuda().to(torch::kHalf); start_time = this->now();
-  //     this->model.forward_full_at_once({test_tensor});
-  //     end_time = this->now();
-  //     RCLCPP_INFO(this->get_logger(), "Time difference full at once: %f",
-  //     (end_time - start_time).seconds());
-  // }
-  // for (int i = 0; i < 500; i++){
-  //     auto test_tensor = torch::randn({1, 3, 640,
-  //     640}).cuda().to(torch::kHalf); start_time = this->now();
-  //     this->model.forward_full({test_tensor});
-  //     end_time = this->now();
-  //     RCLCPP_INFO(this->get_logger(), "Time difference full: %f", (end_time -
-  //     start_time).seconds());
-  // }
+
+  if (use_waitable_) {
+    // initialize waitable
+    cuda_waitable_ =
+        std::make_shared<CudaWaitable>([this]() { this->waitable_callback(); });
+
+    this->get_node_waitables_interface()->add_waitable(
+        cuda_waitable_,
+        this->get_node_base_interface()->get_default_callback_group());
+
+    model.set_waitable(cuda_waitable_);
+  } else {
+    waitable_timer_ = this->create_wall_timer(
+        std::chrono::milliseconds(0),
+        std::bind(&YOLONodeST::waitable_callback, this));
+    waitable_timer_->cancel();
+  }
 }
 
 YOLOModelConfig YOLONodeST::create_config() {
   this->declare_parameter<std::string>("weights_path");
-
   auto weights_path = this->get_parameter("weights_path").as_string();
+
   RCLCPP_INFO(this->get_logger(), "Weights path1: %s", weights_path.c_str());
+
   YOLOModelConfig config{
       .weights_path = weights_path + "/yolov7-tiny-traced-half.pt",
       .source_info_path = weights_path + "/yolov7-tiny-traced.json",
       .stream = c10::cuda::getDefaultCUDAStream()};
+
   RCLCPP_INFO(this->get_logger(), "Weights path2: %s",
               config.weights_path.c_str());
+
   return config;
 }
 
 void YOLONodeST::timer_forward_callback() {
+  // RCLCPP_INFO(this->get_logger(), "Timer callback");
+  if (use_waitable_) {
+    // RCLCPP_INFO(this->get_logger(), "Notifying");
+    cuda_waitable_->notify();
+  } else {
+    // RCLCPP_INFO(this->get_logger(), "Starting timer");
+    waitable_timer_->reset();
+  }
+
+  // set start time
+  start_time = this->now();
+}
+
+void YOLONodeST::waitable_callback() {
   if (this->forward_one()) {
     end_time = this->now();
     // //print time difference
@@ -58,7 +79,26 @@ void YOLONodeST::timer_forward_callback() {
                 (end_time - start_time).seconds());
     auto test_tensor = torch::randn({1, 3, 640, 640}).cuda().to(torch::kHalf);
     this->initialize_forward(test_tensor);
-    start_time = this->now();
+
+    // add time to times, calculate mean and std, and print mean and std
+    this->times.push_back((end_time - start_time).seconds());
+    this->mean_time =
+        std::accumulate(this->times.begin(), this->times.end(), 0.0) /
+        this->times.size();
+    this->std_time =
+        std::sqrt(std::accumulate(this->times.begin(), this->times.end(), 0.0,
+                                  [this](double partial_sum, double time) {
+                                    return partial_sum +
+                                           std::pow(time - this->mean_time, 2);
+                                  }) /
+                  this->times.size());
+    RCLCPP_INFO(this->get_logger(), "Mean time: %f", this->mean_time);
+    RCLCPP_INFO(this->get_logger(), "Std time: %f", this->std_time);
+
+    // start_time = this->now();
+    if (!use_waitable_) {
+      waitable_timer_->cancel();
+    }
   }
 }
 
@@ -75,6 +115,7 @@ bool YOLONodeST::forward_one() {
 
 // subscription callback camera_callback
 void YOLONodeST::camera_callback(const sensor_msgs::msg::Image::SharedPtr msg) {
+  (void)msg;
   // RCLCPP_INFO(this->get_logger(), "Received image");
   // //use torch from_blob to convert image to tensor
   // auto tensor = torch::from_blob((void*)msg->data.data(), {msg->height,

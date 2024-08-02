@@ -23,6 +23,7 @@ def generate_launch_description():
 
     enable_camera = LaunchConfiguration('enable_camera', default='true')
     threading_type = LaunchConfiguration('threading_type', default='single')
+    use_waitable = LaunchConfiguration('use_waitable', default='false')
 
     enable_camera_arg = DeclareLaunchArgument(
         'enable_camera',
@@ -36,13 +37,20 @@ def generate_launch_description():
         description='Threading type'
     )
 
+    use_waitable_arg = DeclareLaunchArgument(
+        'use_waitable',
+        default_value='false',
+        description='Use waitable'
+    )
+
     yolo_cmd = Node(
         package='yolo_rt',
         executable='yolo_rt',
         name='yolo',
         output='screen',
         parameters=[{
-            'weights_path': weights_path
+            'weights_path': weights_path,
+            'use_waitable': use_waitable
         }],
         arguments=[threading_type]
     )
@@ -79,6 +87,7 @@ def generate_launch_description():
 
     # launch_description.add_action(enable_camera_arg)
     launch_description.add_action(threading_type_arg)
+    launch_description.add_action(use_waitable_arg)
     launch_description.add_action(yolo_cmd)
     # launch_description.add_action(realsense_cmd)
 

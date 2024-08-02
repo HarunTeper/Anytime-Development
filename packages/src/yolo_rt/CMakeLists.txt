@@ -22,6 +22,9 @@ find_package(Torch REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
+find_package(waitable_test REQUIRED)
+find_package(anytime_interfaces REQUIRED)
+find_package(rclcpp_action REQUIRED)
 
 # Include Cpp "include" directory
 include_directories(include)
@@ -33,7 +36,9 @@ add_library(yolo_rt_model SHARED src/yolo_model.cpp)
 # Create Cpp executable
 add_executable(yolo_rt src/yolo_main.cpp)
 
-set(yolo_rt_dependencies rclcpp Torch nlohmann_json sensor_msgs)
+set(yolo_rt_dependencies "rclcpp" "Torch" "nlohmann_json" "sensor_msgs" "waitable_test")
+ament_target_dependencies(yolo_rt_node ${yolo_rt_dependencies})
+ament_target_dependencies(yolo_rt_model ${yolo_rt_dependencies})
 ament_target_dependencies(yolo_rt_node ${yolo_rt_dependencies})
 
 # Link libraries

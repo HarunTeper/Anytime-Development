@@ -15,22 +15,35 @@ class YOLONodeST : public rclcpp::Node {
  private:
   YOLOModel model;
 
-  rclcpp::TimerBase::SharedPtr timer_;
-
   YOLOModelConfig create_config();
 
-  void timer_forward_callback();
+  bool use_waitable_ = false;
 
-  rclcpp::Time start_time;
-  rclcpp::Time end_time;
+  rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::TimerBase::SharedPtr waitable_timer_;
 
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_;
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_;
-  void camera_callback(const sensor_msgs::msg::Image::SharedPtr msg);
 
   sensor_msgs::msg::Image::SharedPtr subscription_msg;
   sensor_msgs::msg::Image::SharedPtr yolo_msg;
+
+  std::shared_ptr<CudaWaitable> cuda_waitable_;
+
+  void timer_forward_callback();
+  void waitable_callback();
+
+  void camera_callback(const sensor_msgs::msg::Image::SharedPtr msg);
+
+  rclcpp::Time start_time;
+  rclcpp::Time end_time;
+  // mean and std times
+  std::vector<double> times;
+  double mean_time = 0;
+  double std_time = 0;
 };
+
+// ----------------------------
 
 class YOLONodeMT : public rclcpp::Node {
  public:
@@ -43,10 +56,24 @@ class YOLONodeMT : public rclcpp::Node {
  private:
   YOLOModel model;
 
+  YOLOModelConfig create_config();
+
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::TimerBase::SharedPtr fake_sub;
 
-  YOLOModelConfig create_config();
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_;
+  // rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_;
+  // void camera_callback(const sensor_msgs::msg::Image::SharedPtr msg);
+
+  // sensor_msgs::msg::Image::SharedPtr subscription_msg;
+  // sensor_msgs::msg::Image::SharedPtr yolo_msg;
+
+  rclcpp::CallbackGroup::SharedPtr callback_group1_;
+  rclcpp::CallbackGroup::SharedPtr callback_group2_;
+
+  std::shared_ptr<CudaWaitable> cuda_waitable_;
+
+  void camera_callback();
 
   void timer_forward_callback();
 
@@ -62,15 +89,4 @@ class YOLONodeMT : public rclcpp::Node {
   bool cancel_queued = false;
 
   torch::Tensor queued_tensor;
-
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_;
-  // rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_;
-  // void camera_callback(const sensor_msgs::msg::Image::SharedPtr msg);
-  void camera_callback();
-
-  rclcpp::CallbackGroup::SharedPtr callback_group1_;
-  rclcpp::CallbackGroup::SharedPtr callback_group2_;
-
-  // sensor_msgs::msg::Image::SharedPtr subscription_msg;
-  // sensor_msgs::msg::Image::SharedPtr yolo_msg;
 };

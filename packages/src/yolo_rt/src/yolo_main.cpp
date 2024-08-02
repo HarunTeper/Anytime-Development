@@ -1,11 +1,9 @@
 #include "yolo_rt/yolo_node.hpp"
 
 int main(int argc, char* argv[]) {
-  // print argv
   for (int i = 0; i < argc; i++) {
     std::cout << "argv[" << i << "] = " << argv[i] << std::endl;
   }
-
   rclcpp::init(argc, argv);
 
   if (argc > 1 && strcmp(argv[1], "single") == 0) {

@@ -23,7 +23,6 @@ find_package(std_srvs REQUIRED)
 # Include Cpp "include" directory
 include_directories(include)
 
-
 set(anytime_dependencies "anytime_interfaces" "rclcpp" "rclcpp_action")
 
 # Add libraries
@@ -37,6 +36,9 @@ ament_target_dependencies(basic_publisher rclcpp std_msgs)
 # Link libraries
 target_link_libraries(basic_publisher cuda_waitable)
 
+# Export libraries
+ament_export_targets(cuda_waitable HAS_LIBRARY_TARGET)
+
 # Install Cpp executables
 install(TARGETS
   basic_publisher
@@ -46,6 +48,20 @@ install(TARGETS
 install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}/
+)
+
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+
+install(
+  TARGETS cuda_waitable
+  EXPORT cuda_waitable
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include
 )
 
 ament_package()

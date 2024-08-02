@@ -3,6 +3,8 @@
 #include <string>
 #include <variant>
 
+#include "waitable_test/cuda_waitable.hpp"
+
 using LayerSourceInfo = std::variant<int, std::vector<int>>;
 
 struct YOLOModelConfig {
@@ -31,7 +33,6 @@ class YOLOModel {
 
   std::function<void()> callback;
 
-
   torch::IValue forward_full(torch::Tensor x);
   void forward_full_at_once(torch::Tensor x);
 
@@ -41,5 +42,9 @@ class YOLOModel {
   bool forward_one_callback();
 
   YOLOModel(YOLOModelConfig config);
-  ~YOLOModel() {}
+  ~YOLOModel(){};
+
+  std::shared_ptr<CudaWaitable> cuda_waitable_;
+
+  void set_waitable(std::shared_ptr<CudaWaitable> waitable);
 };

@@ -13,6 +13,7 @@
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
+  <depend>waitable_test</depend>
 
   <depend>realsense2_camera</depend>
 
