@@ -100,6 +100,9 @@ void YOLOModel::set_waitable(std::shared_ptr<CudaWaitable> waitable) {
   this->callback = [this]() {
     if (cuda_waitable_) {
       cuda_waitable_->notify();
+      // print THREAD ID
+      std::cout << "THREAD ID CUDA: " << std::this_thread::get_id()
+                << std::endl;
     } else {
       std::cout << "cuda_waitable_ is null" << std::endl;
     }

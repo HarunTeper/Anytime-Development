@@ -2,5 +2,6 @@ compile_commands.json
 packages/build
 packages/install
 packages/log
-
-.cache
+**/.cache
+**/compile_commands.json
+**/.cache

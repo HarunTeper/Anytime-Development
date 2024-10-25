@@ -77,6 +77,8 @@ void YOLONodeST::waitable_callback() {
     // //print time difference
     RCLCPP_INFO(this->get_logger(), "Time difference: %f",
                 (end_time - start_time).seconds());
+    // print THREAD ID
+    std::cout << "THREAD ID: " << std::this_thread::get_id() << std::endl;
     auto test_tensor = torch::randn({1, 3, 640, 640}).cuda().to(torch::kHalf);
     this->initialize_forward(test_tensor);
 

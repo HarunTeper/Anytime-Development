@@ -87,8 +87,8 @@ RUN apt-get install -y ros-humble-ament-cmake-google-benchmark
 
 # --- Install DevTools ---
 
-    RUN apt-get -y install clangd clang-format clang-tidy cppcheck
-    RUN pip install pep8 pylint
+RUN apt-get -y install clangd clang-format clang-tidy cppcheck
+RUN pip install pep8 pylint
 
 # --- Set up user ---
 
