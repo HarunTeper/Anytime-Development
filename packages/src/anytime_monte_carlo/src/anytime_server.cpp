@@ -35,16 +35,16 @@ AnytimeActionServer::AnytimeActionServer(const rclcpp::NodeOptions& options)
   // Create a shared pointer to a MonteCarloPi object with the values of the
   // parameters as the template arguments
   if (anytime_active && anytime_blocking) {
-    auto monte_carlo_pi =
+    auto monte_carlo_pi_ =
         std::make_shared<MonteCarloPi<true, true>>(anytime_waitable_);
   } else if (anytime_active && !anytime_blocking) {
-    auto monte_carlo_pi =
+    auto monte_carlo_pi_ =
         std::make_shared<MonteCarloPi<true, false>>(anytime_waitable_);
   } else if (!anytime_active && anytime_blocking) {
-    auto monte_carlo_pi =
+    auto monte_carlo_pi_ =
         std::make_shared<MonteCarloPi<false, true>>(anytime_waitable_);
   } else {
-    auto monte_carlo_pi =
+    auto monte_carlo_pi_ =
         std::make_shared<MonteCarloPi<false, false>>(anytime_waitable_);
   }
 }
@@ -68,6 +68,9 @@ rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
     const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
   RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
   (void)goal_handle;  // Suppress unused variable warning
+
+  monte_carlo_pi_->cancel();
+
   return rclcpp_action::CancelResponse::ACCEPT;
 }
 

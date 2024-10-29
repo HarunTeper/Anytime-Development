@@ -12,8 +12,8 @@ using AnytimeGoalHandle = rclcpp_action::ServerGoalHandle<Anytime>;
 
 // Template alias for the Monte Carlo Pi base class
 template <bool isBlocking, bool isActive>
-using MonteCarloPiBase =
-    AnytimeModel<uint64_t, double, AnytimeGoalHandle, isBlocking, isActive>;
+using MonteCarloPiBase = AnytimeModel<uint64_t, double, Anytime,
+                                      AnytimeGoalHandle, isBlocking, isActive>;
 
 // Monte Carlo Pi class template
 template <bool isBlocking, bool isActive>

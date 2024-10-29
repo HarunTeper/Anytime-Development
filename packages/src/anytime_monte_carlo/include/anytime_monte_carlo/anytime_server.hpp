@@ -29,8 +29,7 @@ class AnytimeActionServer : public rclcpp::Node {
 
   std::shared_ptr<AnytimeWaitable> anytime_waitable_;
 
-  // create a monte carlo object
-  //   MonteCarloPi monte_carlo_pi_;
+  std::shared_ptr<MonteCarloPi<true, true>> monte_carlo_pi_;
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(AnytimeActionServer)
