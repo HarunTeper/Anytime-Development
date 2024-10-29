@@ -29,6 +29,10 @@ def include_launch_description(context: LaunchContext):
                 package="anytime_monte_carlo",
                 plugin="AnytimeActionServer",
                 name="anytime_server",
+                parameters=[
+                    {"anytime_active": False},
+                    {"anytime_blocking": False},
+                ],
             )
         ],
     )

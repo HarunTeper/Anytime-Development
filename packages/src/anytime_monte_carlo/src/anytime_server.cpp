@@ -22,6 +22,31 @@ AnytimeActionServer::AnytimeActionServer(const rclcpp::NodeOptions& options)
           [this](const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
             return this->handle_accepted(goal_handle);
           });
+
+  // read the ros2 paramter anytime_active and anytime_blocking
+  bool anytime_active = this->declare_parameter("anytime_active", false);
+  bool anytime_blocking = this->declare_parameter("anytime_blocking", false);
+
+  RCLCPP_INFO(this->get_logger(), "anytime_active: %d", anytime_active);
+  RCLCPP_INFO(this->get_logger(), "anytime_blocking: %d", anytime_blocking);
+
+  anytime_waitable_ = std::make_shared<AnytimeWaitable>([this]() {});
+
+  // Create a shared pointer to a MonteCarloPi object with the values of the
+  // parameters as the template arguments
+  if (anytime_active && anytime_blocking) {
+    auto monte_carlo_pi =
+        std::make_shared<MonteCarloPi<true, true>>(anytime_waitable_);
+  } else if (anytime_active && !anytime_blocking) {
+    auto monte_carlo_pi =
+        std::make_shared<MonteCarloPi<true, false>>(anytime_waitable_);
+  } else if (!anytime_active && anytime_blocking) {
+    auto monte_carlo_pi =
+        std::make_shared<MonteCarloPi<false, true>>(anytime_waitable_);
+  } else {
+    auto monte_carlo_pi =
+        std::make_shared<MonteCarloPi<false, false>>(anytime_waitable_);
+  }
 }
 
 // Destructor for the AnytimeActionServer class
@@ -47,8 +72,7 @@ rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
 }
 
 void AnytimeActionServer::execute(
-    const std::shared_ptr<AnytimeGoalHandle> goal_handle,
-    std::shared_ptr<rclcpp::TimerBase> timer) {
+    const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
   RCLCPP_INFO(this->get_logger(), "Executing goal");
   auto feedback =
       std::make_shared<anytime_interfaces::action::Anytime::Feedback>();
@@ -104,10 +128,6 @@ void AnytimeActionServer::execute(
   goal_handle->succeed(result);
 
   RCLCPP_INFO(this->get_logger(), "Goal was completed");
-
-  if (timer) {
-    timer->cancel();
-  }
 }
 
 void AnytimeActionServer::handle_accepted(
@@ -115,6 +135,6 @@ void AnytimeActionServer::handle_accepted(
   // Create a new thread to execute the goal
   std::thread([this, goal_handle]() {
     // Execute the goal
-    this->execute(goal_handle, nullptr);
+    this->execute(goal_handle);
   }).detach();  // Detach the thread to allow it to run independently
 }

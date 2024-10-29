@@ -32,10 +32,10 @@ add_library(anytime_client SHARED src/anytime_client.cpp)
 add_library(anytime_server SHARED src/anytime_server.cpp)
 
 # Include directories
-target_include_directories(anytime_client PRIVATE
+target_include_directories(anytime_client PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_include_directories(anytime_server PRIVATE
+target_include_directories(anytime_server PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 

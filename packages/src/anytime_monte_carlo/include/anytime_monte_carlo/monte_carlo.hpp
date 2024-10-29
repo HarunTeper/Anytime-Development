@@ -4,34 +4,36 @@
 #include <cstdint>
 #include <future>
 #include <random>
-#include "anytime_template.hpp"
+#include "anytime_monte_carlo/anytime_template.hpp"
 
-class MonteCarloPi : public Anytime<uint64_t, double> {
+// Aliases for better readability
+using Anytime = anytime_interfaces::action::Anytime;
+using AnytimeGoalHandle = rclcpp_action::ServerGoalHandle<Anytime>;
+
+// Template alias for the Monte Carlo Pi base class
+template <bool isBlocking, bool isActive>
+using MonteCarloPiBase =
+    AnytimeModel<uint64_t, double, AnytimeGoalHandle, isBlocking, isActive>;
+
+// Monte Carlo Pi class template
+template <bool isBlocking, bool isActive>
+class MonteCarloPi : public MonteCarloPiBase<isBlocking, isActive> {
  public:
+  // Constructor
+  MonteCarloPi(std::shared_ptr<AnytimeWaitable> waitable)
+      : MonteCarloPiBase<isBlocking, isActive>(waitable) {}
+
   // Blocking function to approximate Pi
-  double blockingFunction(const uint64_t& numPoints) override {
-    uint64_t insideCircle = 0;
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0.0, 1.0);
-
-    for (uint64_t i = 0; i < numPoints; ++i) {
-      double x = dis(gen);
-      double y = dis(gen);
-      if (x * x + y * y <= 1.0) {
-        ++insideCircle;
-      }
-    }
-
-    return (4.0 * insideCircle) / numPoints;
+  double blocking_function(const uint64_t& num_samples) {
+    (void)num_samples;
+    return 0;
   }
 
   // Non-blocking function to approximate Pi
-  double nonBlockingFunction(const uint64_t& numPoints) override {
-    auto future =
-        std::async(std::launch::async, &MonteCarloPi::blockingFunction, this,
-                   std::ref(numPoints));
-    return future.get();
+  void non_blocking_function(const uint64_t& num_samples,
+                             std::shared_ptr<double> result) {
+    (void)num_samples;
+    (void)result;
   }
 };
 
