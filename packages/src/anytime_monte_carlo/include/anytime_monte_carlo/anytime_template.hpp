@@ -11,7 +11,9 @@ class AnytimeModel {
 
   // Constructor that takes an AnytimeWaitable
   AnytimeModel(std::shared_ptr<AnytimeWaitable> waitable)
-      : anytime_waitable_(waitable) {}
+      : anytime_waitable_(waitable) {
+    // TODO create waitable with executing callback
+  }
 
   // // function with input of goal handle
   // ReturnType call_blocking(const GoalHandleType& goal_handle) {
@@ -25,11 +27,11 @@ class AnytimeModel {
   //   }
   // }
 
-  void cancel() {
-    // if constexpr (isActive) {
-    //   goal_handle_->succeed(result_);
-    // }
-  }
+  // void cancel() {
+  //   if constexpr (isActive) {
+  //     goal_handle_->succeed(result_);
+  //   }
+  // }
 
   // Pure virtual function for blocking operation
   virtual ReturnType blocking_function(const InputType& input) = 0;
@@ -49,6 +51,5 @@ class AnytimeModel {
   std::shared_ptr<typename InterfaceType::Result> result_ =
       std::make_shared<typename InterfaceType::Result>();
 };
-;
 
 #endif  // ANYTIME_TEMPLATE_HPP

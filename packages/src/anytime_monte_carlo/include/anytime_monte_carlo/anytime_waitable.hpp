@@ -8,8 +8,8 @@
 
 class AnytimeWaitable : public rclcpp::Waitable {
  public:
-  using Anytime = anytime_interfaces::action::Anytime;
-  using AnytimeGoalHandle = rclcpp_action::ServerGoalHandle<Anytime>;
+  // using Anytime = anytime_interfaces::action::Anytime;
+  // using AnytimeGoalHandle = rclcpp_action::ServerGoalHandle<Anytime>;
 
   AnytimeWaitable(std::function<void(void)> on_execute_callback)
       : execute_callback_(on_execute_callback) {
@@ -64,11 +64,12 @@ class AnytimeWaitable : public rclcpp::Waitable {
     guard_condition_->trigger();
   }
 
-  void set_goal_handle(std::shared_ptr<AnytimeGoalHandle> goal_handle) {
-    goal_handle_ = goal_handle;
-  }
+  // void set_goal_handle(std::shared_ptr<AnytimeGoalHandle> goal_handle) {
+  //   goal_handle_ = goal_handle;
+  // }
 
-  std::shared_ptr<AnytimeGoalHandle> get_goal_handle() { return goal_handle_; }
+  // std::shared_ptr<AnytimeGoalHandle> get_goal_handle() { return goal_handle_;
+  // }
 
   std::shared_ptr<rclcpp::GuardCondition> guard_condition_;
 
@@ -76,8 +77,8 @@ class AnytimeWaitable : public rclcpp::Waitable {
   std::mutex notify_guard_conditions_;
   std::mutex execute_mutex_;
 
-  // rclcpp anytime goal handle
-  std::shared_ptr<AnytimeGoalHandle> goal_handle_;
+  // // rclcpp anytime goal handle
+  // std::shared_ptr<AnytimeGoalHandle> goal_handle_;
 
   std::function<void(void)> execute_callback_;
 };

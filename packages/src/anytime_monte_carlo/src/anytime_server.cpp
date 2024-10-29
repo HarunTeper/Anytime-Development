@@ -30,8 +30,6 @@ AnytimeActionServer::AnytimeActionServer(const rclcpp::NodeOptions& options)
   RCLCPP_INFO(this->get_logger(), "anytime_active: %d", anytime_active);
   RCLCPP_INFO(this->get_logger(), "anytime_blocking: %d", anytime_blocking);
 
-  anytime_waitable_ = std::make_shared<AnytimeWaitable>([this]() {});
-
   // Create a shared pointer to a MonteCarloPi object with the values of the
   // parameters as the template arguments
   if (anytime_active && anytime_blocking) {
@@ -69,75 +67,81 @@ rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
   RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
   (void)goal_handle;  // Suppress unused variable warning
 
-  monte_carlo_pi_->cancel();
+  // monte_carlo_pi_->cancel();
 
   return rclcpp_action::CancelResponse::ACCEPT;
 }
 
 void AnytimeActionServer::execute(
     const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
-  RCLCPP_INFO(this->get_logger(), "Executing goal");
-  auto feedback =
-      std::make_shared<anytime_interfaces::action::Anytime::Feedback>();
-  auto& feedback_value = feedback->feedback;
-  feedback_value = 0;
-  auto result = std::make_shared<anytime_interfaces::action::Anytime::Result>();
-  result->result = 0;
+  (void)goal_handle;
+  // RCLCPP_INFO(this->get_logger(), "Executing goal");
+  // auto feedback =
+  //     std::make_shared<anytime_interfaces::action::Anytime::Feedback>();
+  // auto& feedback_value = feedback->feedback;
+  // feedback_value = 0;
+  // auto result =
+  // std::make_shared<anytime_interfaces::action::Anytime::Result>();
+  // result->result = 0;
 
-  int count_total = 0;
-  int count_inside = 0;
-  int count_outside = 0;
+  // int count_total = 0;
+  // int count_inside = 0;
+  // int count_outside = 0;
 
-  float_t x = 0.0;
-  float_t y = 0.0;
+  // float_t x = 0.0;
+  // float_t y = 0.0;
 
-  // start time
-  auto start = rclcpp::Clock().now();
+  // // start time
+  // auto start = rclcpp::Clock().now();
 
-  for (int i = 1; i <= goal_handle->get_goal()->goal; i++) {
-    if (goal_handle->is_canceling()) {
-      RCLCPP_INFO(this->get_logger(), "Goal was canceled");
-      result->result = feedback_value;
-      goal_handle->canceled(result);
-      return;
-    }
-    // sample x and y between 0 and 1, and if the length of the vector is
-    // greater than one, add count to count_outside, otherwise add to
-    // count_inside
-    x = (float_t)rand() / RAND_MAX;
-    y = (float_t)rand() / RAND_MAX;
+  // for (int i = 1; i <= goal_handle->get_goal()->goal; i++) {
+  //   if (goal_handle->is_canceling()) {
+  //     RCLCPP_INFO(this->get_logger(), "Goal was canceled");
+  //     result->result = feedback_value;
+  //     goal_handle->canceled(result);
+  //     return;
+  //   }
+  //   // sample x and y between 0 and 1, and if the length of the vector is
+  //   // greater than one, add count to count_outside, otherwise add to
+  //   // count_inside
+  //   x = (float_t)rand() / RAND_MAX;
+  //   y = (float_t)rand() / RAND_MAX;
 
-    if (sqrt(pow(x, 2) + pow(y, 2)) <= 1) {
-      count_inside++;
-    } else {
-      count_outside++;
-    }
-    count_total++;
+  //   if (sqrt(pow(x, 2) + pow(y, 2)) <= 1) {
+  //     count_inside++;
+  //   } else {
+  //     count_outside++;
+  //   }
+  //   count_total++;
 
-    feedback_value = 4 * (float_t)count_inside / count_total;
+  //   feedback_value = 4 * (float_t)count_inside / count_total;
 
-    // goal_handle->publish_feedback(feedback);
-  }
+  //   // goal_handle->publish_feedback(feedback);
+  // }
 
-  result->result = feedback_value;
+  // result->result = feedback_value;
 
-  // end time
-  auto end = rclcpp::Clock().now();
-  // calculate the duration
-  auto duration = end - start;
-  // print the duration in msec and sec
-  RCLCPP_INFO(this->get_logger(), "Duration: %f msec",
-              duration.nanoseconds() / 1e6);
-  goal_handle->succeed(result);
+  // // end time
+  // auto end = rclcpp::Clock().now();
+  // // calculate the duration
+  // auto duration = end - start;
+  // // print the duration in msec and sec
+  // RCLCPP_INFO(this->get_logger(), "Duration: %f msec",
+  //             duration.nanoseconds() / 1e6);
+  // goal_handle->succeed(result);
 
-  RCLCPP_INFO(this->get_logger(), "Goal was completed");
+  // RCLCPP_INFO(this->get_logger(), "Goal was completed");
 }
 
 void AnytimeActionServer::handle_accepted(
     const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
-  // Create a new thread to execute the goal
-  std::thread([this, goal_handle]() {
-    // Execute the goal
-    this->execute(goal_handle);
-  }).detach();  // Detach the thread to allow it to run independently
+  monte_carlo_pi_->goal_handle_ = goal_handle;
+
+  monte_carlo_pi_->anytime_waitable_->notify();
+
+  // // Create a new thread to execute the goal
+  // std::thread([this, goal_handle]() {
+  //   // Execute the goal
+  //   this->execute(goal_handle);
+  // }).detach();  // Detach the thread to allow it to run independently
 }
