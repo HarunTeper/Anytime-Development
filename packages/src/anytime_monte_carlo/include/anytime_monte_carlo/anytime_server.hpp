@@ -27,8 +27,6 @@ class AnytimeActionServer : public rclcpp::Node {
 
   void handle_accepted(const std::shared_ptr<AnytimeGoalHandle> goal_handle);
 
-  std::shared_ptr<AnytimeWaitable> anytime_waitable_;
-
   std::shared_ptr<MonteCarloPi<true, true>> monte_carlo_pi_;
 };
 

@@ -64,18 +64,18 @@ class AnytimeWaitable : public rclcpp::Waitable {
     guard_condition_->trigger();
   }
 
+  std::shared_ptr<rclcpp::GuardCondition> guard_condition_;
+
+  std::mutex guard_condition_mutex_;
+  std::mutex notify_guard_conditions_;
+  std::mutex execute_mutex_;
+
   // void set_goal_handle(std::shared_ptr<AnytimeGoalHandle> goal_handle) {
   //   goal_handle_ = goal_handle;
   // }
 
   // std::shared_ptr<AnytimeGoalHandle> get_goal_handle() { return goal_handle_;
   // }
-
-  std::shared_ptr<rclcpp::GuardCondition> guard_condition_;
-
-  std::mutex guard_condition_mutex_;
-  std::mutex notify_guard_conditions_;
-  std::mutex execute_mutex_;
 
   // // rclcpp anytime goal handle
   // std::shared_ptr<AnytimeGoalHandle> goal_handle_;
