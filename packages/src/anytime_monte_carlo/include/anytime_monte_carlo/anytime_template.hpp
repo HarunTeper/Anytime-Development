@@ -3,16 +3,16 @@
 
 #include "anytime_monte_carlo/anytime_waitable.hpp"
 
-template <typename InputType, typename ReturnType, typename InterfaceType,
-          typename GoalHandleType, bool isBlocking, bool isActive>
+template <typename ReturnType, typename InterfaceType, typename GoalHandleType,
+          bool isBlocking, bool isActive>
 class AnytimeModel {
  public:
   bool canceled_ = false;
 
   // Constructor that takes an AnytimeWaitable
-  AnytimeModel(std::shared_ptr<AnytimeWaitable> waitable)
-      : anytime_waitable_(waitable) {
-    // TODO create waitable with executing callback
+  AnytimeModel() {
+    anytime_waitable_ = std::make_shared<AnytimeWaitable>(
+        [this]() { this->blocking_function(goal_handle_); });
   }
 
   // // function with input of goal handle
@@ -33,12 +33,26 @@ class AnytimeModel {
   //   }
   // }
 
+  void activate() { is_running_ = true; }
+
+  void deactivate() { is_running_ = false; }
+
+  bool is_active() { return is_running_; }
+
+  virtual void reset() = 0;
+
   // Pure virtual function for blocking operation
-  virtual ReturnType blocking_function(const InputType& input) = 0;
+  virtual void blocking_function(
+      const std::shared_ptr<GoalHandleType> goal_handle) = 0;
 
   // Pure virtual function for non-blocking operation
-  virtual void non_blocking_function(const InputType& input,
-                                     std::shared_ptr<ReturnType> result) = 0;
+  virtual void non_blocking_function(
+      const std::shared_ptr<GoalHandleType> goal_handle,
+      std::shared_ptr<ReturnType> result) = 0;
+
+  virtual bool check_cancel() = 0;
+
+  virtual void finish() = 0;
 
   std::shared_ptr<AnytimeWaitable> anytime_waitable_;
 
@@ -50,6 +64,8 @@ class AnytimeModel {
 
   std::shared_ptr<typename InterfaceType::Result> result_ =
       std::make_shared<typename InterfaceType::Result>();
+
+  bool is_running_ = false;
 };
 
 #endif  // ANYTIME_TEMPLATE_HPP
