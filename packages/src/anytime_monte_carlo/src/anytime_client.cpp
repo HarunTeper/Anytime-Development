@@ -96,6 +96,9 @@ void AnytimeActionClient::result_callback(
       // If the goal succeeded, log the result
       RCLCPP_INFO(this->get_logger(), "Result received: %f",
                   result.result->result);
+      // print the number of iterations
+      RCLCPP_INFO(this->get_logger(), "Number of iterations: %d",
+                  result.result->iterations);
       print_time_differences(result);
       break;
     case rclcpp_action::ResultCode::ABORTED:
@@ -107,6 +110,9 @@ void AnytimeActionClient::result_callback(
       RCLCPP_ERROR(this->get_logger(), "Goal was canceled");
       RCLCPP_INFO(this->get_logger(), "Result after cancel callback: %f",
                   result.result->result);
+      // print the number of iterations
+      RCLCPP_INFO(this->get_logger(), "Number of iterations: %d",
+                  result.result->iterations);
       print_time_differences(result);
       break;
     default:

@@ -65,6 +65,7 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
   void calculate_result() override {
     // Calculate the result
     this->result_->result = 4 * (double)count_inside_ / count_total_;
+    this->result_->iterations = loop_count_;
     this->result_->client_start = this->goal_handle_->get_goal()->client_start;
     this->result_->action_send = this->goal_handle_->get_goal()->action_send;
     this->result_->action_accept = this->goal_handle_accept_time_;
