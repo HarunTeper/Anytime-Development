@@ -29,6 +29,7 @@ void AnytimeActionClient::send_goal() {
   // Create and populate the goal message
   auto goal_msg = anytime_interfaces::action::Anytime::Goal();
   goal_msg.goal = 500000;
+  goal_msg.client_start = this->now();
 
   // Define the goal options with callbacks
   auto send_goal_options = rclcpp_action::Client<
@@ -48,7 +49,10 @@ void AnytimeActionClient::send_goal() {
       };
 
   // Send the goal asynchronously
+  goal_msg.action_send = this->now();
   action_client_->async_send_goal(goal_msg, send_goal_options);
+  // set the cancel time to the client start time
+  cancel_time_ = goal_msg.client_start;
 }
 
 void AnytimeActionClient::goal_response_callback(
@@ -84,6 +88,7 @@ void AnytimeActionClient::feedback_callback(
 
 void AnytimeActionClient::result_callback(
     const AnytimeGoalHandle::WrappedResult& result) {
+  receive_time_ = this->now();
   cancel_timeout_timer_->cancel();
   // Log the result based on the result code
   switch (result.code) {
@@ -91,6 +96,7 @@ void AnytimeActionClient::result_callback(
       // If the goal succeeded, log the result
       RCLCPP_INFO(this->get_logger(), "Result received: %f",
                   result.result->result);
+      print_time_differences(result);
       break;
     case rclcpp_action::ResultCode::ABORTED:
       // If the goal was aborted, log an error
@@ -101,6 +107,7 @@ void AnytimeActionClient::result_callback(
       RCLCPP_ERROR(this->get_logger(), "Goal was canceled");
       RCLCPP_INFO(this->get_logger(), "Result after cancel callback: %f",
                   result.result->result);
+      print_time_differences(result);
       break;
     default:
       // If the result code is unknown, log an error
@@ -118,8 +125,58 @@ void AnytimeActionClient::cancel_timeout_callback() {
   // Cancel the timeout timer to prevent multiple cancel requests
   cancel_timeout_timer_->cancel();
 
+  // Set the cancel time
+  cancel_time_ = this->now();
+
   // Send a cancel request for the current goal
   action_client_->async_cancel_goal(goal_handle_);
 
   RCLCPP_INFO(this->get_logger(), "Cancel request sent");
+}
+
+void AnytimeActionClient::print_time_differences(
+    const AnytimeGoalHandle::WrappedResult& result) {
+  auto to_chrono = [](const builtin_interfaces::msg::Time& time) {
+    return std::chrono::seconds(time.sec) +
+           std::chrono::nanoseconds(time.nanosec);
+  };
+
+  auto client_start_chrono = to_chrono(result.result->client_start);
+  auto action_send_chrono = to_chrono(result.result->action_send);
+  auto action_accept_chrono = to_chrono(result.result->action_accept);
+  auto action_start_chrono = to_chrono(result.result->action_start);
+  auto action_cancel_chrono = to_chrono(cancel_time_);
+  auto action_end_chrono = to_chrono(result.result->action_end);
+  auto receive_chrono = to_chrono(receive_time_);
+
+  auto diff_send = action_send_chrono - client_start_chrono;
+  auto diff_accept = action_accept_chrono - client_start_chrono;
+  auto diff_start = action_start_chrono - client_start_chrono;
+  auto diff_cancel = action_cancel_chrono - client_start_chrono;
+  auto diff_end = action_end_chrono - client_start_chrono;
+  auto diff_receive = receive_chrono - client_start_chrono;
+  auto total_computation = action_end_chrono - action_start_chrono;
+  auto total_diff = receive_chrono - client_start_chrono;
+
+  RCLCPP_INFO(this->get_logger(), "Time differences:");
+  RCLCPP_INFO(this->get_logger(), "Send: %ld.%09ld seconds",
+              diff_send.count() / 1000000000, diff_send.count() % 1000000000);
+  RCLCPP_INFO(this->get_logger(), "Accept: %ld.%09ld seconds",
+              diff_accept.count() / 1000000000,
+              diff_accept.count() % 1000000000);
+  RCLCPP_INFO(this->get_logger(), "Start: %ld.%09ld seconds",
+              diff_start.count() / 1000000000, diff_start.count() % 1000000000);
+  RCLCPP_INFO(this->get_logger(), "Cancel: %ld.%09ld seconds",
+              diff_cancel.count() / 1000000000,
+              diff_cancel.count() % 1000000000);
+  RCLCPP_INFO(this->get_logger(), "End: %ld.%09ld seconds",
+              diff_end.count() / 1000000000, diff_end.count() % 1000000000);
+  RCLCPP_INFO(this->get_logger(), "Receive: %ld.%09ld seconds",
+              diff_receive.count() / 1000000000,
+              diff_receive.count() % 1000000000);
+  RCLCPP_INFO(this->get_logger(), "Total computation: %ld.%09ld seconds",
+              total_computation.count() / 1000000000,
+              total_computation.count() % 1000000000);
+  RCLCPP_INFO(this->get_logger(), "Total: %ld.%09ld seconds",
+              total_diff.count() / 1000000000, total_diff.count() % 1000000000);
 }
