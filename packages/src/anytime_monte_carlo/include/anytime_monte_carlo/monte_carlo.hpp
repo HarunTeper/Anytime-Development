@@ -34,10 +34,7 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
       return;
     }
     if (loop_count_ < goal_handle->get_goal()->goal) {
-      RCLCPP_INFO(node_->get_logger(), "Loop count: %d", loop_count_);
-      // sample x and y between 0 and 1, and if the length of the vector is
-      // greater than one, add count to count_outside, otherwise add to
-      // count_inside
+      // RCLCPP_INFO(node_->get_logger(), "Loop count: %d", loop_count_);
       x = (float)rand() / RAND_MAX;
       y = (float)rand() / RAND_MAX;
 
@@ -65,13 +62,21 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
     loop_count_ = 0;
   }
 
+  void calculate_result() override {
+    // Calculate the result
+    this->result_->result = 4 * (double)count_inside_ / count_total_;
+    this->result_->client_start = this->goal_handle_->get_goal()->client_start;
+    this->result_->action_send = this->goal_handle_->get_goal()->action_send;
+    this->result_->action_accept = this->goal_handle_accept_time_;
+    this->result_->action_start = this->goal_processing_start_time_;
+    this->result_->action_end = this->node_->now();
+  }
+
   bool check_cancel() override {
     // Check if the goal is canceled
     if (this->goal_handle_->is_canceling()) {
-      // access the result_ from anytimemodel
-      this->result_->result = 4 * (double)count_inside_ / count_total_;
-
-      // Set the result and cancel the goal
+      RCLCPP_INFO(node_->get_logger(), "Canceling goal");
+      calculate_result();
       this->goal_handle_->canceled(this->result_);
       this->deactivate();
       return true;
@@ -81,8 +86,7 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
 
   void finish() override {
     RCLCPP_INFO(node_->get_logger(), "Started finish");
-    // Set the result and succeed the goal
-    this->result_->result = 4 * (double)count_inside_ / count_total_;
+    calculate_result();
     this->goal_handle_->succeed(this->result_);
     this->deactivate();
   }

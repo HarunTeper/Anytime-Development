@@ -49,9 +49,17 @@ class AnytimeActionClient : public rclcpp::Node {
 
   // Callback for cancel timeout
   void cancel_timeout_callback();
+
+  // Function to print time differences between action result timestamps
+  void print_time_differences(const AnytimeGoalHandle::WrappedResult& result);
+
+  // receive time
+  rclcpp::Time receive_time_ = rclcpp::Time(0, 0);
+
+  // cancel time
+  rclcpp::Time cancel_time_ = rclcpp::Time(0, 0);
 };
 
-// Register the node as a component
 RCLCPP_COMPONENTS_REGISTER_NODE(AnytimeActionClient)
 
 #endif  // ANYTIME_CLIENT_HPP
