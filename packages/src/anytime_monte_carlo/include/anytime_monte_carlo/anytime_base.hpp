@@ -12,6 +12,7 @@ class AnytimeBase {
   virtual bool check_cancel_and_finish() = 0;
   virtual void calculate_result() = 0;
   virtual void cancel() = 0;
+  virtual void start() = 0;
 
   void activate() { is_running_ = true; }
   void deactivate() { is_running_ = false; }
@@ -20,6 +21,8 @@ class AnytimeBase {
   void set_goal_handle(std::shared_ptr<GoalHandleType> goal_handle) {
     goal_handle_ = goal_handle;
   }
+
+  std::shared_ptr<GoalHandleType> get_goal_handle() { return goal_handle_; }
 
   void set_anytime_waitable(std::shared_ptr<AnytimeWaitable> anytime_waitable) {
     anytime_waitable_ = anytime_waitable;

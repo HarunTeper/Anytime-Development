@@ -11,7 +11,7 @@ using Anytime = anytime_interfaces::action::Anytime;
 using AnytimeGoalHandle = rclcpp_action::ServerGoalHandle<Anytime>;
 
 // Monte Carlo Pi class template
-template <bool isActive>
+template <bool isActive, bool separate_thread>
 class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
  public:
   // Constructor
@@ -128,6 +128,14 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
       return true;
     }
     return false;
+  }
+
+  void start() override {
+    if constexpr (separate_thread) {
+      std::thread([this]() { this->notify(); }).detach();
+    } else {
+      this->notify();
+    }
   }
 
  protected:

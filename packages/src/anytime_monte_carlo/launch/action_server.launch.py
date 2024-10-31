@@ -31,7 +31,7 @@ def include_launch_description(context: LaunchContext):
                 name="anytime_server",
                 parameters=[
                     {"anytime_active": LaunchConfiguration("anytime_active")},
-                    {"anytime_blocking": False},
+                    {"separate_thread": LaunchConfiguration("separate_thread")},
                 ],
             )
         ],
@@ -55,11 +55,16 @@ def generate_launch_description():
         "anytime_active", default_value="False", description="Anytime active"
     )
 
+    separate_thread_arg = DeclareLaunchArgument(
+        "separate_thread", default_value="False", description="Separate thread"
+    )
+
     # Launch Description
     launch_description = LaunchDescription()
 
     launch_description.add_action(threading_type_arg)
     launch_description.add_action(anytime_active_arg)
+    launch_description.add_action(separate_thread_arg)
 
     launch_description.add_action(OpaqueFunction(function=include_launch_description))
 

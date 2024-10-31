@@ -26,20 +26,29 @@ AnytimeActionServer::AnytimeActionServer(const rclcpp::NodeOptions& options)
 
   // read the ros2 paramter anytime_active and anytime_blocking
   bool anytime_active = this->declare_parameter("anytime_active", false);
-  bool anytime_blocking = this->declare_parameter("anytime_blocking", false);
+  bool separate_thread = this->declare_parameter("separate_thread", false);
 
   RCLCPP_INFO(this->get_logger(), "anytime_active: %d", anytime_active);
-  RCLCPP_INFO(this->get_logger(), "anytime_blocking: %d", anytime_blocking);
+  RCLCPP_INFO(this->get_logger(), "separate_thread: %d", separate_thread);
 
   // Create a shared pointer to a MonteCarloPi object with the node reference
-  if (anytime_active) {
-    RCLCPP_INFO(this->get_logger(), "Creating MonteCarloPi in active mode");
-    monte_carlo_pi_ =
-        std::make_shared<MonteCarloPi<true>>(this);  // Active mode
+  if (anytime_active && separate_thread) {
+    RCLCPP_INFO(this->get_logger(),
+                "Creating MonteCarloPi in active mode with separate thread");
+    monte_carlo_pi_ = std::make_shared<MonteCarloPi<true, true>>(this);
+  } else if (anytime_active && !separate_thread) {
+    RCLCPP_INFO(this->get_logger(),
+                "Creating MonteCarloPi in active mode without separate thread");
+    monte_carlo_pi_ = std::make_shared<MonteCarloPi<true, false>>(this);
+  } else if (!anytime_active && separate_thread) {
+    RCLCPP_INFO(this->get_logger(),
+                "Creating MonteCarloPi in inactive mode with separate thread");
+    monte_carlo_pi_ = std::make_shared<MonteCarloPi<false, true>>(this);
   } else {
-    RCLCPP_INFO(this->get_logger(), "Creating MonteCarloPi in inactive mode");
-    monte_carlo_pi_ =
-        std::make_shared<MonteCarloPi<false>>(this);  // Inactive mode
+    RCLCPP_INFO(
+        this->get_logger(),
+        "Creating MonteCarloPi in inactive mode without separate thread");
+    monte_carlo_pi_ = std::make_shared<MonteCarloPi<false, false>>(this);
   }
 }
 
@@ -87,6 +96,6 @@ void AnytimeActionServer::handle_accepted(
   RCLCPP_INFO(this->get_logger(), "Resetting MonteCarloPi");
   monte_carlo_pi_->reset();
 
-  RCLCPP_INFO(this->get_logger(), "Notifying anytime waitable");
-  monte_carlo_pi_->notify();
+  RCLCPP_INFO(this->get_logger(), "Start MonteCarloPi");
+  monte_carlo_pi_->start();
 }

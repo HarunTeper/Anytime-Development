@@ -24,9 +24,9 @@
             }
         },
         {
-            "label": "ROS2-Monte-Carlo-Server-Active",
+            "label": "ROS2-Monte-Carlo-Server-Active-Single",
             "type": "shell",
-            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=true",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=true separate_thread:=false",
             "problemMatcher": [],
             "presentation": {
                 "echo": true,
@@ -38,9 +38,9 @@
             }
         },
         {
-            "label": "ROS2-Monte-Carlo-Server-Passive",
+            "label": "ROS2-Monte-Carlo-Server-Active-Separate",
             "type": "shell",
-            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=false",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=true separate_thread:=true",
             "problemMatcher": [],
             "presentation": {
                 "echo": true,
@@ -50,7 +50,35 @@
                 "showReuseMessage": true,
                 "clear": false
             }
-        }
+        },
+        {
+            "label": "ROS2-Monte-Carlo-Server-Passive-Single",
+            "type": "shell",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=false separate_thread:=false",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "ROS2-Monte-Carlo-Server-Passive-Separate",
+            "type": "shell",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=false separate_thread:=true",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
         // {
         //     "label": "ROS2-Test-Waitable",
         //     "type": "shell",
