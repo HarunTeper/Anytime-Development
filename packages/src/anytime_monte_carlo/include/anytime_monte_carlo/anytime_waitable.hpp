@@ -1,3 +1,6 @@
+#ifndef ANYTIME_WAITABLE_HPP
+#define ANYTIME_WAITABLE_HPP
+
 #include <rcl/event.h>
 #include <rcl/wait.h>
 #include <rclcpp/guard_condition.hpp>
@@ -82,3 +85,5 @@ class AnytimeWaitable : public rclcpp::Waitable {
 
   std::function<void(void)> execute_callback_;
 };
+
+#endif  // ANYTIME_WAITABLE_HPP

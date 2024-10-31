@@ -28,7 +28,7 @@ void AnytimeActionClient::send_goal() {
 
   // Create and populate the goal message
   auto goal_msg = anytime_interfaces::action::Anytime::Goal();
-  goal_msg.goal = 5000000;
+  goal_msg.goal = 500000;
 
   // Define the goal options with callbacks
   auto send_goal_options = rclcpp_action::Client<

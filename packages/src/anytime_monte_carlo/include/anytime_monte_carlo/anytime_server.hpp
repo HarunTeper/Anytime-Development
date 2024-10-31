@@ -1,5 +1,4 @@
 #include "anytime_interfaces/action/anytime.hpp"
-#include "anytime_monte_carlo/anytime_template.hpp"
 #include "anytime_monte_carlo/monte_carlo.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
@@ -27,7 +26,8 @@ class AnytimeActionServer : public rclcpp::Node {
 
   void handle_accepted(const std::shared_ptr<AnytimeGoalHandle> goal_handle);
 
-  std::shared_ptr<MonteCarloPi<true, true>> monte_carlo_pi_;
+  std::shared_ptr<AnytimeBase<double, Anytime, AnytimeGoalHandle>>
+      monte_carlo_pi_;
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(AnytimeActionServer)

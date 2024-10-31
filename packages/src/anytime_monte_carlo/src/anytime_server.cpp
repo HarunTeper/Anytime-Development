@@ -1,4 +1,5 @@
 #include "anytime_monte_carlo/anytime_server.hpp"
+#include <rclcpp/logging.hpp>
 
 // Constructor for the AnytimeActionServer class
 AnytimeActionServer::AnytimeActionServer(const rclcpp::NodeOptions& options)
@@ -30,17 +31,8 @@ AnytimeActionServer::AnytimeActionServer(const rclcpp::NodeOptions& options)
   RCLCPP_INFO(this->get_logger(), "anytime_active: %d", anytime_active);
   RCLCPP_INFO(this->get_logger(), "anytime_blocking: %d", anytime_blocking);
 
-  // Create a shared pointer to a MonteCarloPi object with the values of the
-  // parameters as the template arguments
-  if (anytime_active && anytime_blocking) {
-    auto monte_carlo_pi_ = std::make_shared<MonteCarloPi<true, true>>();
-  } else if (anytime_active && !anytime_blocking) {
-    auto monte_carlo_pi_ = std::make_shared<MonteCarloPi<true, false>>();
-  } else if (!anytime_active && anytime_blocking) {
-    auto monte_carlo_pi_ = std::make_shared<MonteCarloPi<false, true>>();
-  } else {
-    auto monte_carlo_pi_ = std::make_shared<MonteCarloPi<false, false>>();
-  }
+  // Create a shared pointer to a MonteCarloPi object with the node reference
+  monte_carlo_pi_ = std::make_shared<MonteCarloPi>(this);
 }
 
 // Destructor for the AnytimeActionServer class
@@ -58,6 +50,7 @@ rclcpp_action::GoalResponse AnytimeActionServer::handle_goal(
     RCLCPP_INFO(this->get_logger(), "Goal rejected: server is active");
     return rclcpp_action::GoalResponse::REJECT;
   }
+  RCLCPP_INFO(this->get_logger(), "Goal accepted: server is inactive");
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
@@ -66,8 +59,6 @@ rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
     const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
   RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
   (void)goal_handle;  // Suppress unused variable warning
-
-  // monte_carlo_pi_->cancel();
 
   return rclcpp_action::CancelResponse::ACCEPT;
 }
@@ -142,14 +133,8 @@ void AnytimeActionServer::handle_accepted(
   monte_carlo_pi_->reset();
 
   RCLCPP_INFO(this->get_logger(), "Setting goal handle for MonteCarloPi");
-  monte_carlo_pi_->goal_handle_ = goal_handle;
+  monte_carlo_pi_->set_goal_handle(goal_handle);
 
   RCLCPP_INFO(this->get_logger(), "Notifying anytime waitable");
-  monte_carlo_pi_->anytime_waitable_->notify();
-
-  // // Create a new thread to execute the goal
-  // std::thread([this, goal_handle]() {
-  //   // Execute the goal
-  //   this->execute(goal_handle);
-  // }).detach();  // Detach the thread to allow it to run independently
+  monte_carlo_pi_->notify();
 }
