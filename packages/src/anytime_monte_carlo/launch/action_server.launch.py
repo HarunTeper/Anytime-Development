@@ -30,7 +30,7 @@ def include_launch_description(context: LaunchContext):
                 plugin="AnytimeActionServer",
                 name="anytime_server",
                 parameters=[
-                    {"anytime_active": False},
+                    {"anytime_active": LaunchConfiguration("anytime_active")},
                     {"anytime_blocking": False},
                 ],
             )
@@ -51,10 +51,15 @@ def generate_launch_description():
         "threading_type", default_value="single", description="Threading type"
     )
 
+    anytime_active_arg = DeclareLaunchArgument(
+        "anytime_active", default_value="False", description="Anytime active"
+    )
+
     # Launch Description
     launch_description = LaunchDescription()
 
     launch_description.add_action(threading_type_arg)
+    launch_description.add_action(anytime_active_arg)
 
     launch_description.add_action(OpaqueFunction(function=include_launch_description))
 

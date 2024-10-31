@@ -9,9 +9,9 @@ class AnytimeBase {
   virtual ~AnytimeBase() = default;
 
   virtual void reset() = 0;
-  virtual bool check_cancel() = 0;
-  virtual void finish() = 0;
+  virtual bool check_cancel_and_finish() = 0;
   virtual void calculate_result() = 0;
+  virtual void cancel() = 0;
 
   void activate() { is_running_ = true; }
   void deactivate() { is_running_ = false; }
@@ -37,10 +37,6 @@ class AnytimeBase {
 
   void notify_finish() { anytime_finish_waitable_->notify(); }
 
-  void cancel() { cancel_ = true; }
-
-  void unset_cancel() { cancel_ = false; }
-
   void set_goal_handle_accept_time(rclcpp::Time time) {
     goal_handle_accept_time_ = time;
   }
@@ -51,10 +47,8 @@ class AnytimeBase {
 
  protected:
   std::shared_ptr<AnytimeWaitable> anytime_waitable_;
-  std::shared_ptr<AnytimeWaitable> anytime_finish_waitable_ =
-      std::make_shared<AnytimeWaitable>([this]() { this->finish(); });
+  std::shared_ptr<AnytimeWaitable> anytime_finish_waitable_;
   bool is_running_ = false;
-  bool cancel_ = false;
 
   // goal handle
   std::shared_ptr<GoalHandleType> goal_handle_;

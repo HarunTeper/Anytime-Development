@@ -32,7 +32,15 @@ AnytimeActionServer::AnytimeActionServer(const rclcpp::NodeOptions& options)
   RCLCPP_INFO(this->get_logger(), "anytime_blocking: %d", anytime_blocking);
 
   // Create a shared pointer to a MonteCarloPi object with the node reference
-  monte_carlo_pi_ = std::make_shared<MonteCarloPi>(this);
+  if (anytime_active) {
+    RCLCPP_INFO(this->get_logger(), "Creating MonteCarloPi in active mode");
+    monte_carlo_pi_ =
+        std::make_shared<MonteCarloPi<true>>(this);  // Active mode
+  } else {
+    RCLCPP_INFO(this->get_logger(), "Creating MonteCarloPi in inactive mode");
+    monte_carlo_pi_ =
+        std::make_shared<MonteCarloPi<false>>(this);  // Inactive mode
+  }
 }
 
 // Destructor for the AnytimeActionServer class
@@ -62,6 +70,9 @@ rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
   RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
   (void)goal_handle;  // Suppress unused variable warning
 
+  // Cancel the MonteCarloPi
+  monte_carlo_pi_->cancel();
+
   return rclcpp_action::CancelResponse::ACCEPT;
 }
 
@@ -70,14 +81,12 @@ void AnytimeActionServer::handle_accepted(
   RCLCPP_INFO(this->get_logger(), "Activating MonteCarloPi");
   monte_carlo_pi_->activate();
 
-  RCLCPP_INFO(this->get_logger(), "Resetting MonteCarloPi");
-  monte_carlo_pi_->reset();
-
   RCLCPP_INFO(this->get_logger(), "Setting goal handle for MonteCarloPi");
   monte_carlo_pi_->set_goal_handle(goal_handle);
 
+  RCLCPP_INFO(this->get_logger(), "Resetting MonteCarloPi");
+  monte_carlo_pi_->reset();
+
   RCLCPP_INFO(this->get_logger(), "Notifying anytime waitable");
   monte_carlo_pi_->notify();
-
-  monte_carlo_pi_->set_goal_processing_start_time(this->now());
 }

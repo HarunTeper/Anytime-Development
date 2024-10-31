@@ -24,9 +24,23 @@
             }
         },
         {
-            "label": "ROS2-Monte-Carlo-Server",
+            "label": "ROS2-Monte-Carlo-Server-Active",
             "type": "shell",
-            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=true",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "ROS2-Monte-Carlo-Server-Passive",
+            "type": "shell",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=false",
             "problemMatcher": [],
             "presentation": {
                 "echo": true,
