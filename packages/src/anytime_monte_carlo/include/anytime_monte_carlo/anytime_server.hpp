@@ -28,6 +28,9 @@ class AnytimeActionServer : public rclcpp::Node {
 
   std::shared_ptr<AnytimeBase<double, Anytime, AnytimeGoalHandle>>
       monte_carlo_pi_;
+
+  // callback group for action
+  rclcpp::CallbackGroup::SharedPtr callback_group_;
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(AnytimeActionServer)

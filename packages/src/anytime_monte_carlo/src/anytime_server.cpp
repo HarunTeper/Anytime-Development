@@ -7,6 +7,11 @@ AnytimeActionServer::AnytimeActionServer(const rclcpp::NodeOptions& options)
   RCLCPP_INFO(this->get_logger(), "Starting Anytime action server");
 
   // Create the action server
+  // Create a callback group for the action server
+  callback_group_ =
+      this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+  // Create the action server
   action_server_ =
       rclcpp_action::create_server<anytime_interfaces::action::Anytime>(
           this, "anytime",
@@ -22,7 +27,8 @@ AnytimeActionServer::AnytimeActionServer(const rclcpp::NodeOptions& options)
           // Lambda function to handle accepted goals
           [this](const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
             return this->handle_accepted(goal_handle);
-          });
+          },
+          rcl_action_server_get_default_options(), callback_group_);
 
   // read the ros2 paramter anytime_active and anytime_blocking
   bool anytime_active = this->declare_parameter("anytime_active", false);
