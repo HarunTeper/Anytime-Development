@@ -9,7 +9,8 @@ class AnytimeBase {
   virtual ~AnytimeBase() = default;
 
   virtual void reset() = 0;
-  virtual bool check_cancel_and_finish() = 0;
+  virtual bool check_cancel_and_finish_active() = 0;
+  virtual void check_cancel_and_finish_passive() = 0;
   virtual void calculate_result() = 0;
   virtual void cancel() = 0;
   virtual void start() = 0;
@@ -23,18 +24,6 @@ class AnytimeBase {
   }
 
   std::shared_ptr<GoalHandleType> get_goal_handle() { return goal_handle_; }
-
-  void set_anytime_waitable(std::shared_ptr<AnytimeWaitable> anytime_waitable) {
-    anytime_waitable_ = anytime_waitable;
-  }
-
-  std::shared_ptr<AnytimeWaitable> get_anytime_waitable() {
-    return anytime_waitable_;
-  }
-
-  std::shared_ptr<AnytimeWaitable> get_anytime_finish_waitable() {
-    return anytime_finish_waitable_;
-  }
 
   void notify() { anytime_waitable_->notify(); }
 
@@ -52,6 +41,8 @@ class AnytimeBase {
   std::shared_ptr<AnytimeWaitable> anytime_waitable_;
   std::shared_ptr<AnytimeWaitable> anytime_finish_waitable_;
   bool is_running_ = false;
+  bool finished_ = false;
+  bool canceled_ = false;
 
   // goal handle
   std::shared_ptr<GoalHandleType> goal_handle_;
@@ -68,8 +59,11 @@ class AnytimeBase {
   // goal_processing_start_time
   rclcpp::Time goal_processing_start_time_;
 
-  // goal_processing finish time
-  rclcpp::Time goal_processing_finish_time_;
+  // notify mutex
+  std::mutex notify_mutex_;
+
+  // callback group for compute
+  rclcpp::CallbackGroup::SharedPtr compute_callback_group_;
 };
 
 #endif  // ANYTIME_BASE_HPP

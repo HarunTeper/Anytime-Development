@@ -10,12 +10,13 @@ AnytimeActionClient::AnytimeActionClient(const rclcpp::NodeOptions& options)
           this, "anytime");
 
   // Create a timer to send goals periodically
-  timer_ = this->create_wall_timer(std::chrono::seconds(2),
+  timer_ = this->create_wall_timer(std::chrono::milliseconds(100),
                                    [this]() { this->send_goal(); });
 
   // Create a timer for cancel timeout, initially canceled
-  cancel_timeout_timer_ = this->create_wall_timer(
-      std::chrono::seconds(1), [this]() { this->cancel_timeout_callback(); });
+  cancel_timeout_timer_ =
+      this->create_wall_timer(std::chrono::milliseconds(50),
+                              [this]() { this->cancel_timeout_callback(); });
   cancel_timeout_timer_->cancel();
 }
 
@@ -24,11 +25,11 @@ AnytimeActionClient::~AnytimeActionClient() {}
 void AnytimeActionClient::send_goal() {
   // Cancel the timer to prevent sending multiple goals
   timer_->cancel();
-  RCLCPP_INFO(this->get_logger(), "Sending goal");
+  // RCLCPP_INFO(this->get_logger(), "Sending goal");
 
   // Create and populate the goal message
   auto goal_msg = anytime_interfaces::action::Anytime::Goal();
-  goal_msg.goal = 500000;
+  goal_msg.goal = 1000000;
   goal_msg.client_start = this->now();
 
   // Define the goal options with callbacks
@@ -66,8 +67,8 @@ void AnytimeActionClient::goal_response_callback(
   }
 
   // Log that the goal was accepted by the server
-  RCLCPP_INFO(this->get_logger(),
-              "Goal accepted by server, waiting for result");
+  // RCLCPP_INFO(this->get_logger(),
+  //             "Goal accepted by server, waiting for result");
 
   // Store the goal handle for future reference
   goal_handle_ = goal_handle;

@@ -93,14 +93,14 @@ rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
 
 void AnytimeActionServer::handle_accepted(
     const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
-  RCLCPP_INFO(this->get_logger(), "Activating MonteCarloPi");
-  monte_carlo_pi_->activate();
-
   RCLCPP_INFO(this->get_logger(), "Setting goal handle for MonteCarloPi");
   monte_carlo_pi_->set_goal_handle(goal_handle);
 
   RCLCPP_INFO(this->get_logger(), "Resetting MonteCarloPi");
   monte_carlo_pi_->reset();
+
+  RCLCPP_INFO(this->get_logger(), "Activating MonteCarloPi");
+  monte_carlo_pi_->activate();
 
   RCLCPP_INFO(this->get_logger(), "Start MonteCarloPi");
   monte_carlo_pi_->start();
