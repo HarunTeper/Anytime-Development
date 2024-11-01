@@ -55,8 +55,6 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
   }
 
   void compute() {
-    // start time
-    // auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < batch_size_; ++i) {
       x = (float)rand() / RAND_MAX;
       y = (float)rand() / RAND_MAX;
@@ -68,11 +66,6 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
 
       loop_count_++;
     }
-    // end time
-    // auto end = std::chrono::high_resolution_clock::now();
-    // RCLCPP_INFO(node_->get_logger(), "Compute time: %f ms",
-    //             std::chrono::duration<double, std::milli>(end -
-    //             start).count());
   }
 
   // Blocking function to approximate Pi
@@ -86,37 +79,7 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
       this->anytime_waitable_->notify();
 
     } else {
-      RCLCPP_INFO(node_->get_logger(), "Goal was completed");
-      finished_ = true;
-      check_cancel_and_finish_active();
-    }
-  }
-
-  // Passive function to approximate Pi
-  void passive_function(const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
-    if (loop_count_ < goal_handle->get_goal()->goal && !canceled_) {
-      compute();
-
-      calculate_result();
-
-      this->anytime_waitable_->notify();
-
-    } else {
-      RCLCPP_INFO(node_->get_logger(), "Goal was completed");
-      {
-        std::lock_guard<std::mutex> lock(this->notify_mutex_);
-        if (!canceled_ && !finished_) {
-          RCLCPP_INFO(node_->get_logger(), "Finishing Goal");
-          this->result_->action_end = this->node_->now();
-          this->goal_handle_->succeed(this->result_);
-          finished_ = true;
-          this->deactivate();
-        } else if (canceled_ && finished_) {
-          this->deactivate();
-        } else if (canceled_ && !finished_) {
-          finished_ = true;
-        }
-      }
+      active_finish();
     }
   }
 
@@ -130,11 +93,29 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
       if (loop_count_ < goal_handle->get_goal()->goal) {
         compute();
       } else {
-        RCLCPP_INFO(node_->get_logger(), "Goal was completed");
-        finished_ = true;
-        check_cancel_and_finish_active();
+        active_finish();
         break;
       }
+    }
+  }
+
+  void active_finish() {
+    RCLCPP_INFO(node_->get_logger(), "Goal was completed");
+    finished_ = true;
+    check_cancel_and_finish_active();
+  }
+
+  // Passive function to approximate Pi
+  void passive_function(const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
+    if (loop_count_ < goal_handle->get_goal()->goal && !canceled_) {
+      compute();
+
+      calculate_result();
+
+      this->anytime_waitable_->notify();
+
+    } else {
+      passive_function_finish();
     }
   }
 
@@ -146,22 +127,26 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
 
         calculate_result();
       } else {
-        RCLCPP_INFO(node_->get_logger(), "Goal was completed");
-        {
-          std::lock_guard<std::mutex> lock(this->notify_mutex_);
-          if (!canceled_ && !finished_) {
-            RCLCPP_INFO(node_->get_logger(), "Finishing Goal");
-            this->result_->action_end = this->node_->now();
-            this->goal_handle_->succeed(this->result_);
-            finished_ = true;
-            this->deactivate();
-          } else if (canceled_ && finished_) {
-            this->deactivate();
-          } else if (canceled_ && !finished_) {
-            finished_ = true;
-          }
-        }
+        passive_function_finish();
         break;
+      }
+    }
+  }
+
+  void passive_function_finish() {
+    RCLCPP_INFO(node_->get_logger(), "Goal was completed");
+    {
+      std::lock_guard<std::mutex> lock(this->notify_mutex_);
+      if (!canceled_ && !finished_) {
+        RCLCPP_INFO(node_->get_logger(), "Finishing Goal");
+        this->result_->action_end = this->node_->now();
+        this->goal_handle_->succeed(this->result_);
+        finished_ = true;
+        this->deactivate();
+      } else if (canceled_ && finished_) {
+        this->deactivate();
+      } else if (canceled_ && !finished_) {
+        finished_ = true;
       }
     }
   }
@@ -211,6 +196,7 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
 
   // Cancel function
   void cancel() override {
+    this->result_->action_cancel = this->node_->now();
     if constexpr (isActive) {
       // nothing to do
     } else if constexpr (!isActive) {
@@ -239,10 +225,10 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
     this->result_->client_start = this->goal_handle_->get_goal()->client_start;
     this->result_->action_send = this->goal_handle_->get_goal()->action_send;
     this->result_->action_accept = this->goal_handle_accept_time_;
-    this->result_->action_start = node_->now();
   }
 
   void start() override {
+    this->result_->action_start = node_->now();
     if constexpr (separate_thread) {
       std::thread([this]() {
         if constexpr (isActive) {
