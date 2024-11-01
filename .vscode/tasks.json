@@ -24,9 +24,9 @@
             }
         },
         {
-            "label": "ROS2-Monte-Carlo-Server-Active-Single",
+            "label": "ROS2-Monte-Carlo-Server",
             "type": "shell",
-            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=true separate_thread:=false",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=${input:anytime_active} separate_thread:=${input:separate_thread} multi_threading:=${input:multi_threading}",
             "problemMatcher": [],
             "presentation": {
                 "echo": true,
@@ -36,216 +36,38 @@
                 "showReuseMessage": true,
                 "clear": false
             }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "anytime_active",
+            "type": "pickString",
+            "description": "Select the anytime_active parameter",
+            "options": [
+                "true",
+                "false"
+            ],
+            "default": "false"
         },
         {
-            "label": "ROS2-Monte-Carlo-Server-Active-Separate",
-            "type": "shell",
-            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=true separate_thread:=true",
-            "problemMatcher": [],
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            }
+            "id": "separate_thread",
+            "type": "pickString",
+            "description": "Select the separate_thread parameter",
+            "options": [
+                "true",
+                "false"
+            ],
+            "default": "false"
         },
         {
-            "label": "ROS2-Monte-Carlo-Server-Passive-Single",
-            "type": "shell",
-            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=false separate_thread:=false",
-            "problemMatcher": [],
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            }
-        },
-        {
-            "label": "ROS2-Monte-Carlo-Server-Passive-Separate",
-            "type": "shell",
-            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=false separate_thread:=true",
-            "problemMatcher": [],
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            }
-        },
-        // {
-        //     "label": "ROS2-Test-Waitable",
-        //     "type": "shell",
-        //     "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch waitable_test launch_publisher_subscription.launch.py",
-        //     "problemMatcher": [],
-        //     "presentation": {
-        //         "echo": true,
-        //         "reveal": "always",
-        //         "focus": true,
-        //         "panel": "shared",
-        //         "showReuseMessage": true,
-        //         "clear": false
-        //     }
-        // },
-        // {
-        //     "label": "ROS2-YOLO-Custom-Single-Threaded-Waitable",
-        //     "type": "shell",
-        //     "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch yolo_rt yolocpp.launch.py threading_type:=single use_waitable:=true",
-        //     "problemMatcher": [],
-        //     "presentation": {
-        //         "echo": true,
-        //         "reveal": "always",
-        //         "focus": true,
-        //         "panel": "shared",
-        //         "showReuseMessage": true,
-        //         "clear": false
-        //     }
-        // },
-        // {
-        //     "label": "ROS2-YOLO-Custom-Single-Threaded-Busy-Waiting",
-        //     "type": "shell",
-        //     "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch yolo_rt yolocpp.launch.py threading_type:=single use_waitable:=false",
-        //     "problemMatcher": [],
-        //     "presentation": {
-        //         "echo": true,
-        //         "reveal": "always",
-        //         "focus": true,
-        //         "panel": "shared",
-        //         "showReuseMessage": true,
-        //         "clear": false
-        //     }
-        // },
-        // {
-        //     "label": "ROS2-YOLO-Custom-Multi-Threaded",
-        //     "type": "shell",
-        //     "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch yolo_rt yolocpp.launch.py threading_type:=multi",
-        //     "problemMatcher": [],
-        //     "presentation": {
-        //         "echo": true,
-        //         "reveal": "always",
-        //         "focus": true,
-        //         "panel": "shared",
-        //         "showReuseMessage": true,
-        //         "clear": false
-        //     }
-        // },
-        // {
-        //     "label": "ROS2-Monte-Carlo-Custom-Single-Threaded",
-        //     "type": "shell",
-        //     "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_custom anytime_custom.launch.py threading_type:=single",
-        //     "problemMatcher": [],
-        //     "presentation": {
-        //         "echo": true,
-        //         "reveal": "always",
-        //         "focus": true,
-        //         "panel": "shared",
-        //         "showReuseMessage": true,
-        //         "clear": false
-        //     }
-        // },
-        // {
-        //     "label": "ROS2-Monte-Carlo-Custom-Multi-Threaded",
-        //     "type": "shell",
-        //     "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_custom anytime_custom.launch.py threading_type:=multi",
-        //     "problemMatcher": [],
-        //     "presentation": {
-        //         "echo": true,
-        //         "reveal": "always",
-        //         "focus": true,
-        //         "panel": "shared",
-        //         "showReuseMessage": true,
-        //         "clear": false
-        //     }
-        // },
-        // {
-        //     "label": "ROS2-Monte-Carlon-Action-Server-Single",
-        //     "type": "shell",
-        //     "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_action action_server.launch.py threading_type:=single",
-        //     "problemMatcher": [],
-        //     "presentation": {
-        //         "echo": true,
-        //         "reveal": "always",
-        //         "focus": true,
-        //         "panel": "shared",
-        //         "showReuseMessage": true,
-        //         "clear": false
-        //     }
-        // },
-        // {
-        //     "label": "ROS2-Monte-Carlon-Action-Server-Multi",
-        //     "type": "shell",
-        //     "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_action action_server.launch.py threading_type:=multi",
-        //     "problemMatcher": [],
-        //     "presentation": {
-        //         "echo": true,
-        //         "reveal": "always",
-        //         "focus": true,
-        //         "panel": "shared",
-        //         "showReuseMessage": true,
-        //         "clear": false
-        //     }
-        // },
-        // {
-        //     "label": "ROS2-Monte-Carlon-Action-Client-Single",
-        //     "type": "shell",
-        //     "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_action action_client.launch.py threading_type:=single",
-        //     "problemMatcher": [],
-        //     "presentation": {
-        //         "echo": true,
-        //         "reveal": "always",
-        //         "focus": true,
-        //         "panel": "shared",
-        //         "showReuseMessage": true,
-        //         "clear": false
-        //     }
-        // },
-        // {
-        //     "label": "ROS2-YOLO-Action-Server-Single",
-        //     "type": "shell",
-        //     "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch yolo_action action_server.launch.py threading_type:=single",
-        //     "problemMatcher": [],
-        //     "presentation": {
-        //         "echo": true,
-        //         "reveal": "always",
-        //         "focus": true,
-        //         "panel": "shared",
-        //         "showReuseMessage": true,
-        //         "clear": false
-        //     }
-        // },
-        // {
-        //     "label": "ROS2-YOLO-Action-Server-Multi",
-        //     "type": "shell",
-        //     "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch yolo_action action_server.launch.py threading_type:=multi",
-        //     "problemMatcher": [],
-        //     "presentation": {
-        //         "echo": true,
-        //         "reveal": "always",
-        //         "focus": true,
-        //         "panel": "shared",
-        //         "showReuseMessage": true,
-        //         "clear": false
-        //     }
-        // },
-        // {
-        //     "label": "ROS2-YOLO-Action-Client",
-        //     "type": "shell",
-        //     "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch yolo_action action_client.launch.py",
-        //     "problemMatcher": [],
-        //     "presentation": {
-        //         "echo": true,
-        //         "reveal": "always",
-        //         "focus": true,
-        //         "panel": "shared",
-        //         "showReuseMessage": true,
-        //         "clear": false
-        //     }
-        // }
+            "id": "multi_threading",
+            "type": "pickString",
+            "description": "Select the multi_threading parameter",
+            "options": [
+                "true",
+                "false"
+            ],
+            "default": "false"
+        }
     ]
 }
