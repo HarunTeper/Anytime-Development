@@ -8,6 +8,8 @@ builtin_interfaces/Time client_start
 builtin_interfaces/Time action_send
 builtin_interfaces/Time action_accept
 builtin_interfaces/Time action_start
+builtin_interfaces/Time action_cancel
+builtin_interfaces/Time action_compute_end
 builtin_interfaces/Time action_end
 ---
 float32 feedback
