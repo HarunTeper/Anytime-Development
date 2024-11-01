@@ -15,7 +15,8 @@ template <bool isActive, bool separate_thread, bool multi_threading>
 class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
  public:
   // Constructor
-  MonteCarloPi(rclcpp::Node* node) : node_(node) {
+  MonteCarloPi(rclcpp::Node* node, int batch_size = 1)
+      : node_(node), batch_size_(batch_size) {
     anytime_waitable_ = std::make_shared<AnytimeWaitable>([this]() {
       if constexpr (isActive) {
         if constexpr (multi_threading) {
@@ -54,15 +55,24 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
   }
 
   void compute() {
-    x = (float)rand() / RAND_MAX;
-    y = (float)rand() / RAND_MAX;
+    // start time
+    // auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < batch_size_; ++i) {
+      x = (float)rand() / RAND_MAX;
+      y = (float)rand() / RAND_MAX;
 
-    if (sqrt(pow(x, 2) + pow(y, 2)) <= 1) {
-      count_inside_++;
+      if (sqrt(pow(x, 2) + pow(y, 2)) <= 1) {
+        count_inside_++;
+      }
+      count_total_++;
+
+      loop_count_++;
     }
-    count_total_++;
-
-    loop_count_++;
+    // end time
+    // auto end = std::chrono::high_resolution_clock::now();
+    // RCLCPP_INFO(node_->get_logger(), "Compute time: %f ms",
+    //             std::chrono::duration<double, std::milli>(end -
+    //             start).count());
   }
 
   // Blocking function to approximate Pi
@@ -248,6 +258,7 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
 
  protected:
   rclcpp::Node* node_;  // Node reference for logging
+  int batch_size_;      // Batch size for compute iterations
 
   // Count variables
   int count_total_ = 0;

@@ -33,6 +33,7 @@ AnytimeActionServer::AnytimeActionServer(rclcpp::NodeOptions options)
   bool anytime_active = this->declare_parameter("anytime_active", false);
   bool separate_thread = this->declare_parameter("separate_thread", false);
   bool multi_threading = this->declare_parameter("multi_threading", false);
+  int batch_size = this->declare_parameter("batch_size", 1);
 
   RCLCPP_INFO(this->get_logger(), "anytime_active: %s",
               anytime_active ? "true" : "false");
@@ -40,10 +41,11 @@ AnytimeActionServer::AnytimeActionServer(rclcpp::NodeOptions options)
               separate_thread ? "true" : "false");
   RCLCPP_INFO(this->get_logger(), "multi_threading: %s",
               multi_threading ? "true" : "false");
+  RCLCPP_INFO(this->get_logger(), "batch_size: %d", batch_size);
 
   // Create the MonteCarloPi instance using a factory function
   monte_carlo_pi_ = create_monte_carlo_pi(this, anytime_active, separate_thread,
-                                          multi_threading);
+                                          multi_threading, batch_size);
 }
 
 // Destructor for the AnytimeActionServer class
@@ -54,33 +56,34 @@ std::shared_ptr<AnytimeBase<double, Anytime, AnytimeGoalHandle>>
 AnytimeActionServer::create_monte_carlo_pi(rclcpp::Node* node,
                                            bool anytime_active,
                                            bool separate_thread,
-                                           bool multi_threading) {
+                                           bool multi_threading,
+                                           int batch_size) {
   if (anytime_active) {
     if (separate_thread) {
       if (multi_threading) {
-        return std::make_shared<MonteCarloPi<true, true, true>>(node);
+        return std::make_shared<MonteCarloPi<true, true, true>>(node, batch_size);
       } else {
-        return std::make_shared<MonteCarloPi<true, true, false>>(node);
+        return std::make_shared<MonteCarloPi<true, true, false>>(node, batch_size);
       }
     } else {
       if (multi_threading) {
-        return std::make_shared<MonteCarloPi<true, false, true>>(node);
+        return std::make_shared<MonteCarloPi<true, false, true>>(node, batch_size);
       } else {
-        return std::make_shared<MonteCarloPi<true, false, false>>(node);
+        return std::make_shared<MonteCarloPi<true, false, false>>(node, batch_size);
       }
     }
   } else {
     if (separate_thread) {
       if (multi_threading) {
-        return std::make_shared<MonteCarloPi<false, true, true>>(node);
+        return std::make_shared<MonteCarloPi<false, true, true>>(node, batch_size);
       } else {
-        return std::make_shared<MonteCarloPi<false, true, false>>(node);
+        return std::make_shared<MonteCarloPi<false, true, false>>(node, batch_size);
       }
     } else {
       if (multi_threading) {
-        return std::make_shared<MonteCarloPi<false, false, true>>(node);
+        return std::make_shared<MonteCarloPi<false, false, true>>(node, batch_size);
       } else {
-        return std::make_shared<MonteCarloPi<false, false, false>>(node);
+        return std::make_shared<MonteCarloPi<false, false, false>>(node, batch_size);
       }
     }
   }

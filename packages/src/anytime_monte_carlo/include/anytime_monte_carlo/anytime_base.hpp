@@ -37,6 +37,10 @@ class AnytimeBase {
     goal_processing_start_time_ = time;
   }
 
+  void set_batch_size(int batch_size) {
+    batch_size_ = batch_size;
+  }
+
  protected:
   std::shared_ptr<AnytimeWaitable> anytime_waitable_;
   std::shared_ptr<AnytimeWaitable> anytime_finish_waitable_;
@@ -67,6 +71,8 @@ class AnytimeBase {
 
   // callback group for compute
   rclcpp::CallbackGroup::SharedPtr compute_callback_group_;
+
+  int batch_size_ = 1;  // Default batch size
 };
 
 #endif  // ANYTIME_BASE_HPP
