@@ -33,6 +33,7 @@ def include_launch_description(context: LaunchContext):
                     {"anytime_active": LaunchConfiguration("anytime_active")},
                     {"separate_thread": LaunchConfiguration("separate_thread")},
                     {"multi_threading": LaunchConfiguration("multi_threading")},
+                    {"batch_size": LaunchConfiguration("batch_size")},
                 ],
             )
         ],
@@ -60,12 +61,17 @@ def generate_launch_description():
         "separate_thread", default_value="False", description="Separate thread"
     )
 
+    batch_size_arg = DeclareLaunchArgument(
+        "batch_size", default_value="100", description="Batch size for compute iterations"
+    )
+
     # Launch Description
     launch_description = LaunchDescription()
 
     launch_description.add_action(threading_type_arg)
     launch_description.add_action(anytime_active_arg)
     launch_description.add_action(separate_thread_arg)
+    launch_description.add_action(batch_size_arg)
 
     launch_description.add_action(OpaqueFunction(function=include_launch_description))
 

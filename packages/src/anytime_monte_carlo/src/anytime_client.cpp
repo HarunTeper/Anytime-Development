@@ -29,7 +29,7 @@ void AnytimeActionClient::send_goal() {
 
   // Create and populate the goal message
   auto goal_msg = anytime_interfaces::action::Anytime::Goal();
-  goal_msg.goal = 1000000;
+  goal_msg.goal = 10000000;
   goal_msg.client_start = this->now();
 
   // Define the goal options with callbacks
