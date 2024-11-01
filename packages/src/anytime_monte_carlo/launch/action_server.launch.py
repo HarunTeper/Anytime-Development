@@ -11,9 +11,9 @@ from launch.launch_context import LaunchContext
 def include_launch_description(context: LaunchContext):
     """Include launch description"""
 
-    if context.launch_configurations["multi_threading"] == "False":
+    if context.launch_configurations["multi_threading"].lower() == "false":
         executable = "component_container"
-    elif context.launch_configurations["multi_threading"] == "True":
+    elif context.launch_configurations["multi_threading"].lower() == "true":
         executable = "component_container_mt"
     else:
         raise ValueError("Invalid threading type")
