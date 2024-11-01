@@ -1,4 +1,8 @@
 #include "anytime_monte_carlo/anytime_client.hpp"
+#include <algorithm>
+#include <cmath>
+#include <numeric>
+#include <vector>
 
 AnytimeActionClient::AnytimeActionClient(const rclcpp::NodeOptions& options)
     : Node("anytime_action_client", options) {
@@ -53,7 +57,7 @@ void AnytimeActionClient::send_goal() {
   goal_msg.action_send = this->now();
   action_client_->async_send_goal(goal_msg, send_goal_options);
   // set the cancel time to the client start time
-  cancel_time_ = goal_msg.client_start;
+  cancel_send_time_ = goal_msg.client_start;
 }
 
 void AnytimeActionClient::goal_response_callback(
@@ -133,7 +137,7 @@ void AnytimeActionClient::cancel_timeout_callback() {
   cancel_timeout_timer_->cancel();
 
   // Set the cancel time
-  cancel_time_ = this->now();
+  cancel_send_time_ = this->now();
 
   // Send a cancel request for the current goal
   action_client_->async_cancel_goal(goal_handle_);
@@ -143,47 +147,72 @@ void AnytimeActionClient::cancel_timeout_callback() {
 
 void AnytimeActionClient::print_time_differences(
     const AnytimeGoalHandle::WrappedResult& result) {
-  auto to_chrono = [](const builtin_interfaces::msg::Time& time) {
-    return std::chrono::seconds(time.sec) +
-           std::chrono::nanoseconds(time.nanosec);
+  auto action_send_time = rclcpp::Time(result.result->action_send);
+  auto action_start_time = rclcpp::Time(result.result->action_start);
+  auto action_cancel_time = rclcpp::Time(result.result->action_cancel);
+  auto action_end_time = rclcpp::Time(result.result->action_end);
+  auto receive_time = receive_time_;
+
+  auto interval1 = action_start_time - action_send_time;
+  auto interval2 = action_cancel_time - cancel_send_time_;
+  auto interval3 = action_end_time - action_cancel_time;
+  auto interval4 = receive_time - action_end_time;
+  auto interval5 = receive_time - cancel_send_time_;
+  auto interval6 = receive_time - action_send_time;
+
+  intervals1_.push_back(interval1.nanoseconds());
+  intervals2_.push_back(interval2.nanoseconds());
+  intervals3_.push_back(interval3.nanoseconds());
+  intervals4_.push_back(interval4.nanoseconds());
+  intervals5_.push_back(interval5.nanoseconds());
+  intervals6_.push_back(interval6.nanoseconds());
+
+  auto calculate_stats = [](const std::vector<int64_t>& intervals) {
+    double mean = std::accumulate(intervals.begin(), intervals.end(), 0.0) /
+                  intervals.size() / 1e6;  // Convert to milliseconds
+    double sq_sum = std::inner_product(intervals.begin(), intervals.end(),
+                                       intervals.begin(), 0.0) /
+                    1e12;  // Convert to milliseconds^2
+    double stdev = std::sqrt(sq_sum / intervals.size() - mean * mean);
+    auto max = *std::max_element(intervals.begin(), intervals.end()) /
+               1e6;  // Convert to milliseconds
+    auto p99 = intervals[static_cast<size_t>(intervals.size() * 0.99)] /
+               1e6;  // Convert to milliseconds
+    return std::make_tuple(mean, stdev, p99, max);
   };
 
-  auto client_start_chrono = to_chrono(result.result->client_start);
-  auto action_send_chrono = to_chrono(result.result->action_send);
-  auto action_accept_chrono = to_chrono(result.result->action_accept);
-  auto action_start_chrono = to_chrono(result.result->action_start);
-  auto action_cancel_chrono = to_chrono(cancel_time_);
-  auto action_end_chrono = to_chrono(result.result->action_end);
-  auto receive_chrono = to_chrono(receive_time_);
+  auto [mean1, stdev1, p99_1, max1] = calculate_stats(intervals1_);
+  auto [mean2, stdev2, p99_2, max2] = calculate_stats(intervals2_);
+  auto [mean3, stdev3, p99_3, max3] = calculate_stats(intervals3_);
+  auto [mean4, stdev4, p99_4, max4] = calculate_stats(intervals4_);
+  auto [mean5, stdev5, p99_5, max5] = calculate_stats(intervals5_);
+  auto [mean6, stdev6, p99_6, max6] = calculate_stats(intervals6_);
 
-  auto diff_send = action_send_chrono - client_start_chrono;
-  auto diff_accept = action_accept_chrono - client_start_chrono;
-  auto diff_start = action_start_chrono - client_start_chrono;
-  auto diff_cancel = action_cancel_chrono - client_start_chrono;
-  auto diff_end = action_end_chrono - client_start_chrono;
-  auto diff_receive = receive_chrono - client_start_chrono;
-  auto total_computation = action_end_chrono - action_start_chrono;
-  auto total_diff = receive_chrono - client_start_chrono;
-
-  RCLCPP_INFO(this->get_logger(), "Time differences:");
-  RCLCPP_INFO(this->get_logger(), "Send: %ld.%09ld seconds",
-              diff_send.count() / 1000000000, diff_send.count() % 1000000000);
-  RCLCPP_INFO(this->get_logger(), "Accept: %ld.%09ld seconds",
-              diff_accept.count() / 1000000000,
-              diff_accept.count() % 1000000000);
-  RCLCPP_INFO(this->get_logger(), "Start: %ld.%09ld seconds",
-              diff_start.count() / 1000000000, diff_start.count() % 1000000000);
-  RCLCPP_INFO(this->get_logger(), "Cancel: %ld.%09ld seconds",
-              diff_cancel.count() / 1000000000,
-              diff_cancel.count() % 1000000000);
-  RCLCPP_INFO(this->get_logger(), "End: %ld.%09ld seconds",
-              diff_end.count() / 1000000000, diff_end.count() % 1000000000);
-  RCLCPP_INFO(this->get_logger(), "Receive: %ld.%09ld seconds",
-              diff_receive.count() / 1000000000,
-              diff_receive.count() % 1000000000);
-  RCLCPP_INFO(this->get_logger(), "Total computation: %ld.%09ld seconds",
-              total_computation.count() / 1000000000,
-              total_computation.count() % 1000000000);
-  RCLCPP_INFO(this->get_logger(), "Total: %ld.%09ld seconds",
-              total_diff.count() / 1000000000, total_diff.count() % 1000000000);
+  RCLCPP_INFO(
+      this->get_logger(),
+      "Interval 1 (action_send to action_start): mean=%f ms, stdev=%f ms, "
+      "p99=%f ms, max=%f ms",
+      mean1, stdev1, p99_1, max1);
+  RCLCPP_INFO(this->get_logger(),
+              "Interval 2 (cancel_send_time_ to action_cancel): mean=%f ms, "
+              "stdev=%f ms, "
+              "p99=%f ms, max=%f ms",
+              mean2, stdev2, p99_2, max2);
+  RCLCPP_INFO(
+      this->get_logger(),
+      "Interval 3 (action_cancel to action_end): mean=%f ms, stdev=%f ms, "
+      "p99=%f ms, max=%f ms",
+      mean3, stdev3, p99_3, max3);
+  RCLCPP_INFO(this->get_logger(),
+              "Interval 4 (action_end to receive): mean=%f ms, stdev=%f ms, "
+              "p99=%f ms, max=%f ms",
+              mean4, stdev4, p99_4, max4);
+  RCLCPP_INFO(this->get_logger(),
+              "Interval 5 (action_cancel to receive): mean=%f ms, stdev=%f ms, "
+              "p99=%f ms, max=%f ms",
+              mean5, stdev5, p99_5, max5);
+  RCLCPP_INFO(this->get_logger(),
+              "Interval 6 (action_send to receive): mean=%f ms, stdev=%f ms, "
+              "p99=%f ms, max=%f ms",
+              mean6, stdev6, p99_6, max6);
 }

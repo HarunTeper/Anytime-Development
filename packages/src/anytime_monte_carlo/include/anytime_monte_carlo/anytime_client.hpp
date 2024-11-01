@@ -56,8 +56,16 @@ class AnytimeActionClient : public rclcpp::Node {
   // receive time
   rclcpp::Time receive_time_ = rclcpp::Time(0, 0);
 
-  // cancel time
-  rclcpp::Time cancel_time_ = rclcpp::Time(0, 0);
+  // cancel send time
+  rclcpp::Time cancel_send_time_ = rclcpp::Time(0, 0);
+
+  // Data structures to store intervals
+  std::vector<int64_t> intervals1_;
+  std::vector<int64_t> intervals2_;
+  std::vector<int64_t> intervals3_;
+  std::vector<int64_t> intervals4_;
+  std::vector<int64_t> intervals5_;
+  std::vector<int64_t> intervals6_;
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(AnytimeActionClient)
