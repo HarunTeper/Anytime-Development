@@ -50,7 +50,7 @@ def generate_launch_description():
     """Return launch description"""
 
     threading_type_arg = DeclareLaunchArgument(
-        "multi_threading", default_value="True", description="Threading type"
+        "multi_threading", default_value="False", description="Threading type"
     )
 
     anytime_active_arg = DeclareLaunchArgument(
@@ -62,7 +62,7 @@ def generate_launch_description():
     )
 
     batch_size_arg = DeclareLaunchArgument(
-        "batch_size", default_value="100", description="Batch size for compute iterations"
+        "batch_size", default_value="1000", description="Batch size for compute iterations"
     )
 
     # Launch Description
