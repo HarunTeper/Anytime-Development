@@ -128,5 +128,6 @@ void AnytimeActionServer::handle_accepted(
   monte_carlo_pi_->activate();
 
   RCLCPP_INFO(this->get_logger(), "Start MonteCarloPi");
+  monte_carlo_pi_->set_goal_processing_start_time(this->now());
   monte_carlo_pi_->start();
 }

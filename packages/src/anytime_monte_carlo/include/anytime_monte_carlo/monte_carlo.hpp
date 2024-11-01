@@ -19,13 +19,13 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
     anytime_waitable_ = std::make_shared<AnytimeWaitable>([this]() {
       if constexpr (isActive) {
         if constexpr (multi_threading) {
-          this->active_function_separate(this->goal_handle_);
+          this->active_function_loop(this->goal_handle_);
         } else if constexpr (!multi_threading) {
           this->active_function(this->goal_handle_);
         }
       } else if constexpr (!isActive) {
         if constexpr (multi_threading) {
-          this->passive_function_separate(this->goal_handle_);
+          this->passive_function_loop(this->goal_handle_);
         } else if constexpr (!multi_threading) {
           this->passive_function(this->goal_handle_);
         }
@@ -53,23 +53,28 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
         node_->get_node_base_interface()->get_default_callback_group());
   }
 
+  void compute() {
+    x = (float)rand() / RAND_MAX;
+    y = (float)rand() / RAND_MAX;
+
+    if (sqrt(pow(x, 2) + pow(y, 2)) <= 1) {
+      count_inside_++;
+    }
+    count_total_++;
+
+    loop_count_++;
+  }
+
   // Blocking function to approximate Pi
   void active_function(const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
     if (check_cancel_and_finish_active()) {
       return;
     }
     if (loop_count_ < goal_handle->get_goal()->goal) {
-      x = (float)rand() / RAND_MAX;
-      y = (float)rand() / RAND_MAX;
-
-      if (sqrt(pow(x, 2) + pow(y, 2)) <= 1) {
-        count_inside_++;
-      }
-      count_total_++;
-
-      loop_count_++;
+      compute();
 
       this->anytime_waitable_->notify();
+
     } else {
       RCLCPP_INFO(node_->get_logger(), "Goal was completed");
       finished_ = true;
@@ -80,19 +85,12 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
   // Passive function to approximate Pi
   void passive_function(const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
     if (loop_count_ < goal_handle->get_goal()->goal && !canceled_) {
-      x = (float)rand() / RAND_MAX;
-      y = (float)rand() / RAND_MAX;
-
-      if (sqrt(pow(x, 2) + pow(y, 2)) <= 1) {
-        count_inside_++;
-      }
-      count_total_++;
-
-      loop_count_++;
+      compute();
 
       calculate_result();
 
       this->anytime_waitable_->notify();
+
     } else {
       RCLCPP_INFO(node_->get_logger(), "Goal was completed");
       {
@@ -113,23 +111,14 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
   }
 
   // Blocking function to approximate Pi
-  void active_function_separate(
+  void active_function_loop(
       const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
     while (true) {
       if (check_cancel_and_finish_active()) {
         break;
       }
       if (loop_count_ < goal_handle->get_goal()->goal) {
-        x = (float)rand() / RAND_MAX;
-        y = (float)rand() / RAND_MAX;
-
-        if (sqrt(pow(x, 2) + pow(y, 2)) <= 1) {
-          count_inside_++;
-        }
-        count_total_++;
-
-        loop_count_++;
-
+        compute();
       } else {
         RCLCPP_INFO(node_->get_logger(), "Goal was completed");
         finished_ = true;
@@ -139,19 +128,11 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
     }
   }
 
-  void passive_function_separate(
+  void passive_function_loop(
       const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
     while (true) {
       if (loop_count_ < goal_handle->get_goal()->goal && !canceled_) {
-        x = (float)rand() / RAND_MAX;
-        y = (float)rand() / RAND_MAX;
-
-        if (sqrt(pow(x, 2) + pow(y, 2)) <= 1) {
-          count_inside_++;
-        }
-        count_total_++;
-
-        loop_count_++;
+        compute();
 
         calculate_result();
       } else {
@@ -172,6 +153,49 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
         }
         break;
       }
+    }
+  }
+
+  void calculate_result() override {
+    // Calculate the result
+    this->result_->action_compute_end = this->node_->now();
+    this->result_->result = 4 * (double)count_inside_ / count_total_;
+    this->result_->iterations = loop_count_;
+  }
+
+  bool check_cancel_and_finish_active() {
+    if (this->goal_handle_->is_canceling()) {
+      RCLCPP_INFO(node_->get_logger(), "Canceling goal");
+      calculate_result();
+      this->result_->action_end = this->node_->now();
+      this->goal_handle_->canceled(this->result_);
+      this->deactivate();
+      return true;
+    }
+    if (finished_) {
+      RCLCPP_INFO(node_->get_logger(), "Finishing Goal");
+      calculate_result();
+      this->result_->action_end = this->node_->now();
+      this->goal_handle_->succeed(this->result_);
+      this->deactivate();
+      return true;
+    }
+    return false;
+  }
+
+  void check_cancel_and_finish_passive() {
+    std::lock_guard<std::mutex> lock(this->notify_mutex_);
+    if (finished_) {
+      RCLCPP_INFO(node_->get_logger(), "Finishing Goal");
+      this->result_->action_end = this->node_->now();
+      this->goal_handle_->succeed(this->result_);
+      this->deactivate();
+      return;
+    } else {
+      RCLCPP_INFO(node_->get_logger(), "Canceling goal");
+      this->result_->action_end = this->node_->now();
+      this->goal_handle_->canceled(this->result_);
+      finished_ = true;
     }
   }
 
@@ -208,55 +232,13 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
     this->result_->action_start = node_->now();
   }
 
-  void calculate_result() override {
-    // Calculate the result
-    this->result_->result = 4 * (double)count_inside_ / count_total_;
-    this->result_->iterations = loop_count_;
-  }
-
-  bool check_cancel_and_finish_active() {
-    if (this->goal_handle_->is_canceling()) {
-      RCLCPP_INFO(node_->get_logger(), "Canceling goal");
-      calculate_result();
-      this->result_->action_end = this->node_->now();
-      this->goal_handle_->canceled(this->result_);
-      this->deactivate();
-      return true;
-    }
-    if (finished_) {
-      RCLCPP_INFO(node_->get_logger(), "Finishing Goal");
-      calculate_result();
-      this->result_->action_end = this->node_->now();
-      this->goal_handle_->succeed(this->result_);
-      this->deactivate();
-      return true;
-    }
-    return false;
-  }
-
-  void check_cancel_and_finish_passive() {
-    std::lock_guard<std::mutex> lock(this->notify_mutex_);
-    if (finished_) {
-      RCLCPP_INFO(node_->get_logger(), "Canceling goal");
-      this->result_->action_end = this->node_->now();
-      this->goal_handle_->canceled(this->result_);
-      this->deactivate();
-      return;
-    } else {
-      RCLCPP_INFO(node_->get_logger(), "Canceling goal");
-      this->result_->action_end = this->node_->now();
-      this->goal_handle_->canceled(this->result_);
-      finished_ = true;
-    }
-  }
-
   void start() override {
     if constexpr (separate_thread) {
       std::thread([this]() {
         if constexpr (isActive) {
-          this->active_function_separate(this->goal_handle_);
+          this->active_function_loop(this->goal_handle_);
         } else if constexpr (!isActive) {
-          this->passive_function_separate(this->goal_handle_);
+          this->passive_function_loop(this->goal_handle_);
         }
       }).detach();
     } else {
