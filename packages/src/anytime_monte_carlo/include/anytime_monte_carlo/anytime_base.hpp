@@ -44,6 +44,9 @@ class AnytimeBase {
   bool finished_ = false;
   bool canceled_ = false;
 
+  // timer
+  rclcpp::TimerBase::SharedPtr timer_;
+
   // goal handle
   std::shared_ptr<GoalHandleType> goal_handle_;
 

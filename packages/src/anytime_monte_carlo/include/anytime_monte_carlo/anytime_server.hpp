@@ -6,7 +6,7 @@
 
 class AnytimeActionServer : public rclcpp::Node {
  public:
-  AnytimeActionServer(const rclcpp::NodeOptions& options);
+  AnytimeActionServer(rclcpp::NodeOptions options);
   ~AnytimeActionServer();
 
   using Anytime = anytime_interfaces::action::Anytime;
@@ -28,6 +28,11 @@ class AnytimeActionServer : public rclcpp::Node {
 
   std::shared_ptr<AnytimeBase<double, Anytime, AnytimeGoalHandle>>
       monte_carlo_pi_;
+
+  // factory function for monte carlo pi
+  std::shared_ptr<AnytimeBase<double, Anytime, AnytimeGoalHandle>>
+  create_monte_carlo_pi(rclcpp::Node* node, bool anytime_active,
+                        bool separate_thread, bool threading_type);
 
   // callback group for action
   rclcpp::CallbackGroup::SharedPtr callback_group_;

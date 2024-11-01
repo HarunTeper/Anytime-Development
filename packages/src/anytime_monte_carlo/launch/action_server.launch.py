@@ -11,9 +11,9 @@ from launch.launch_context import LaunchContext
 def include_launch_description(context: LaunchContext):
     """Include launch description"""
 
-    if context.launch_configurations["threading_type"] == "single":
+    if context.launch_configurations["multi_threading"] == "False":
         executable = "component_container"
-    elif context.launch_configurations["threading_type"] == "multi":
+    elif context.launch_configurations["multi_threading"] == "True":
         executable = "component_container_mt"
     else:
         raise ValueError("Invalid threading type")
@@ -32,6 +32,7 @@ def include_launch_description(context: LaunchContext):
                 parameters=[
                     {"anytime_active": LaunchConfiguration("anytime_active")},
                     {"separate_thread": LaunchConfiguration("separate_thread")},
+                    {"multi_threading": LaunchConfiguration("multi_threading")},
                 ],
             )
         ],
@@ -48,7 +49,7 @@ def generate_launch_description():
     """Return launch description"""
 
     threading_type_arg = DeclareLaunchArgument(
-        "threading_type", default_value="single", description="Threading type"
+        "multi_threading", default_value="True", description="Threading type"
     )
 
     anytime_active_arg = DeclareLaunchArgument(
