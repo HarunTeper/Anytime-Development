@@ -147,6 +147,11 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
         this->deactivate();
       } else if (canceled_ && !finished_) {
         finished_ = true;
+      } else if (canceled_ && finished_) {
+        RCLCPP_INFO(node_->get_logger(), "Finishing Goal");
+        this->result_->action_end = this->node_->now();
+        this->goal_handle_->succeed(this->result_);
+        this->deactivate();
       }
     }
   }
