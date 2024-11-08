@@ -54,6 +54,9 @@ RUN cd /home/vscode/ros2_tracing_ws &&\
     . /opt/ros/humble/setup.sh &&\
     colcon build --symlink-install --allow-overriding tracetools
 
+RUN apt-get update && \ 
+    apt-get install -y ros-humble-rmw-cyclonedds-cpp
+
 # --- Install CUDA and LibTorch ---
 
 # install libtorch
@@ -85,6 +88,10 @@ RUN apt-get install -y python-is-python3
 
 RUN apt-get install -y ros-humble-ament-cmake-google-benchmark
 
+RUN pip install pandas matplotlib numpy
+
+RUN pip install --upgrade numpy matplotlib pandas
+
 # --- Install DevTools ---
 
 RUN apt-get -y install clangd clang-format clang-tidy cppcheck
@@ -105,6 +112,8 @@ RUN echo '. /home/vscode/ros2_tracing_ws/install/setup.sh' >> /home/vscode/.bash
 ENV DISPLAY=unix:1
 ENV ROS_LOCALHOST_ONLY=0
 ENV ROS_DOMAIN_ID=0
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+ENV CYCLONEDDS_URI=/home/vscode/workspace/cyclone_dds_config.xml
 
 # --- Set up entrypoint ---
 

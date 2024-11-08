@@ -153,6 +153,13 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
 
   void calculate_result() override {
     // Calculate the result
+    auto start_time = std::chrono::high_resolution_clock::now();
+    while (std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::high_resolution_clock::now() - start_time)
+               .count() < 10) {
+      // Spin for 5 ms
+    }
+
     this->result_->action_compute_end = this->node_->now();
     this->result_->result = 4 * (double)count_inside_ / count_total_;
     this->result_->iterations = loop_count_;

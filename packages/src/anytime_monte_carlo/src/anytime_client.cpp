@@ -55,6 +55,12 @@ void AnytimeActionClient::send_goal() {
 
   // Send the goal asynchronously
   goal_msg.action_send = this->now();
+  if (!action_client_->wait_for_action_server(std::chrono::seconds(5))) {
+    RCLCPP_ERROR(this->get_logger(),
+                 "Action server not available after waiting");
+    timer_->reset();
+    return;
+  }
   action_client_->async_send_goal(goal_msg, send_goal_options);
   // set the cancel time to the client start time
   cancel_send_time_ = goal_msg.client_start;
@@ -178,41 +184,61 @@ void AnytimeActionClient::print_time_differences(
                1e6;  // Convert to milliseconds
     auto p99 = intervals[static_cast<size_t>(intervals.size() * 0.99)] /
                1e6;  // Convert to milliseconds
-    return std::make_tuple(mean, stdev, p99, max);
+    auto p999 = intervals[static_cast<size_t>(intervals.size() * 0.999)] /
+                1e6;  // Convert to milliseconds
+    return std::make_tuple(mean, stdev, p99, p999, max);
   };
 
-  auto [mean1, stdev1, p99_1, max1] = calculate_stats(intervals1_);
-  auto [mean2, stdev2, p99_2, max2] = calculate_stats(intervals2_);
-  auto [mean3, stdev3, p99_3, max3] = calculate_stats(intervals3_);
-  auto [mean4, stdev4, p99_4, max4] = calculate_stats(intervals4_);
-  auto [mean5, stdev5, p99_5, max5] = calculate_stats(intervals5_);
-  auto [mean6, stdev6, p99_6, max6] = calculate_stats(intervals6_);
+  auto [mean1, stdev1, p99_1, p999_1, max1] = calculate_stats(intervals1_);
+  auto [mean2, stdev2, p99_2, p999_2, max2] = calculate_stats(intervals2_);
+  auto [mean3, stdev3, p99_3, p999_3, max3] = calculate_stats(intervals3_);
+  auto [mean4, stdev4, p99_4, p999_4, max4] = calculate_stats(intervals4_);
+  auto [mean5, stdev5, p99_5, p999_5, max5] = calculate_stats(intervals5_);
+  auto [mean6, stdev6, p99_6, p999_6, max6] = calculate_stats(intervals6_);
 
   RCLCPP_INFO(
       this->get_logger(),
       "Interval 1 (action_send to action_start): mean=%f ms, stdev=%f ms, "
-      "p99=%f ms, max=%f ms",
-      mean1, stdev1, p99_1, max1);
+      "p99=%f ms, p999=%f ms, max=%f ms",
+      mean1, stdev1, p99_1, p999_1, max1);
   RCLCPP_INFO(this->get_logger(),
               "Interval 2 (cancel_send_time_ to action_cancel): mean=%f ms, "
               "stdev=%f ms, "
-              "p99=%f ms, max=%f ms",
-              mean2, stdev2, p99_2, max2);
+              "p99=%f ms, p999=%f ms, max=%f ms",
+              mean2, stdev2, p99_2, p999_2, max2);
   RCLCPP_INFO(
       this->get_logger(),
       "Interval 3 (action_cancel to action_end): mean=%f ms, stdev=%f ms, "
-      "p99=%f ms, max=%f ms",
-      mean3, stdev3, p99_3, max3);
+      "p99=%f ms, p999=%f ms, max=%f ms",
+      mean3, stdev3, p99_3, p999_3, max3);
   RCLCPP_INFO(this->get_logger(),
               "Interval 4 (action_end to receive): mean=%f ms, stdev=%f ms, "
-              "p99=%f ms, max=%f ms",
-              mean4, stdev4, p99_4, max4);
+              "p99=%f ms, p999=%f ms, max=%f ms",
+              mean4, stdev4, p99_4, p999_4, max4);
   RCLCPP_INFO(this->get_logger(),
               "Interval 5 (action_cancel to receive): mean=%f ms, stdev=%f ms, "
-              "p99=%f ms, max=%f ms",
-              mean5, stdev5, p99_5, max5);
+              "p99=%f ms, p999=%f ms, max=%f ms",
+              mean5, stdev5, p99_5, p999_5, max5);
   RCLCPP_INFO(this->get_logger(),
               "Interval 6 (action_send to receive): mean=%f ms, stdev=%f ms, "
-              "p99=%f ms, max=%f ms",
-              mean6, stdev6, p99_6, max6);
+              "p99=%f ms, p999=%f ms, max=%f ms",
+              mean6, stdev6, p99_6, p999_6, max6);
+
+  // Calculate the statistics for the iterations, which is an integer
+  auto iterations = result.result->iterations;
+  iterations_.push_back(iterations);
+
+  auto mean = std::accumulate(iterations_.begin(), iterations_.end(), 0.0) /
+              iterations_.size();
+  auto sq_sum = std::inner_product(iterations_.begin(), iterations_.end(),
+                                   iterations_.begin(), 0.0);
+  auto stdev = std::sqrt(sq_sum / iterations_.size() - mean * mean);
+  auto max = *std::max_element(iterations_.begin(), iterations_.end());
+  auto p99 = iterations_[static_cast<size_t>(iterations_.size() * 0.99)];
+  auto p999 = iterations_[static_cast<size_t>(iterations_.size() * 0.999)];
+
+  RCLCPP_INFO(
+      this->get_logger(),
+      "Number of iterations: mean=%f, stdev=%f, p99=%li, p999=%li, max=%li",
+      mean, stdev, p99, p999, max);
 }

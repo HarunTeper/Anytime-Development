@@ -66,6 +66,8 @@ class AnytimeActionClient : public rclcpp::Node {
   std::vector<int64_t> intervals4_;
   std::vector<int64_t> intervals5_;
   std::vector<int64_t> intervals6_;
+
+  std::vector<int64_t> iterations_;
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(AnytimeActionClient)
