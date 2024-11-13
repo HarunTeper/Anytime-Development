@@ -97,6 +97,8 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
     }
   }
 
+  // ----------------- Reactive Functions -----------------
+
   // Blocking function to approximate Pi
   void reactive_function() {
     if (check_cancel_reactive()) {
@@ -160,6 +162,8 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
     }
     return false;
   }
+
+  // ----------------- Proactive Functions -----------------
 
   // proactive function to approximate Pi
   void proactive_function(
@@ -228,6 +232,8 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
       finished_ = true;
     }
   }
+
+  // ----------------- Common Functions -----------------
 
   void calculate_result() override {
     // Calculate the result
