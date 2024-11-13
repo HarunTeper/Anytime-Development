@@ -62,12 +62,10 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
       if constexpr (isReactive) {
         // add the waitable to the node
         node_->get_node_waitables_interface()->add_waitable(
-            anytime_iteration_waitable_,
-            node_->get_node_base_interface()->get_default_callback_group());
+            anytime_iteration_waitable_, compute_callback_group_);
 
         node_->get_node_waitables_interface()->add_waitable(
-            anytime_result_waitable_,
-            node_->get_node_base_interface()->get_default_callback_group());
+            anytime_result_waitable_, compute_callback_group_);
       } else if constexpr (!isReactive) {
         // add the waitable to the node
         node_->get_node_waitables_interface()->add_waitable(
