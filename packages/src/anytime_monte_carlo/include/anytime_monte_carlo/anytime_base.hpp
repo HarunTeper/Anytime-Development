@@ -9,15 +9,16 @@ class AnytimeBase {
   virtual ~AnytimeBase() = default;
 
   virtual void reset() = 0;
-  virtual bool check_cancel_and_finish_active() = 0;
-  virtual void check_cancel_and_finish_passive() = 0;
+  // check_cancel
+  // check_finish
+  virtual void calculate_result_reactive() = 0;
   virtual void calculate_result() = 0;
   virtual void cancel() = 0;
   virtual void start() = 0;
 
   void activate() { is_running_ = true; }
   void deactivate() { is_running_ = false; }
-  bool is_active() { return is_running_; }
+  bool is_reactive() { return is_running_; }
 
   void set_goal_handle(std::shared_ptr<GoalHandleType> goal_handle) {
     goal_handle_ = goal_handle;
@@ -25,7 +26,9 @@ class AnytimeBase {
 
   std::shared_ptr<GoalHandleType> get_goal_handle() { return goal_handle_; }
 
-  void notify() { anytime_waitable_->notify(); }
+  void notify_iteration() { anytime_iteration_waitable_->notify(); }
+
+  void notify_result() { anytime_result_waitable_->notify(); }
 
   void notify_finish() { anytime_finish_waitable_->notify(); }
 
@@ -37,12 +40,11 @@ class AnytimeBase {
     goal_processing_start_time_ = time;
   }
 
-  void set_batch_size(int batch_size) {
-    batch_size_ = batch_size;
-  }
+  void set_batch_size(int batch_size) { batch_size_ = batch_size; }
 
  protected:
-  std::shared_ptr<AnytimeWaitable> anytime_waitable_;
+  std::shared_ptr<AnytimeWaitable> anytime_iteration_waitable_;
+  std::shared_ptr<AnytimeWaitable> anytime_result_waitable_;
   std::shared_ptr<AnytimeWaitable> anytime_finish_waitable_;
   bool is_running_ = false;
   bool finished_ = false;

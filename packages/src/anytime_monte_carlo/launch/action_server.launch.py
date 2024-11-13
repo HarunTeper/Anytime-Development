@@ -30,7 +30,7 @@ def include_launch_description(context: LaunchContext):
                 plugin="AnytimeActionServer",
                 name="anytime_server",
                 parameters=[
-                    {"anytime_active": LaunchConfiguration("anytime_active")},
+                    {"anytime_reactive": LaunchConfiguration("anytime_reactive")},
                     {"separate_thread": LaunchConfiguration("separate_thread")},
                     {"multi_threading": LaunchConfiguration("multi_threading")},
                     {"batch_size": LaunchConfiguration("batch_size")},
@@ -53,8 +53,8 @@ def generate_launch_description():
         "multi_threading", default_value="False", description="Threading type"
     )
 
-    anytime_active_arg = DeclareLaunchArgument(
-        "anytime_active", default_value="False", description="Anytime active"
+    anytime_reactive_arg = DeclareLaunchArgument(
+        "anytime_reactive", default_value="False", description="Anytime reactive"
     )
 
     separate_thread_arg = DeclareLaunchArgument(
@@ -69,7 +69,7 @@ def generate_launch_description():
     launch_description = LaunchDescription()
 
     launch_description.add_action(threading_type_arg)
-    launch_description.add_action(anytime_active_arg)
+    launch_description.add_action(anytime_reactive_arg)
     launch_description.add_action(separate_thread_arg)
     launch_description.add_action(batch_size_arg)
 

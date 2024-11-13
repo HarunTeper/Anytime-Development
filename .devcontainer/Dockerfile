@@ -88,7 +88,7 @@ RUN apt-get install -y python-is-python3
 
 RUN apt-get install -y ros-humble-ament-cmake-google-benchmark
 
-RUN pip install pandas matplotlib numpy
+RUN pip install pandas numpy
 
 RUN pip install --upgrade numpy matplotlib pandas
 

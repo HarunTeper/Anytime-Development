@@ -31,7 +31,7 @@ class AnytimeActionServer : public rclcpp::Node {
 
   // factory function for monte carlo pi
   std::shared_ptr<AnytimeBase<double, Anytime, AnytimeGoalHandle>>
-  create_monte_carlo_pi(rclcpp::Node* node, bool anytime_active,
+  create_monte_carlo_pi(rclcpp::Node* node, bool anytime_reactive,
                         bool separate_thread, bool threading_type, int batch_size);
 
   // callback group for action

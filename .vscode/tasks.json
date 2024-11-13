@@ -26,7 +26,7 @@
         {
             "label": "ROS2-Monte-Carlo-Server",
             "type": "shell",
-            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_active:=${input:anytime_active} separate_thread:=${input:separate_thread} multi_threading:=${input:multi_threading}",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_monte_carlo action_server.launch.py anytime_reactive:=${input:anytime_reactive} separate_thread:=${input:separate_thread} multi_threading:=${input:multi_threading}",
             "problemMatcher": [],
             "presentation": {
                 "echo": true,
@@ -40,9 +40,9 @@
     ],
     "inputs": [
         {
-            "id": "anytime_active",
+            "id": "anytime_reactive",
             "type": "pickString",
-            "description": "Select the anytime_active parameter",
+            "description": "Select the anytime_reactive parameter",
             "options": [
                 "true",
                 "false"

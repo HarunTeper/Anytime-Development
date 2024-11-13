@@ -11,47 +11,71 @@ using Anytime = anytime_interfaces::action::Anytime;
 using AnytimeGoalHandle = rclcpp_action::ServerGoalHandle<Anytime>;
 
 // Monte Carlo Pi class template
-template <bool isActive, bool separate_thread, bool multi_threading>
+template <bool isReactive, bool separate_thread, bool multi_threading>
 class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
  public:
   // Constructor
   MonteCarloPi(rclcpp::Node* node, int batch_size = 1)
       : node_(node), batch_size_(batch_size) {
-    anytime_waitable_ = std::make_shared<AnytimeWaitable>([this]() {
-      if constexpr (isActive) {
-        if constexpr (multi_threading) {
-          this->active_function_loop(this->goal_handle_);
-        } else if constexpr (!multi_threading) {
-          this->active_function(this->goal_handle_);
-        }
-      } else if constexpr (!isActive) {
-        if constexpr (multi_threading) {
-          this->passive_function_loop(this->goal_handle_);
-        } else if constexpr (!multi_threading) {
-          this->passive_function(this->goal_handle_);
-        }
+    if constexpr (isReactive && multi_threading) {
+      anytime_iteration_waitable_ = std::make_shared<AnytimeWaitable>(
+          [this]() { this->reactive_function_loop(); });
+    } else if constexpr (isReactive && !multi_threading) {
+      anytime_iteration_waitable_ = std::make_shared<AnytimeWaitable>(
+          [this]() { this->reactive_function(); });
+    } else if constexpr (!isReactive && multi_threading) {
+      anytime_iteration_waitable_ = std::make_shared<AnytimeWaitable>(
+          [this]() { this->proactive_function_loop(this->goal_handle_); });
+    } else if constexpr (!isReactive && !multi_threading) {
+      anytime_iteration_waitable_ = std::make_shared<AnytimeWaitable>(
+          [this]() { this->proactive_function(this->goal_handle_); });
+    }
+
+    if constexpr (isReactive) {
+      anytime_result_waitable_ = std::make_shared<AnytimeWaitable>(
+          [this]() { this->calculate_result_reactive(); });
+    } else if constexpr (!isReactive) {
+      anytime_result_waitable_ = std::make_shared<AnytimeWaitable>(
+          [this]() { this->calculate_result(); });
+    }
+
+    anytime_result_waitable_ = std::make_shared<AnytimeWaitable>([this]() {
+      if constexpr (isReactive) {
+        this->calculate_result_reactive();
+      } else if constexpr (!isReactive) {
+        this->calculate_result();
       }
     });
 
-    anytime_finish_waitable_ = std::make_shared<AnytimeWaitable>([this]() {
-      if constexpr (isActive) {
-        this->check_cancel_and_finish_active();
-      } else if constexpr (!isActive) {
-        this->check_cancel_and_finish_passive();
-      }
-    });
+    if constexpr (isReactive) {
+      // nothing to do
+    } else if constexpr (!isReactive) {
+      anytime_finish_waitable_ = std::make_shared<AnytimeWaitable>(
+          [this]() { this->check_cancel_and_finish_proactive(); });
+    }
 
     // callback group
     compute_callback_group_ = node_->create_callback_group(
         rclcpp::CallbackGroupType::MutuallyExclusive);
 
-    // add the waitable to the node
-    node_->get_node_waitables_interface()->add_waitable(
-        anytime_waitable_, compute_callback_group_);
+    if constexpr (!separate_thread) {
+      // add the waitable to the node
+      node_->get_node_waitables_interface()->add_waitable(
+          anytime_iteration_waitable_,
+          node_->get_node_base_interface()->get_default_callback_group());
 
-    node_->get_node_waitables_interface()->add_waitable(
-        anytime_finish_waitable_,
-        node_->get_node_base_interface()->get_default_callback_group());
+      node_->get_node_waitables_interface()->add_waitable(
+          anytime_result_waitable_,
+          node_->get_node_base_interface()->get_default_callback_group());
+
+      if constexpr (isReactive) {
+        // nothing to do
+      } else if constexpr (!isReactive) {
+        node_->get_node_waitables_interface()->add_waitable(
+            anytime_finish_waitable_,
+            node_->get_node_base_interface()->get_default_callback_group());
+      }
+    }
   }
 
   void compute() {
@@ -69,57 +93,85 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
   }
 
   // Blocking function to approximate Pi
-  void active_function(const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
-    if (check_cancel_and_finish_active()) {
+  void reactive_function() {
+    if (check_cancel_reactive()) {
       return;
-    }
-    if (loop_count_ < goal_handle->get_goal()->goal) {
-      compute();
-
-      this->anytime_waitable_->notify();
-
     } else {
-      active_finish();
+      compute();
+      this->notify_result();
+    }
+  }
+
+  void calculate_result_reactive() {
+    if (check_cancel_reactive()) {
+      return;
+    } else {
+      calculate_result();
+      if (check_finish_reactive()) {
+        return;
+      } else {
+        this->notify_iteration();
+      }
     }
   }
 
   // Blocking function to approximate Pi
-  void active_function_loop(
-      const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
+  void reactive_function_loop() {
     while (true) {
-      if (check_cancel_and_finish_active()) {
-        break;
-      }
-      if (loop_count_ < goal_handle->get_goal()->goal) {
-        compute();
+      if (check_cancel_reactive()) {
+        return;
       } else {
-        active_finish();
-        break;
+        compute();
+      }
+      if (check_cancel_reactive()) {
+        return;
+      } else {
+        calculate_result();
+      }
+      if (check_finish_reactive()) {
+        return;
       }
     }
   }
 
-  void active_finish() {
-    RCLCPP_INFO(node_->get_logger(), "Goal was completed");
-    finished_ = true;
-    check_cancel_and_finish_active();
+  bool check_cancel_reactive() {
+    if (this->goal_handle_->is_canceling()) {
+      RCLCPP_INFO(node_->get_logger(), "Canceling goal");
+      this->result_->action_end = this->node_->now();
+      this->goal_handle_->canceled(this->result_);
+      this->deactivate();
+      return true;
+    }
+    return false;
   }
 
-  // Passive function to approximate Pi
-  void passive_function(const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
+  bool check_finish_reactive() {
+    if (loop_count_ >= this->goal_handle_->get_goal()->goal) {
+      RCLCPP_INFO(node_->get_logger(), "Finishing Goal");
+      this->result_->action_end = this->node_->now();
+      this->goal_handle_->succeed(this->result_);
+      this->deactivate();
+      return true;
+    }
+    return false;
+  }
+
+  // proactive function to approximate Pi
+  void proactive_function(
+      const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
     if (loop_count_ < goal_handle->get_goal()->goal && !canceled_) {
       compute();
 
       calculate_result();
 
-      this->anytime_waitable_->notify();
+      this->notify_iteration();
 
     } else {
-      passive_function_finish();
+      proactive_function_finish();
     }
   }
 
-  void passive_function_loop(
+  void proactive_function_loop(
       const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
     while (true) {
       if (loop_count_ < goal_handle->get_goal()->goal && !canceled_) {
@@ -127,13 +179,13 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
 
         calculate_result();
       } else {
-        passive_function_finish();
+        proactive_function_finish();
         break;
       }
     }
   }
 
-  void passive_function_finish() {
+  void proactive_function_finish() {
     RCLCPP_INFO(node_->get_logger(), "Goal was completed");
     {
       std::lock_guard<std::mutex> lock(this->notify_mutex_);
@@ -156,41 +208,7 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
     }
   }
 
-  void calculate_result() override {
-    // Calculate the result
-    auto start_time = std::chrono::high_resolution_clock::now();
-    while (std::chrono::duration_cast<std::chrono::milliseconds>(
-               std::chrono::high_resolution_clock::now() - start_time)
-               .count() < 10) {
-      // Spin for 5 ms
-    }
-
-    this->result_->action_compute_end = this->node_->now();
-    this->result_->result = 4 * (double)count_inside_ / count_total_;
-    this->result_->iterations = loop_count_;
-  }
-
-  bool check_cancel_and_finish_active() {
-    if (this->goal_handle_->is_canceling()) {
-      RCLCPP_INFO(node_->get_logger(), "Canceling goal");
-      calculate_result();
-      this->result_->action_end = this->node_->now();
-      this->goal_handle_->canceled(this->result_);
-      this->deactivate();
-      return true;
-    }
-    if (finished_) {
-      RCLCPP_INFO(node_->get_logger(), "Finishing Goal");
-      calculate_result();
-      this->result_->action_end = this->node_->now();
-      this->goal_handle_->succeed(this->result_);
-      this->deactivate();
-      return true;
-    }
-    return false;
-  }
-
-  void check_cancel_and_finish_passive() {
+  void check_cancel_and_finish_proactive() {
     std::lock_guard<std::mutex> lock(this->notify_mutex_);
     if (finished_) {
       RCLCPP_INFO(node_->get_logger(), "Finishing Goal");
@@ -206,12 +224,19 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
     }
   }
 
+  void calculate_result() override {
+    // Calculate the result
+    this->result_->action_compute_end = this->node_->now();
+    this->result_->result = 4 * (double)count_inside_ / count_total_;
+    this->result_->iterations = loop_count_;
+  }
+
   // Cancel function
   void cancel() override {
     this->result_->action_cancel = this->node_->now();
-    if constexpr (isActive) {
+    if constexpr (isReactive) {
       // nothing to do
-    } else if constexpr (!isActive) {
+    } else if constexpr (!isReactive) {
       {
         std::lock_guard<std::mutex> lock(this->notify_mutex_);
         if (!finished_) {
@@ -243,14 +268,14 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
     this->result_->action_start = node_->now();
     if constexpr (separate_thread) {
       std::thread([this]() {
-        if constexpr (isActive) {
-          this->active_function_loop(this->goal_handle_);
-        } else if constexpr (!isActive) {
-          this->passive_function_loop(this->goal_handle_);
+        if constexpr (isReactive) {
+          this->reactive_function_loop();
+        } else if constexpr (!isReactive) {
+          this->proactive_function_loop(this->goal_handle_);
         }
       }).detach();
     } else {
-      this->notify();
+      this->notify_iteration();
     }
   }
 

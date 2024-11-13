@@ -6,24 +6,24 @@ import numpy as np
 import pandas as pd
 import sys
 
-def plot_data(batch_size):
+def plot_data(threading, reactive, separate, batch_size):
     # Define the configurations
-    threading_types = ["False", "True"]
-    anytime_actives = ["False", "True"]
-    separate_threads = ["False", "True"]
+    threading_types = ["False", "True"] if threading == "Both" else [threading]
+    anytime_reactives = ["False", "True"] if reactive == "Both" else [reactive]
+    separate_threads = ["False", "True"] if separate == "Both" else [separate]
 
     # Initialize a dictionary to store the data
     data = {}
 
     # Read the data from the files
     for threading in threading_types:
-        for active in anytime_actives:
+        for reactive in anytime_reactives:
             for separate in separate_threads:
-                config_name = f"anytime_{threading}_{active}_{separate}_{batch_size}"
+                config_name = f"anytime_{threading}_{reactive}_{separate}_{batch_size}"
                 file_path = f"/home/vscode/workspace/results/{config_name}.log"
                 
                 # map threading from false true to single multi
-                # map active to false true proactive reactive
+                # map reactive to false true proactive reactive
                 # map false true to executor pthread
                 # create the key_name using the mapped values
                 
@@ -32,17 +32,17 @@ def plot_data(batch_size):
                 else:
                     threading_mapped = "multi"
                     
-                if active == "False":
-                    active_mapped = "proactive"
+                if reactive == "False":
+                    reactive_mapped = "proactive"
                 else:
-                    active_mapped = "reactive"
+                    reactive_mapped = "reactive"
                     
                 if separate == "False":
                     separate_mapped = "executor"
                 else:
                     separate_mapped = "pthread"
                     
-                key_name = f"{threading_mapped}_{active_mapped}_{separate_mapped}"
+                key_name = f"{threading_mapped}_{reactive_mapped}_{separate_mapped}"
                 
                 value_dict = {}
                 
@@ -50,7 +50,25 @@ def plot_data(batch_size):
                 if os.path.exists(file_path):
                     with open(file_path, 'r') as file:
                         
-                        lines = file.readlines()[-7:]
+                        # determine the last line that has "Number of iterations" in it
+                        
+                        lines = file.readlines()
+                        last_iteration_line = None
+                        for line in lines:
+                            if "Number of iterations: mean=" in line:
+                                last_iteration_line = line
+                        if last_iteration_line:
+                            lines = lines[:lines.index(last_iteration_line)+1]
+        
+                        
+                            
+            
+                        
+                        lines = lines[-7:]
+                        
+                                                
+                        print(lines)
+                        
                         
                         
                         for line in lines:
@@ -64,7 +82,13 @@ def plot_data(batch_size):
                             print(line)
                             
                             name = line.split(":")[1][1:]
+                            print(file_path)
+                            print(name)
+                            print("AAAAA")
+                            print(line)
+                            
                             values = line.split(":")[2].split(" ")
+                            print(values)
                             
                             # remove any values from values that do not include an equal sign
                             values = [value for value in values if "=" in value]
@@ -212,13 +236,22 @@ def plot_data(batch_size):
                 
 def main():
     
-    if len(sys.argv) < 2:
-        print("Usage: python evaluation_plotter.py <batch_size>")
+    if len(sys.argv) < 4:
+        print("Usage: python evaluation_plotter.py <executor_types> <anytime_type> <separate_threads> <batch_size>")
         sys.exit(1)
 
-    batch_size = int(sys.argv[1])
+    executor_types = sys.argv[1]
+    anytime_type = sys.argv[2]
+    separate_threads = sys.argv[3]
+    batch_size = int(sys.argv[4])
     
-    plot_data(batch_size)
+    print(f"Executor types: {executor_types}")
+    print(f"Anytime type: {anytime_type}")
+    print(f"Separate threads: {separate_threads}")
+    print(f"Batch size: {batch_size}")
+
+    
+    plot_data(executor_types, anytime_type, separate_threads, batch_size)
 
 if __name__ == "__main__":
     main()
