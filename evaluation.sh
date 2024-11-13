@@ -13,6 +13,10 @@ declare -a threading_types=("False" "True")
 declare -a anytime_reactives=("True")
 declare -a separate_threads=("False" "True")
 
+# Create the results and plots directories
+mkdir -p results
+mkdir -p plots
+
 for threading in "${threading_types[@]}"; do
     for reactive in "${anytime_reactives[@]}"; do
         for separate in "${separate_threads[@]}"; do
