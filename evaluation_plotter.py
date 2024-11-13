@@ -112,11 +112,11 @@ def plot_data(threading, reactive, separate, batch_size):
     for config in data:
         for interval in data[config]:
             if interval != 'Number of iterations':
-                data[config][interval]["mean"] = data[config][interval]["mean"] / 1000
-                data[config][interval]["stdev"] = data[config][interval]["stdev"] / 1000
-                data[config][interval]["p99"] = data[config][interval]["p99"] / 1000
-                data[config][interval]["p999"] = data[config][interval]["p999"] / 1000
-                data[config][interval]["max"] = data[config][interval]["max"] / 1000
+                data[config][interval]["mean"] = data[config][interval]["mean"] 
+                data[config][interval]["stdev"] = data[config][interval]["stdev"] 
+                data[config][interval]["p99"] = data[config][interval]["p99"] 
+                data[config][interval]["p999"] = data[config][interval]["p999"] 
+                data[config][interval]["max"] = data[config][interval]["max"] 
                 
     # Extract intervals and configurations
     intervals = list(data[next(iter(data))].keys())  # Get intervals from any configuration
@@ -179,7 +179,7 @@ def plot_data(threading, reactive, separate, batch_size):
         max_value = max(maxs)
         
         # set the y bar limit between 0 and the max value
-        ax.set_ylim(0, max_value + 0.0001)
+        ax.set_ylim(0, max_value + 0.1)
         
         # Plot bars for each statistic
         ax.bar(indices - 1.5 * bar_width, means, bar_width, label="Mean", color=colors["mean"])
@@ -225,8 +225,8 @@ def plot_data(threading, reactive, separate, batch_size):
         # Boxplot data for the current interval across all configurations
         ax[idx].boxplot(interval_data[interval], tick_labels=configurations, patch_artist=True)
         ax[idx].set_title(interval)
-        ax[idx].set_ylabel('Latency (s)')
-        ax[idx].set_ylim(0, max([max(data) for data in interval_data[interval]]) + 0.0001)
+        ax[idx].set_ylabel('Latency (ms)')
+        ax[idx].set_ylim(0, max([max(data) for data in interval_data[interval]]) + 0.1)
         
 
     plt.xticks(rotation=45, ha="right")
