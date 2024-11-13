@@ -60,35 +60,17 @@ def plot_data(threading, reactive, separate, batch_size):
                         if last_iteration_line:
                             lines = lines[:lines.index(last_iteration_line)+1]
         
-                        
-                            
-            
-                        
                         lines = lines[-7:]
-                        
-                                                
-                        print(lines)
-                        
-                        
                         
                         for line in lines:
                             print(line)
                             # skip the line if it is empty
                             if not line:
                                 continue
-                            print(line)
-                            print(line)
-                            print(line)
-                            print(line)
                             
                             name = line.split(":")[1][1:]
-                            print(file_path)
-                            print(name)
-                            print("AAAAA")
-                            print(line)
                             
                             values = line.split(":")[2].split(" ")
-                            print(values)
                             
                             # remove any values from values that do not include an equal sign
                             values = [value for value in values if "=" in value]
