@@ -117,6 +117,26 @@ def plot_data(threading, reactive, separate, batch_size):
                 data[config][interval]["p99"] = data[config][interval]["p99"] / 1000
                 data[config][interval]["p999"] = data[config][interval]["p999"] / 1000
                 data[config][interval]["max"] = data[config][interval]["max"] / 1000
+                
+    # Extract intervals and configurations
+    intervals = list(data[next(iter(data))].keys())  # Get intervals from any configuration
+    configs = list(data.keys())  # All configurations
+
+    # Create individual tables for each interval
+    for interval in intervals:
+        interval_df = pd.DataFrame(columns=["Configuration", "Mean", "Stdev", "P99", "P999", "Max"])
+        for config in data:
+            interval_df = interval_df._append({
+                "Configuration": config,
+                "Mean": data[config][interval]["mean"],
+                "Stdev": data[config][interval]["stdev"],
+                "P99": data[config][interval]["p99"],
+                "P999": data[config][interval]["p999"],
+                "Max": data[config][interval]["max"]
+            }, ignore_index=True)
+        
+        # Save the DataFrame to a CSV file
+        interval_df.to_csv(f"/home/vscode/workspace/plots/evaluation_data_{interval}_{batch_size}.csv", index=False)
     
     # print number of keys
     print(len(data.keys()))
