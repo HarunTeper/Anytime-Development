@@ -59,18 +59,25 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
         rclcpp::CallbackGroupType::MutuallyExclusive);
 
     if constexpr (!separate_thread) {
-      // add the waitable to the node
-      node_->get_node_waitables_interface()->add_waitable(
-          anytime_iteration_waitable_,
-          node_->get_node_base_interface()->get_default_callback_group());
-
-      node_->get_node_waitables_interface()->add_waitable(
-          anytime_result_waitable_,
-          node_->get_node_base_interface()->get_default_callback_group());
-
       if constexpr (isReactive) {
-        // nothing to do
+        // add the waitable to the node
+        node_->get_node_waitables_interface()->add_waitable(
+            anytime_iteration_waitable_,
+            node_->get_node_base_interface()->get_default_callback_group());
+
+        node_->get_node_waitables_interface()->add_waitable(
+            anytime_result_waitable_,
+            node_->get_node_base_interface()->get_default_callback_group());
       } else if constexpr (!isReactive) {
+        // add the waitable to the node
+        node_->get_node_waitables_interface()->add_waitable(
+            anytime_iteration_waitable_,
+            node_->get_node_base_interface()->get_default_callback_group());
+
+        node_->get_node_waitables_interface()->add_waitable(
+            anytime_result_waitable_,
+            node_->get_node_base_interface()->get_default_callback_group());
+
         node_->get_node_waitables_interface()->add_waitable(
             anytime_finish_waitable_,
             node_->get_node_base_interface()->get_default_callback_group());
