@@ -20,6 +20,11 @@ class AnytimeBase {
   void deactivate() { is_running_ = false; }
   bool is_reactive() { return is_running_; }
 
+  void finish_iteration() { iteration_finished_ = true; }
+  void finish_result() { iteration_finished_ = false; }
+
+  bool get_iteration_finished() { return iteration_finished_; }
+
   void set_goal_handle(std::shared_ptr<GoalHandleType> goal_handle) {
     goal_handle_ = goal_handle;
   }
@@ -30,7 +35,7 @@ class AnytimeBase {
 
   void notify_result() { anytime_result_waitable_->notify(); }
 
-  void notify_finish() { anytime_finish_waitable_->notify(); }
+  void notify_check_finish() { anytime_check_finish_waitable_->notify(); }
 
   void set_goal_handle_accept_time(rclcpp::Time time) {
     goal_handle_accept_time_ = time;
@@ -45,10 +50,12 @@ class AnytimeBase {
  protected:
   std::shared_ptr<AnytimeWaitable> anytime_iteration_waitable_;
   std::shared_ptr<AnytimeWaitable> anytime_result_waitable_;
-  std::shared_ptr<AnytimeWaitable> anytime_finish_waitable_;
+  std::shared_ptr<AnytimeWaitable> anytime_check_finish_waitable_;
   bool is_running_ = false;
   bool finished_ = false;
   bool canceled_ = false;
+
+  bool iteration_finished_ = false;
 
   // timer
   rclcpp::TimerBase::SharedPtr timer_;

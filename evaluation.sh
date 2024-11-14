@@ -10,7 +10,7 @@ batch_size=$1
 source packages/install/setup.bash
 
 declare -a threading_types=("False" "True")
-declare -a anytime_reactives=("True")
+declare -a anytime_reactives=("False" "True")
 declare -a separate_threads=("False" "True")
 
 # Create the results and plots directories
