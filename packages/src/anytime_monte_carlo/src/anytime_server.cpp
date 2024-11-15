@@ -118,7 +118,6 @@ rclcpp_action::GoalResponse AnytimeActionServer::handle_goal(
 // Handle cancel request
 rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
     const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
-  RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
   (void)goal_handle;  // Suppress unused variable warning
 
   // Cancel the MonteCarloPi

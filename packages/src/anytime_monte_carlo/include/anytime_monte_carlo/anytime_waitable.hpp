@@ -25,10 +25,6 @@ class AnytimeWaitable : public rclcpp::Waitable {
 
   void execute(std::shared_ptr<void>& data) override {
     (void)data;
-     {
-      std::lock_guard<std::mutex> lock(notify_guard_conditions_);
-      triggered_.exchange(false);
-     }
     std::lock_guard<std::mutex> lock(execute_mutex_);
     this->execute_callback_();
   }
@@ -66,19 +62,14 @@ class AnytimeWaitable : public rclcpp::Waitable {
     }
   }
 
-  bool notify() {
+  void notify() {
     std::lock_guard<std::mutex> lock(notify_guard_conditions_);
-    if (!triggered_.exchange(true)) {
-      guard_condition_->trigger();
-      return true;
-    }
-    return false;
+    guard_condition_->trigger();
   }
 
   std::shared_ptr<rclcpp::GuardCondition> guard_condition_;
 
-  private:
-
+ private:
   std::atomic<bool> triggered_{false};
 
   std::mutex guard_condition_mutex_;

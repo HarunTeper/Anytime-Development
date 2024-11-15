@@ -17,34 +17,27 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
   // Constructor
   MonteCarloPi(rclcpp::Node* node, int batch_size = 1)
       : node_(node), batch_size_(batch_size) {
-    // Iteration Waitables
-    // Iteration for single-threaded, loop for multi-threaded
+    // --- Reactive Variables ---
     if constexpr (isReactive && multi_threading) {
       anytime_iteration_waitable_ = std::make_shared<AnytimeWaitable>(
-          [this]() { this->reactive_function_loop(); });
+          [this]() { this->reactive_function(); });
     } else if constexpr (isReactive && !multi_threading) {
       anytime_iteration_waitable_ = std::make_shared<AnytimeWaitable>(
           [this]() { this->reactive_function(); });
-    } else if constexpr (!isReactive && multi_threading) {
+    }
+
+    // --- Proactive Variables ---
+    // Iteration Waitables
+    // Iteration for single-threaded, loop for multi-threaded
+    if constexpr (!isReactive && multi_threading) {
       anytime_iteration_waitable_ = std::make_shared<AnytimeWaitable>(
-          [this]() { this->proactive_function_loop(); });
+          [this]() { this->proactive_function(); });
     } else if constexpr (!isReactive && !multi_threading) {
       anytime_iteration_waitable_ = std::make_shared<AnytimeWaitable>(
           [this]() { this->proactive_function(); });
     }
 
-    // Result Waitables
-    if constexpr (isReactive) {
-      anytime_result_waitable_ = std::make_shared<AnytimeWaitable>(
-          [this]() { this->calculate_result_reactive(); });
-    } else if constexpr (!isReactive) {
-      anytime_result_waitable_ = std::make_shared<AnytimeWaitable>(
-          [this]() { this->calculate_result_proactive(); });
-    }
-
-    if constexpr (isReactive) {
-      // nothing to do
-    } else if constexpr (!isReactive) {
+    if constexpr (!isReactive) {
       anytime_check_finish_waitable_ = std::make_shared<AnytimeWaitable>(
           [this]() { this->check_cancel_and_finish_proactive(); });
     }
@@ -58,16 +51,10 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
         // add the waitable to the node
         node_->get_node_waitables_interface()->add_waitable(
             anytime_iteration_waitable_, compute_callback_group_);
-
-        node_->get_node_waitables_interface()->add_waitable(
-            anytime_result_waitable_, compute_callback_group_);
       } else if constexpr (!isReactive) {
         // add the waitable to the node
         node_->get_node_waitables_interface()->add_waitable(
             anytime_iteration_waitable_, compute_callback_group_);
-
-        node_->get_node_waitables_interface()->add_waitable(
-            anytime_result_waitable_, compute_callback_group_);
 
         node_->get_node_waitables_interface()->add_waitable(
             anytime_check_finish_waitable_,
@@ -88,42 +75,21 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
 
   // Blocking function to approximate Pi
   void reactive_function() {
-    if (check_cancel_reactive()) {
+    if (check_cancel_reactive() || check_finish_reactive()) {
       return;
     } else {
       compute();
-      this->notify_result();
-    }
-  }
-
-  void calculate_result_reactive() {
-    if (check_cancel_reactive()) {
-      return;
-    } else {
-      calculate_result();
-      if (check_finish_reactive()) {
-        return;
-      } else {
-        this->notify_iteration();
-      }
+      notify_iteration();
     }
   }
 
   // Blocking function to approximate Pi
   void reactive_function_loop() {
     while (true) {
-      if (check_cancel_reactive()) {
+      if (check_cancel_reactive() || check_finish_reactive()) {
         return;
       } else {
         compute();
-      }
-      if (check_cancel_reactive()) {
-        return;
-      } else {
-        calculate_result();
-      }
-      if (check_finish_reactive()) {
-        return;
       }
     }
   }
@@ -131,6 +97,7 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
   bool check_cancel_reactive() {
     if (this->goal_handle_->is_canceling()) {
       RCLCPP_INFO(node_->get_logger(), "Canceling goal");
+      this->calculate_result();
       this->result_->action_end = this->node_->now();
       this->goal_handle_->canceled(this->result_);
       this->deactivate();
@@ -142,6 +109,7 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
   bool check_finish_reactive() {
     if (loop_count_ >= this->goal_handle_->get_goal()->goal) {
       RCLCPP_INFO(node_->get_logger(), "Finishing Goal");
+      this->calculate_result();
       this->result_->action_end = this->node_->now();
       this->goal_handle_->succeed(this->result_);
       this->deactivate();
@@ -155,28 +123,17 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
   // proactive function to approximate Pi
   void proactive_function() {
     compute();
-    this->finish_iteration();
-    this->notify_check_finish();
-  }
-
-  void calculate_result_proactive() {
     calculate_result();
-    this->finish_result();
-    this->notify_check_finish();
+    notify_check_finish();
   }
 
   void proactive_function_loop() {
     while (true) {
       if (check_cancel_proactive() || check_finish_proactive()) {
-        this->notify_check_finish();
+        notify_check_finish();
         return;
       } else {
         compute();
-      }
-      if (check_cancel_proactive()) {
-        this->notify_check_finish();
-        return;
-      } else {
         calculate_result();
       }
     }
@@ -217,17 +174,10 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
     if (check_cancel_proactive()) {
       cancel_proactive();
       return;
-    } else {
-      if (get_iteration_finished()) {
-        this->notify_result();
-      } else {
-        if (check_finish_proactive()) {
-          finish_proactive();
-        } else {
-          this->notify_iteration();
-        }
-      }
-    }
+    } else if (check_finish_proactive()) {
+      finish_proactive();
+    } else
+      notify_iteration();
   }
 
   // ----------------- Common Functions -----------------
@@ -291,7 +241,7 @@ class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle> {
         }
       }).detach();
     } else {
-      this->notify_iteration();
+      notify_iteration();
     }
   }
 

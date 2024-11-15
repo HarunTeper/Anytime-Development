@@ -62,7 +62,7 @@ def generate_launch_description():
     )
 
     batch_size_arg = DeclareLaunchArgument(
-        "batch_size", default_value="1000", description="Batch size for compute iterations"
+        "batch_size", default_value="2", description="Batch size for compute iterations"
     )
 
     # Launch Description

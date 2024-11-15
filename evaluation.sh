@@ -11,7 +11,7 @@ source packages/install/setup.bash
 
 declare -a threading_types=("False" "True")
 declare -a anytime_reactives=("False" "True")
-declare -a separate_threads=("False" "True")
+declare -a separate_threads=("False")
 
 # Create the results and plots directories
 mkdir -p results
@@ -20,30 +20,31 @@ mkdir -p plots
 for threading in "${threading_types[@]}"; do
     for reactive in "${anytime_reactives[@]}"; do
         for separate in "${separate_threads[@]}"; do
-            config_name="anytime_${threading}_${reactive}_${separate}_${batch_size}"
-            echo "Running configuration: $config_name"
+            for run in {1..3}; do
+                config_name="anytime_${threading}_${reactive}_${separate}_${batch_size}_run${run}"
+                echo "Running configuration: $config_name"
 
-            # Start the action server in the background
-            ros2 launch anytime_monte_carlo action_server.launch.py multi_threading:=$threading anytime_reactive:=$reactive separate_thread:=$separate batch_size:=$batch_size > /dev/null &
-            server_pid=$!
-            
-            sleep 5
-            
-            # Start the action client in the background and log output
-            ros2 launch anytime_monte_carlo action_client.launch.py > "./results/${config_name}.log" &
-            client_pid=$!
-            
-            # Wait for 300 seconds
-            sleep 30
+                # Start the action server in the background
+                ros2 launch anytime_monte_carlo action_server.launch.py multi_threading:=$threading anytime_reactive:=$reactive separate_thread:=$separate batch_size:=$batch_size > /dev/null &
+                server_pid=$!
+                
+                sleep 5
+                
+                # Start the action client in the background and log output
+                ros2 launch anytime_monte_carlo action_client.launch.py > "./results/${config_name}.log" &
+                client_pid=$!
+                
+                # Wait for 300 seconds
+                sleep 60
 
-            # Terminate both processes after 300 seconds
-            kill $server_pid 2>/dev/null
-            kill $client_pid 2>/dev/null
-            pkill -f '/opt/ros/humble'
-            
-            # Wait briefly to ensure processes have terminated
-            sleep 5
-
+                # Terminate both processes after 300 seconds
+                kill $server_pid 2>/dev/null
+                kill $client_pid 2>/dev/null
+                pkill -f '/opt/ros/humble'
+                
+                # Wait briefly to ensure processes have terminated
+                sleep 5
+            done
         done
     done
 done

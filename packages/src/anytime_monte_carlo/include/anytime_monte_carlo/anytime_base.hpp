@@ -11,7 +11,6 @@ class AnytimeBase {
   virtual void reset() = 0;
   // check_cancel
   // check_finish
-  virtual void calculate_result_reactive() = 0;
   virtual void calculate_result() = 0;
   virtual void cancel() = 0;
   virtual void start() = 0;
