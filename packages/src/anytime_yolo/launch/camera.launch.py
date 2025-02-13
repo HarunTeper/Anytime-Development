@@ -18,9 +18,10 @@ def generate_launch_description():
 
     # realsense cmd with ifcondition to enable camera
     realsense_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(realsense_pkd_dir, 'launch', 'rs_launch.py')),
+        PythonLaunchDescriptionSource(os.path.join(
+            realsense_pkd_dir, 'launch', 'rs_launch.py')),
         launch_arguments={
-            'enable_depth': 'true',
+            'enable_depth': 'false',
             'enable_color': 'true',
             'enable_infra1': 'false',
             'enable_infra2': 'false',
@@ -30,12 +31,12 @@ def generate_launch_description():
             'enable_confidence': 'true',
             'enable_gyro': 'false',
             'enable_accel': 'false',
-            'enable_pose': 'true',
+            'enable_pose': 'false',
             'pointcloud.enable': 'false',
             'enable_sync': 'false',
             'align_depth.enable': 'false',
             'colorizer.enable': 'false',
-            'initial_reset': 'false',
+            'initial_reset': 'true',
             'allow_no_texture_points': 'false',
             'ordered_pc': 'false',
             'decimation_filter.enable': 'false',

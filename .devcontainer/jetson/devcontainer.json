@@ -8,8 +8,8 @@
 		"args": {
 			"INSTALL_ROS2": "true",
 			"INSTALL_ROS2_TRACING": "false",
-			"ROS_DOMAIN_ID": "0",
-			"ROS_LOCALHOST_ONLY": "1",
+			"ROS_DOMAIN_ID": "12",
+			"ROS_LOCALHOST_ONLY": "0",
 			"DISPLAY": "${localEnv:DISPLAY}"
 		}
 	},
@@ -22,31 +22,26 @@
 	// Configure runtime settings
 	"runArgs": [
 		"--network=host",
+		"--env=NVIDIA_VISIBLE_DEVICES=all",
 		"--runtime=nvidia",
 		"--gpus=all",
 		"--privileged"
 	],
 	"mounts": [
+		"source=/dev,target=/dev,type=bind",
 		"source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind"
 	],
 	// Configure VS Code extensions
 	"customizations": {
-		"vscode": {
-			"extensions": [
-				"ms-vscode.cmake-tools",
-				"llvm-vs-code-extensions.vscode-clangd",
-				"xaver.clang-format",
-				"ms-python.python",
-				"donjayamanne.python-extension-pack",
-				"donjayamanne.python-environment-manager",
-				"ms-azuretools.vscode-docker",
-				"ms-python.autopep8",
-				"ms-vscode.cpptools",
-				"ms-vscode.cpptools-extension-pack",
-				"GitHub.copilot",
-				"GitHub.copilot-chat"
-			]
-		}
+		"runArgs": [
+			"--network=host",
+			"--env=NVIDIA_VISIBLE_DEVICES=all",
+			"--runtime=nvidia",
+			"--gpus=all",
+			"--privileged",
+			"--device-cgroup-rule=c 81:* rmw",
+			"--device-cgroup-rule=c 189:* rmw"
+		]
 	},
 	"containerEnv": {
 		"SHELL": "/bin/bash"

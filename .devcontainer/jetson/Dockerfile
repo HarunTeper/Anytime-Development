@@ -61,11 +61,6 @@ RUN pip install pandas numpy
 
 RUN pip install --upgrade numpy matplotlib pandas
 
-# --- Install Realsense ---
-
-# install json library
-# RUN apt-get update && apt-get -y install nlohmann-json3-dev ros-humble-vision-msgs ros-humble-realsense2*
-
 # --- Install DevTools ---
 
 RUN apt-get -y install clangd clang-format clang-tidy cppcheck
@@ -89,6 +84,9 @@ RUN groupadd --gid $USER_GID $USERNAME \
 
 # [Optional] Set the default user. Omit if you want to keep the default as root.
 USER $USERNAME
+
+# add user to video group
+RUN sudo usermod -a -G video vscode
 
 WORKDIR /home/$USERNAME/workspace
 
@@ -115,13 +113,30 @@ RUN if [ "$INSTALL_ROS2_TRACING" = "true" ]; then \
     cd /home/vscode/ros2_tracing_ws &&\
     . /opt/ros/humble/setup.sh &&\
     colcon build --symlink-install --allow-overriding tracetools && \
-    pip install bokeh jupyter; \
-    fi
-
-# source ROS2 tracing setup file
-RUN if [ "$INSTALL_ROS2_TRACING" = "true" ]; then \
+    pip install bokeh jupyter && \
     echo '. /home/vscode/ros2_tracing_ws/install/setup.sh' >> /home/vscode/.bashrc; \
     fi
+
+RUN cd /home/vscode && \
+    git clone https://github.com/IntelRealSense/librealsense.git && \
+    cd librealsense && \
+    mkdir build && cd build && \
+    cmake ../ -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=true -DFORCE_RSUSB_BACKEND=true -DBUILD_WITH_CUDA=true && \
+    make -j$(($(nproc)-1)) && \
+    sudo make install
+
+    RUN cd /home/vscode && \
+    mkdir -p ros2_realsense_ws/src && \
+    cd ros2_realsense_ws/src && \
+    git clone https://github.com/IntelRealSense/realsense-ros.git -b ros2-master && \
+    cd .. && \
+    . /opt/ros/humble/setup.sh && \
+    sudo apt-get install python3-rosdep -y && \
+    sudo rosdep init && \
+    rosdep update && \
+    rosdep install -i --from-path src --rosdistro $ROS_DISTRO --skip-keys=librealsense2 -y && \
+    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+    echo '. /home/vscode/ros2_realsense_ws/install/setup.sh' >> /home/vscode/.bashrc
 
 # configure environment variables
 ARG DISPLAY
