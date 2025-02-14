@@ -7,7 +7,7 @@
 		"dockerfile": "Dockerfile",
 		"args": {
 			"VARIANT": "jammy",
-			"INSTALL_ROS2": "false",
+			"INSTALL_ROS2": "true",
 			"INSTALL_ROS2_TRACING": "false",
 			"ROS_DOMAIN_ID": "0",
 			"ROS_LOCALHOST_ONLY": "1",
@@ -23,6 +23,7 @@
 	"runArgs": [
 		"--network=host",
 		"--gpus=all",
+		"--runtime=nvidia",
 		"--privileged"
 	],
 	"mounts": [

@@ -21,7 +21,6 @@ RUN if [ "$INSTALL_ROS2" = "true" ]; then \
     fi
 
 # --- Install ROS 2 Extensions ---
-
 RUN if [ "$INSTALL_ROS2" = "true" ]; then \
     apt-get update && \
     apt-get install -y ros-humble-rmw-cyclonedds-cpp; \
@@ -44,7 +43,6 @@ RUN apt-get update && \
     pip install pep8 pylint
 
 # --- Install TensorRT ---
-
 RUN wget https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/local_repo/nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5_1.0-1_arm64.deb && \
     dpkg -i nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5_1.0-1_arm64.deb && \
     cp /var/nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5/*-keyring.gpg /usr/share/keyrings/ && \
@@ -53,21 +51,17 @@ RUN wget https://developer.nvidia.com/downloads/compute/machine-learning/tensorr
     rm nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5_1.0-1_arm64.deb
 
 # --- Anytime Dependencies ---
-
-# RUN apt-get update && \
-#     apt-get install -y ros-humble-ament-cmake-google-benchmark
-
-RUN pip install pandas numpy
-
-RUN pip install --upgrade numpy matplotlib pandas
+RUN if [ "$INSTALL_ROS2" = "true" ]; then \
+    apt-get install -y ros-humble-ament-cmake-google-benchmark && \
+    pip install pandas numpy; \
+    RUN pip install --upgrade numpy matplotlib pandas; \
+    fi
 
 # --- Install DevTools ---
-
 RUN apt-get -y install clangd clang-format clang-tidy cppcheck
 RUN pip install pep8 pylint
 
 # --- Set up user ---
-
 ARG USERNAME=vscode
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
@@ -87,7 +81,6 @@ USER $USERNAME
 
 # add user to video group
 RUN sudo usermod -a -G video vscode
-
 WORKDIR /home/$USERNAME/workspace
 
 # source ROS2 setup file and workspace
@@ -117,6 +110,7 @@ RUN if [ "$INSTALL_ROS2_TRACING" = "true" ]; then \
     echo '. /home/vscode/ros2_tracing_ws/install/setup.sh' >> /home/vscode/.bashrc; \
     fi
 
+# --- Install Realsense ---
 RUN cd /home/vscode && \
     git clone https://github.com/IntelRealSense/librealsense.git && \
     cd librealsense && \
@@ -125,7 +119,7 @@ RUN cd /home/vscode && \
     make -j$(($(nproc)-1)) && \
     sudo make install
 
-    RUN cd /home/vscode && \
+RUN cd /home/vscode && \
     mkdir -p ros2_realsense_ws/src && \
     cd ros2_realsense_ws/src && \
     git clone https://github.com/IntelRealSense/realsense-ros.git -b ros2-master && \

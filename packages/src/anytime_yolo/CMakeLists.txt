@@ -45,7 +45,11 @@ ament_target_dependencies(anytime_yolo_model ${yolo_rt_dependencies})
 # Link libraries
 target_link_libraries(anytime_yolo anytime_yolo_node)
 target_link_libraries(anytime_yolo_node anytime_yolo_model)
-target_link_libraries(anytime_yolo_model /usr/lib/aarch64-linux-gnu/libnvinfer.so ${CUDA_LIBRARIES})
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+  target_link_libraries(anytime_yolo_model /usr/lib/aarch64-linux-gnu/libnvinfer.so ${CUDA_LIBRARIES})
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+  target_link_libraries(anytime_yolo_model /usr/lib/x86_64-linux-gnu/libnvinfer.so ${CUDA_LIBRARIES})
+endif()
 
 install(DIRECTORY 
   launch
