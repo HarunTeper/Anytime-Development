@@ -53,8 +53,8 @@ RUN wget https://developer.nvidia.com/downloads/compute/machine-learning/tensorr
 # --- Anytime Dependencies ---
 RUN if [ "$INSTALL_ROS2" = "true" ]; then \
     apt-get install -y ros-humble-ament-cmake-google-benchmark && \
-    pip install pandas numpy; \
-    RUN pip install --upgrade numpy matplotlib pandas; \
+    pip install pandas "numpy<2.0"; \
+    RUN pip install --upgrade "numpy<2.0" matplotlib pandas; \
     fi
 
 # --- Install DevTools ---

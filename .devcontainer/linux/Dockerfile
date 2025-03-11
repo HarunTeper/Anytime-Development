@@ -61,19 +61,6 @@ RUN apt-get update && \
     libc++abi-dev && \
     pip install pep8 pylint
 
-# --- Anytime Dependencies ---
-RUN if [ "$INSTALL_ROS2" = "true" ]; then \
-    apt-get install -y ros-humble-ament-cmake-google-benchmark && \
-    pip install pandas numpy; \
-    fi
-# # --- Install Realsense ---
-# # install json library
-# RUN apt-get update && apt-get -y install nlohmann-json3-dev ros-humble-vision-msgs ros-humble-realsense2*
-
-# --- Install DevTools ---
-RUN apt-get -y install clangd clang-format clang-tidy cppcheck
-RUN pip install pep8 pylint
-
 # --- Install CUDA ---
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin && \
     mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
@@ -93,6 +80,16 @@ RUN wget https://developer.nvidia.com/downloads/compute/machine-learning/tensorr
     apt-get update && \
     apt-get install -y tensorrt && \
     rm nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5_1.0-1_amd64.deb
+
+# --- Anytime Dependencies ---
+RUN if [ "$INSTALL_ROS2" = "true" ]; then \
+    apt-get install -y ros-humble-ament-cmake-google-benchmark && \
+    pip install pandas "numpy<2.0"; \
+    fi
+
+# --- Install DevTools ---
+RUN apt-get -y install clangd clang-format clang-tidy cppcheck
+RUN pip install pep8 pylint
 
 # --- Set up user ---
 USER vscode
