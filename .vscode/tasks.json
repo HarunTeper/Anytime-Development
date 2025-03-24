@@ -4,9 +4,15 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "ROS2-Prepare-Packages",
+            "label": "ROS2-Prepare-Packages-Windows",
             "type": "shell",
-            "command": "chmod +x ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py",
+            "command": "unix2dos ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py && chmod +x ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py",
+            "problemMatcher": []
+        },
+        {
+            "label": "ROS2-Prepare-Packages-Linux",
+            "type": "shell",
+            "command": "dos2unix ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py && chmod +x ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py",
             "problemMatcher": []
         },
         {
@@ -54,6 +60,34 @@
                 "showReuseMessage": true,
                 "clear": false
             }
+        },
+        {
+            "label": "ROS2-Yolo-Client",
+            "type": "shell",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_yolo action_client.launch.py",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "ROS2-Yolo-Server",
+            "type": "shell",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch anytime_yolo action_server.launch.py is_reactive_proactive:=${input:is_reactive_proactive} multi_threading:=${input:multi_threading} batch_size:=${input:batch_size}",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
         }
     ],
     "inputs": [
@@ -81,7 +115,7 @@
             "id": "batch_size",
             "type": "promptString",
             "description": "Enter the batch size parameter",
-            "default": "2"
+            "default": "1"
         }
     ]
 }
