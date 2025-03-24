@@ -87,10 +87,12 @@ RUN if [ "$INSTALL_ROS2" = "true" ]; then \
     pip install pandas "numpy<2.0"; \
     fi
 
+# --- Yolo Dependencies ---
+RUN apt-get -y install nlohmann-json3-dev ros-humble-vision-msgs dos2unix
+
 # --- Install DevTools ---
 RUN apt-get -y install clangd clang-format clang-tidy cppcheck
 RUN pip install pep8 pylint
-
 # --- Set up user ---
 USER vscode
 WORKDIR /home/vscode/workspace
