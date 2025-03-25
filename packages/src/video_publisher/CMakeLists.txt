@@ -24,6 +24,7 @@ include_directories(include)
 install(DIRECTORY 
   launch
   images
+  rviz
   DESTINATION share/${PROJECT_NAME}
 )
 
@@ -33,6 +34,7 @@ ament_python_install_package(${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
   scripts/video_publisher.py
+  scripts/detection_visualizer.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
