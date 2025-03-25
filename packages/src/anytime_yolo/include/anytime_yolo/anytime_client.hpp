@@ -6,7 +6,8 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "rclcpp_components/register_node_macro.hpp"
 
-#include "sensor_msgs/msg/image.hpp"  // Added include for image messages
+#include "sensor_msgs/msg/image.hpp"               // Added include for image messages
+#include "vision_msgs/msg/detection2_d_array.hpp"  // Added include for detection messages
 
 // Class definition for the Anytime Action Client
 class AnytimeActionClient : public rclcpp::Node
@@ -28,6 +29,15 @@ private:
 
   // Subscription for camera images
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_subscription_;
+
+  // Publisher for detection images
+  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr detection_image_publisher_;
+
+  // Publisher for detection results
+  rclcpp::Publisher<vision_msgs::msg::Detection2DArray>::SharedPtr detection_publisher_;
+
+  // Current image buffer
+  sensor_msgs::msg::Image::SharedPtr current_image_;
 
   // Timer for sending goals
   rclcpp::TimerBase::SharedPtr timer_ = nullptr;
@@ -62,6 +72,9 @@ private:
 
   // Callback for camera image subscription
   void image_callback(const sensor_msgs::msg::Image::SharedPtr msg);
+
+  // Function to handle post-processing of the result
+  void post_processing(const AnytimeGoalHandle::WrappedResult & result);
 
   // Variables to store timestamps
   // Timestamps for client-side events

@@ -12,28 +12,28 @@
 AnytimeActionClient::AnytimeActionClient(const rclcpp::NodeOptions & options)
 : Node("anytime_action_client", options)
 {
-  RCLCPP_DEBUG(this->get_logger(), "Starting Anytime action client");
+  RCLCPP_INFO(this->get_logger(), "Starting Anytime action client");
 
   // Declare parameters with default values
-  this->declare_parameter("goal_timer_period_ms", 1000);
   this->declare_parameter("cancel_timeout_period_ms", 500);
   this->declare_parameter("result_filename", "anytime_results");
   this->declare_parameter("image_topic", "video_frames");
 
-  int goal_timer_period = this->get_parameter("goal_timer_period_ms").as_int();
   int cancel_timeout_period = this->get_parameter("cancel_timeout_period_ms").as_int();
   result_filename_ = this->get_parameter("result_filename").as_string();
   std::string image_topic = this->get_parameter("image_topic").as_string();
 
-  RCLCPP_DEBUG(this->get_logger(), "Goal timer period: %d ms", goal_timer_period);
-  RCLCPP_DEBUG(this->get_logger(), "Cancel timeout period: %d ms", cancel_timeout_period);
-  RCLCPP_DEBUG(this->get_logger(), "Result filename: %s", result_filename_.c_str());
-  RCLCPP_DEBUG(this->get_logger(), "Image topic: %s", image_topic.c_str());
+  RCLCPP_INFO(this->get_logger(), "Cancel timeout period: %d ms", cancel_timeout_period);
+  RCLCPP_INFO(this->get_logger(), "Result filename: %s", result_filename_.c_str());
+  RCLCPP_INFO(this->get_logger(), "Image topic: %s", image_topic.c_str());
 
   // Initialize the image subscription
   image_subscription_ = this->create_subscription<sensor_msgs::msg::Image>(
     image_topic, 10,
     [this](const sensor_msgs::msg::Image::SharedPtr msg) { this->image_callback(msg); });
+
+  // Initialize the detection image publisher
+  detection_image_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("images", 10);
 
   // Create a timer for cancel timeout, initially canceled
   cancel_timeout_timer_ = this->create_wall_timer(
@@ -54,18 +54,20 @@ void AnytimeActionClient::image_callback(const sensor_msgs::msg::Image::SharedPt
   Anytime::Goal goal_msg;
 
   // Fill in the goal message with data from the image message
-  goal_msg.data = msg->data;
-  goal_msg.height = msg->height;
-  goal_msg.width = msg->width;
-  goal_msg.channels = msg->step / msg->width;  // Calculate channels from step and width
-  goal_msg.encoding = msg->encoding;
+  goal_msg.image = *msg;
+  goal_msg.image.header.stamp = msg->header.stamp;
+
+  if (!current_image_) {
+    current_image_ = std::make_shared<sensor_msgs::msg::Image>(*msg);
+    current_image_->header.stamp = msg->header.stamp;
+  }
 
   send_goal(goal_msg);
 }
 
 void AnytimeActionClient::send_goal(const Anytime::Goal & goal_msg)
 {
-  RCLCPP_DEBUG(this->get_logger(), "Sending goal info");
+  RCLCPP_INFO(this->get_logger(), "Sending goal info");
 
   // Define the goal options with callbacks
   auto send_goal_options = rclcpp_action::Client<Anytime>::SendGoalOptions();
@@ -100,7 +102,6 @@ void AnytimeActionClient::goal_response_callback(AnytimeGoalHandle::SharedPtr go
   // Check if the goal was rejected by the server
   if (!goal_handle) {
     RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
-    // Reset the timer to try sending the goal again
     return;
   }
 
@@ -116,7 +117,22 @@ void AnytimeActionClient::feedback_callback(
 {
   (void)goal_handle;
   // Log the feedback received from the action server
-  RCLCPP_DEBUG(this->get_logger(), "Next number in the sequence: %f", feedback->feedback);
+  RCLCPP_INFO(this->get_logger(), "Next number in the sequence: %f", feedback->feedback);
+}
+
+void AnytimeActionClient::cancel_timeout_callback()
+{
+  RCLCPP_INFO(this->get_logger(), "Timeout reached, canceling goal");
+
+  // Cancel the timeout timer to prevent multiple cancel requests
+  cancel_timeout_timer_->cancel();
+
+  client_send_cancel_start_time_ = this->now();
+  // Send a cancel request for the current goal
+  action_client_->async_cancel_goal(goal_handle_);
+  client_send_cancel_end_time_ = this->now();
+
+  RCLCPP_INFO(this->get_logger(), "Cancel request sent");
 }
 
 void AnytimeActionClient::result_callback(const AnytimeGoalHandle::WrappedResult & result)
@@ -127,9 +143,8 @@ void AnytimeActionClient::result_callback(const AnytimeGoalHandle::WrappedResult
   switch (result.code) {
     case rclcpp_action::ResultCode::SUCCEEDED:
       // If the goal succeeded, log the result
-      RCLCPP_DEBUG(this->get_logger(), "Result received");
-      // print the number of iterations
-      RCLCPP_DEBUG(this->get_logger(), "Number of iterations: %d", result.result->iterations);
+      RCLCPP_INFO(this->get_logger(), "Result received");
+      post_processing(result);
       print_time_differences(result);
       break;
     case rclcpp_action::ResultCode::ABORTED:
@@ -138,9 +153,8 @@ void AnytimeActionClient::result_callback(const AnytimeGoalHandle::WrappedResult
       break;
     case rclcpp_action::ResultCode::CANCELED:
       // If the goal was canceled, log an error and the result after cancel
-      RCLCPP_DEBUG(this->get_logger(), "Goal was canceled");
-      // print the number of iterations
-      RCLCPP_DEBUG(this->get_logger(), "Number of iterations: %d", result.result->iterations);
+      RCLCPP_INFO(this->get_logger(), "Goal was canceled");
+      post_processing(result);
       print_time_differences(result);
       break;
     default:
@@ -148,27 +162,38 @@ void AnytimeActionClient::result_callback(const AnytimeGoalHandle::WrappedResult
       RCLCPP_ERROR(this->get_logger(), "Unknown result code");
       break;
   }
+  current_image_.reset();
 }
 
-void AnytimeActionClient::cancel_timeout_callback()
+void AnytimeActionClient::post_processing(const AnytimeGoalHandle::WrappedResult & result)
 {
-  RCLCPP_DEBUG(this->get_logger(), "Timeout reached, canceling goal");
+  RCLCPP_INFO(this->get_logger(), "Publishing detection image");
+  detection_image_publisher_->publish(*current_image_);
 
-  // Cancel the timeout timer to prevent multiple cancel requests
-  cancel_timeout_timer_->cancel();
+  // Create a Detection2DArray message for publishing
+  vision_msgs::msg::Detection2DArray detection_array;
+  detection_array.header.stamp = current_image_->header.stamp;
 
-  client_send_cancel_start_time_ = this->now();
-  // Send a cancel request for the current goal
-  action_client_->async_cancel_goal(goal_handle_);
-  client_send_cancel_end_time_ = this->now();
+  // Copy detections from the result
+  detection_array.detections = result.result->detections;
 
-  RCLCPP_DEBUG(this->get_logger(), "Cancel request sent");
+  // Log number of detections
+  RCLCPP_INFO(this->get_logger(), "Publishing %ld detections", detection_array.detections.size());
+
+  // Create publisher on first call if it doesn't exist
+  if (!detection_publisher_) {
+    detection_publisher_ =
+      this->create_publisher<vision_msgs::msg::Detection2DArray>("/detections", 10);
+  }
+
+  // Publish detections
+  detection_publisher_->publish(detection_array);
 }
 
 void AnytimeActionClient::print_time_differences(const AnytimeGoalHandle::WrappedResult & result)
 {
   // Extract timestamps from client side
-  RCLCPP_DEBUG(this->get_logger(), "Extracting raw timestamps");
+  RCLCPP_INFO(this->get_logger(), "Extracting raw timestamps");
 
   // Extract timestamps from server side (sent in the result)
   rclcpp::Time action_server_receive_time(
@@ -185,37 +210,35 @@ void AnytimeActionClient::print_time_differences(const AnytimeGoalHandle::Wrappe
   rclcpp::Time batch_time(result.result->batch_time.sec, result.result->batch_time.nanosec);
 
   // Log raw timestamps in nanoseconds
-  RCLCPP_DEBUG(this->get_logger(), "Raw timestamp data (nanoseconds):");
-  RCLCPP_DEBUG(
+  RCLCPP_INFO(this->get_logger(), "Raw timestamp data (nanoseconds):");
+  RCLCPP_INFO(
     this->get_logger(), "client_goal_start_time: %ld", client_goal_start_time_.nanoseconds());
-  RCLCPP_DEBUG(
+  RCLCPP_INFO(
     this->get_logger(), "client_send_start_time: %ld", client_send_start_time_.nanoseconds());
-  RCLCPP_DEBUG(
-    this->get_logger(), "client_send_end_time: %ld", client_send_end_time_.nanoseconds());
-  RCLCPP_DEBUG(
+  RCLCPP_INFO(this->get_logger(), "client_send_end_time: %ld", client_send_end_time_.nanoseconds());
+  RCLCPP_INFO(
     this->get_logger(), "client_goal_response_time: %ld", client_goal_response_time_.nanoseconds());
-  RCLCPP_DEBUG(
+  RCLCPP_INFO(
     this->get_logger(), "client_send_cancel_start_time: %ld",
     client_send_cancel_start_time_.nanoseconds());
-  RCLCPP_DEBUG(
+  RCLCPP_INFO(
     this->get_logger(), "client_send_cancel_end_time: %ld",
     client_send_cancel_end_time_.nanoseconds());
-  RCLCPP_DEBUG(this->get_logger(), "client_result_time: %ld", client_result_time_.nanoseconds());
-  RCLCPP_DEBUG(
+  RCLCPP_INFO(this->get_logger(), "client_result_time: %ld", client_result_time_.nanoseconds());
+  RCLCPP_INFO(
     this->get_logger(), "action_server_receive_time: %ld",
     action_server_receive_time.nanoseconds());
-  RCLCPP_DEBUG(
+  RCLCPP_INFO(
     this->get_logger(), "action_server_accept_time: %ld", action_server_accept_time.nanoseconds());
-  RCLCPP_DEBUG(
+  RCLCPP_INFO(
     this->get_logger(), "action_server_start_time: %ld", action_server_start_time.nanoseconds());
-  RCLCPP_DEBUG(
+  RCLCPP_INFO(
     this->get_logger(), "action_server_cancel_time: %ld", action_server_cancel_time.nanoseconds());
-  RCLCPP_DEBUG(
+  RCLCPP_INFO(
     this->get_logger(), "action_server_send_result_time: %ld",
     action_server_send_result_time.nanoseconds());
-  RCLCPP_DEBUG(this->get_logger(), "batch_time_ns: %ld", batch_time.nanoseconds());
-  RCLCPP_DEBUG(this->get_logger(), "iterations: %d", result.result->iterations);
-  RCLCPP_DEBUG(this->get_logger(), "batch_size: %d", result.result->batch_size);
+  RCLCPP_INFO(this->get_logger(), "batch_time_ns: %ld", batch_time.nanoseconds());
+  RCLCPP_INFO(this->get_logger(), "batch_size: %d", result.result->batch_size);
 
   // Create results directory if it doesn't exist
   std::string results_dir = "results";
@@ -224,7 +247,7 @@ void AnytimeActionClient::print_time_differences(const AnytimeGoalHandle::Wrappe
   // Use the provided filename instead of generating one
   std::string filename = results_dir + "/" + result_filename_ + ".csv";
 
-  RCLCPP_DEBUG(this->get_logger(), "Using output file: %s", filename.c_str());
+  RCLCPP_INFO(this->get_logger(), "Using output file: %s", filename.c_str());
 
   bool file_exists = std::ifstream(filename).good();
 
@@ -249,9 +272,10 @@ void AnytimeActionClient::print_time_differences(const AnytimeGoalHandle::Wrappe
        << action_server_accept_time.nanoseconds() << "," << action_server_start_time.nanoseconds()
        << "," << action_server_cancel_time.nanoseconds() << ","
        << action_server_send_result_time.nanoseconds() << "," << batch_time.nanoseconds() << ","
-       << result.result->iterations << "," << result.result->batch_size << "\n";
+
+       << "," << result.result->batch_size << "\n";
 
   file.close();
 
-  RCLCPP_DEBUG(this->get_logger(), "Raw timestamp data saved to %s", filename.c_str());
+  RCLCPP_INFO(this->get_logger(), "Raw timestamp data saved to %s", filename.c_str());
 }

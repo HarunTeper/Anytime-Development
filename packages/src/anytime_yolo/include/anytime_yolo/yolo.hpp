@@ -1,5 +1,5 @@
 #include <nlohmann/json.hpp>
-// #include <opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
 
 #include <NvInfer.h>
 #include <NvInferRuntime.h>
@@ -35,7 +35,7 @@ class Logger : public nvinfer1::ILogger
 public:
   void log(Severity severity, const char * msg) noexcept override
   {
-    if (severity != Severity::kINFO) {
+    if (severity <= Severity::kWARNING) {
       std::cout << msg << std::endl;
     }
   }
@@ -173,23 +173,23 @@ private:
   size_t size;
 };
 
-// std::vector<float> convertToNCHW(const cv::Mat & img)
-// {
-//   const int channels = img.channels();
-//   const int height = img.rows;
-//   const int width = img.cols;
-//   std::vector<float> nchw_data(channels * height * width);
+std::vector<float> convertToNCHW(const cv::Mat & img)
+{
+  const int channels = img.channels();
+  const int height = img.rows;
+  const int width = img.cols;
+  std::vector<float> nchw_data(channels * height * width);
 
-//   for (int c = 0; c < channels; c++) {
-//     for (int h = 0; h < height; h++) {
-//       for (int w = 0; w < width; w++) {
-//         nchw_data[c * height * width + h * width + w] = img.at<cv::Vec3f>(h, w)[c];
-//       }
-//     }
-//   }
+  for (int c = 0; c < channels; c++) {
+    for (int h = 0; h < height; h++) {
+      for (int w = 0; w < width; w++) {
+        nchw_data[c * height * width + h * width + w] = img.at<cv::Vec3f>(h, w)[c];
+      }
+    }
+  }
 
-//   return nchw_data;
-// }
+  return nchw_data;
+}
 
 bool loadImageFromFile(
   const std::string & imagePath, CudaBuffer & buffer, bool halfPrecision = false)
@@ -412,29 +412,21 @@ public:
     for (const auto & layerConfig : config["layers"]) {
       std::cout << "Loading layer: " << layerConfig["index"] << " - " << layerConfig["type"]
                 << std::endl;
-      loadLayer(layerConfig);
+      loadLayer(layerConfig, folderPath);
     }
 
     std::cout << "Loading exits..." << std::endl;
 
     for (const auto & exitConfig : config["exits"]) {
       std::cout << "Loading exit: " << exitConfig["index"] << std::endl;
-      loadExit(exitConfig);
+      loadExit(exitConfig, folderPath);
     }
 
     std::cout << "Loading NMS engine..." << std::endl;
 
-    const std::string nmsEnginePath = folderPath + "/nms.engine";
-
-    if (loadEngine(nmsEnginePath, runtime, nmsEngine)) {
-      std::cout << "Successfully loaded cached NMS engine from: " << nmsEnginePath << std::endl;
-    } else {
-      std::cerr << "Failed to load cached NMS engine, falling back to build" << std::endl;
-      buildOnnxEngine(folderPath + "/nms.onnx", nmsEnginePath);
-      std::cout << "Successfully built NMS engine" << std::endl;
-      if (!loadEngine(nmsEnginePath, runtime, nmsEngine)) {
-        throw std::runtime_error("Failed to load NMS engine");
-      }
+    if (!loadNMS(config["nms"], folderPath)) {
+      std::cerr << "Failed to load NMS engine" << std::endl;
+      throw std::runtime_error("Failed to load NMS engine");
     }
 
     // report lengths of layers and exits
@@ -514,7 +506,7 @@ public:
 
   // Execute a single engine
   bool executeEngine(
-    const nvinfer1::ICudaEngine * engine, nvinfer1::IExecutionContext * context,
+    nvinfer1::IExecutionContext * context,
     const std::vector<std::pair<std::string, void *>> & inputs,
     const std::vector<std::pair<std::string, void *>> & outputs, cudaStream_t stream)
   {
@@ -588,7 +580,7 @@ public:
       {bindingInfo.outputNames[0], outputBuffer.getDevicePtr()}};
 
     // Execute the node
-    if (!executeEngine(chunk.engine.get(), chunk.context.get(), inputs, outputs, stream)) {
+    if (!executeEngine(chunk.context.get(), inputs, outputs, stream)) {
       std::cerr << (isLayer ? "Layer" : "Exit") << " execution failed" << std::endl;
       return false;
     }
@@ -622,9 +614,7 @@ public:
 
     auto nmsContext = std::unique_ptr<IExecutionContext>(nmsEngine->createExecutionContext());
     // Execute NMS
-    std::cout << "Input pointer " << inputs[0].second << std::endl;
-
-    if (!executeEngine(nmsEngine.get(), nmsContext.get(), inputs, outputs, stream)) {
+    if (!executeEngine(nmsContext.get(), inputs, outputs, stream)) {
       std::cerr << "NMS execution failed" << std::endl;
       cudaError_t status = cudaGetLastError();
       if (status != cudaSuccess) {
@@ -685,88 +675,30 @@ public:
     }
   }
 
-  CudaBuffer convertToFullPrecision(const CudaBuffer & inputBuffer)
+  std::vector<float> processNMSAndGetResults(const CudaBuffer & input)
   {
-    CudaBuffer fullPrecisionBuffer;
-    fullPrecisionBuffer.allocate(inputBuffer.getSize() * 2);
+    std::cout << "Processing NMS" << std::endl;
 
-    // host buffer for input
-    std::vector<__half> inputData(inputBuffer.getSize() / sizeof(__half));
-    if (!inputBuffer.copyToHost(inputData.data(), inputBuffer.getSize())) {
-      throw std::runtime_error("Failed to copy input to host");
+    CudaBuffer nmsOutputBuffer;
+    std::vector<float> finalOutput;
+
+    if (!processNMS(input, nmsOutputBuffer, stream)) {
+      throw std::runtime_error("NMS processing failed");
     }
 
-    // host buffer for full precision data
-    std::vector<float> fullPrecisionData(inputBuffer.getSize() / sizeof(__half));
+    CHECK_CUDA(cudaStreamSynchronize(stream));
 
-    for (size_t i = 0; i < inputBuffer.getSize() / sizeof(__half); i++) {
-      fullPrecisionData[i] = __half2float(inputData[i]);
+    // Calculate output size in elements
+    size_t nmsOutputSize = 6 * 1000 * sizeof(float);
+    size_t outputElements = nmsOutputSize / sizeof(float);
+
+    // Copy result back to host
+    finalOutput.resize(outputElements);
+    if (!nmsOutputBuffer.copyToHost(finalOutput.data(), nmsOutputSize)) {
+      throw std::runtime_error("Failed to copy NMS output to host");
     }
 
-    // copy full precision data to device
-    fullPrecisionBuffer.copyFromHost(fullPrecisionData.data(), fullPrecisionBuffer.getSize());
-
-    return fullPrecisionBuffer;
-  }
-
-  // Main inference function
-  std::vector<std::vector<float>> infer(
-    const CudaBuffer & inputBuffer, const std::vector<int> & inputDims)
-  {
-    // Store output buffers for each layer
-    std::vector<CudaBuffer> layerOutputBuffers(chunks.size());
-    std::vector<std::vector<int>> outputDims(chunks.size());
-
-    // Process each layer
-    for (size_t i = 0; i < chunks.size(); i++) {
-      if (!processChunk(
-            chunks[i], inputBuffer, layerOutputBuffers, layerOutputBuffers[i], outputDims[i],
-            stream)) {
-        throw std::runtime_error("Layer processing failed");
-      }
-    }
-
-    // Process exit layers
-    std::vector<CudaBuffer> exitOutputBuffers(exits.size());
-    std::vector<std::vector<int>> exitOutputDims(exits.size());
-
-    for (size_t i = 0; i < 1; i++) {
-      if (!processChunk(
-            exits[i], inputBuffer, layerOutputBuffers, exitOutputBuffers[i], exitOutputDims[i],
-            stream, false)) {
-        throw std::runtime_error("Exit processing failed");
-      }
-    }
-
-    // Apply NMS to each exit output
-    std::vector<CudaBuffer> nmsOutputBuffers(exits.size());
-    std::vector<std::vector<float>> finalOutputs(exits.size());
-
-    for (size_t i = 0; i < 1; i++) {
-      CudaBuffer & input = exitOutputBuffers[i];
-      if (halfPrecision) input = convertToFullPrecision(exitOutputBuffers[i]);
-
-      if (!processNMS(input, nmsOutputBuffers[i], stream)) {
-        throw std::runtime_error("NMS processing failed");
-      }
-
-      CHECK_CUDA(cudaStreamSynchronize(stream));
-
-      cudaDeviceSynchronize();
-
-      // Calculate output size in elements
-      size_t nmsOutputSize = 6 * 1000 * sizeof(float);
-      size_t outputElements = nmsOutputSize / sizeof(float);
-
-      // Copy result back to host
-      finalOutputs[i].resize(outputElements);
-      if (!nmsOutputBuffers[i].copyToHost(finalOutputs[i].data(), nmsOutputSize)) {
-        throw std::runtime_error("Failed to copy NMS output to host");
-      }
-    }
-    cudaDeviceSynchronize();
-
-    return finalOutputs;
+    return finalOutput;
   }
 
   InferenceState createInferenceState(const CudaBuffer & inputBuffer)
@@ -823,33 +755,10 @@ public:
       }
 
       case InferenceState::NMS_PROCESSING: {
-        std::cout << "Processing NMS" << std::endl;
+        CudaBuffer & input = state.exitOutputBuffer;
 
-        std::vector<CudaBuffer> nmsOutputBuffers(exits.size());
-        std::vector<std::vector<float>> finalOutputs(exits.size());
-
-        for (size_t i = 0; i < 1; i++) {
-          CudaBuffer & input = state.exitOutputBuffer;
-          if (halfPrecision) input = convertToFullPrecision(state.exitOutputBuffer);
-
-          if (!processNMS(input, nmsOutputBuffers[i], stream)) {
-            throw std::runtime_error("NMS processing failed");
-          }
-
-          CHECK_CUDA(cudaStreamSynchronize(stream));
-
-          cudaDeviceSynchronize();
-
-          // Calculate output size in elements
-          size_t nmsOutputSize = 6 * 1000 * sizeof(float);
-          size_t outputElements = nmsOutputSize / sizeof(float);
-
-          // Copy result back to host
-          finalOutputs[i].resize(outputElements);
-          if (!nmsOutputBuffers[i].copyToHost(finalOutputs[i].data(), nmsOutputSize)) {
-            throw std::runtime_error("Failed to copy NMS output to host");
-          }
-        }
+        // Use the new function to process NMS and get results
+        state.finalOutput = processNMSAndGetResults(input);
 
         // Inference is complete
         state.currentStage = InferenceState::COMPLETED;
@@ -870,6 +779,52 @@ public:
     // cudaLaunchHostFunc(stream, forward_finished_callback, state);
 
     return state.isCompleted();
+  }
+
+  std::vector<float> infer(const CudaBuffer & inputBuffer)
+  {
+    auto state = createInferenceState(inputBuffer);
+    while (!inferStep(state)) {
+    }
+    return finishEarly(state);
+  }
+
+  // 6 outputs, coordinates 4, confidence 1, class 1
+  std::vector<float> calculateLatestExit(InferenceState & state)
+  {
+    int lastExit = -1;
+    for (auto & exit : exits) {
+      bool ready = true;
+      for (auto & f : exit.f) {
+        if (f < state.currentIndex) {
+          continue;
+        }
+        ready = false;
+        break;
+      }
+      if (ready) {
+        lastExit = exit.index;
+        break;
+      }
+    }
+    std::cout << "Calculating result of exit: " << lastExit << std::endl;
+
+    if (lastExit == -1) {
+      return {};  // terminated too early
+    }
+
+    // process the exit
+    const auto & exit = exits[lastExit];
+    if (!processChunk(
+          exit, state.inputBuffer, state.layerOutputBuffers, state.exitOutputBuffer,
+          state.exitOutputDims, stream, false)) {
+      throw std::runtime_error("Exit processing failed");
+    }
+
+    // nms
+    CudaBuffer & input = state.exitOutputBuffer;
+    std::vector<float> results = processNMSAndGetResults(input);
+    return results;
   }
 
   std::vector<float> finishEarly(InferenceState & state)
@@ -909,25 +864,9 @@ public:
 
     // nms
     CudaBuffer & input = state.exitOutputBuffer;
-    if (halfPrecision) {
-      input = convertToFullPrecision(state.exitOutputBuffer);
-    }
 
-    if (!processNMS(input, nmsOutputBuffer, stream)) {
-      throw std::runtime_error("NMS processing failed");
-    }
-
-    cudaStreamSynchronize(stream);
-
-    // Calculate output size in elements
-    size_t nmsOutputSize = 6 * 1000 * sizeof(float);
-    size_t outputElements = nmsOutputSize / sizeof(float);
-
-    // Copy result back to host
-    state.finalOutput.resize(outputElements);
-    if (!nmsOutputBuffer.copyToHost(state.finalOutput.data(), nmsOutputSize)) {
-      throw std::runtime_error("Failed to copy NMS output to host");
-    }
+    // Use the new function to process NMS and get results
+    state.finalOutput = processNMSAndGetResults(input);
 
     state.currentStage = InferenceState::COMPLETED;
 
@@ -946,7 +885,25 @@ private:
 
   cudaStream_t stream;
 
-  bool loadLayer(const json & layerConfig)
+  bool loadNMS(const json & nmsConfig, const std::string & folderPath)
+  {
+    const std::string nmsEnginePath = folderPath + "/" + nmsConfig["weights"].get<std::string>();
+    if (loadEngine(nmsEnginePath, runtime, nmsEngine)) {
+      std::cout << "Successfully loaded cached NMS engine from: " << nmsEnginePath << std::endl;
+      return true;
+    } else {
+      std::cerr << "Failed to load cached NMS engine, falling back to build" << std::endl;
+      buildOnnxEngine(folderPath + "/nms.onnx", nmsEnginePath);
+
+      std::cout << "Successfully built NMS engine" << std::endl;
+      if (!loadEngine(nmsEnginePath, runtime, nmsEngine)) {
+        throw std::runtime_error("Failed to load NMS engine");
+      }
+      return true;
+    }
+  }
+
+  bool loadLayer(const json & layerConfig, const std::string & folderPath)
   {
     const std::string type = layerConfig["type"];
     const int index = layerConfig["index"];
@@ -959,7 +916,7 @@ private:
       f.push_back(layerConfig["f"]);
     }
 
-    const std::string weightsPath = layerConfig["path"];
+    const std::string weightsPath = folderPath + "/" + layerConfig["weights"].get<std::string>();
 
     // engine path is the same as weights path but with .engine extension
     const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) + ".engine";
@@ -987,7 +944,7 @@ private:
     return true;
   }
 
-  bool loadExit(const json & exitConfig)
+  bool loadExit(const json & exitConfig, const std::string & folderPath)
   {
     const std::string type = "exit";
     const int index = exitConfig["index"];
@@ -997,7 +954,7 @@ private:
     } else {
       f.push_back(exitConfig["f"]);
     }
-    const std::string weightsPath = exitConfig["path"];
+    const std::string weightsPath = folderPath + "/" + exitConfig["weights"].get<std::string>();
 
     // engine path is the same as weights path but with .engine extension
     const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) + ".engine";
@@ -1023,58 +980,52 @@ private:
   }
 };
 
-// Example usage
-int main(int argc, char * argv[])
-{
-  bool halfPrecision = false;
+// // Example usage
+// int main(int argc, char *argv[]) {
+//     bool halfPrecision = false;
 
-  std::string folderPath = "/home/vscode/workspace/weights";
-  if (!halfPrecision) {
-    folderPath += "_32";
-  }
+//     AnytimeYOLO yolo("/home/vscode/workspace/weights_32");
 
-  AnytimeYOLO yolo(folderPath, halfPrecision);
+//     // load image
+//     CudaBuffer input;
+//     if (!loadImageFromFile("/home/vscode/workspace/horses.jpg", input,
+//                            halfPrecision)) {
+//         return 1;
+//     }
 
-  // load image
-  CudaBuffer input;
-  // if (!loadImageFromFile("/home/vscode/workspace/horses.jpg", input, halfPrecision)) {
-  //   return 1;
-  // }
+//     for (int i = 0; i < 5; i++) {
+//         std::cout << "warmup " << i << std::endl;
+//         yolo.infer(input);
+//     }
 
-  for (int i = 0; i < 5; i++) {
-    std::cout << "warmup " << i << std::endl;
-    yolo.infer(input, {3, 640, 640});
-  }
+//     auto start = std::chrono::high_resolution_clock::now();
+//     std::vector<std::vector<float>> results;
 
-  auto start = std::chrono::high_resolution_clock::now();
-  std::vector<std::vector<float>> results;
+//     for (int i = 0; i < 200; i++) {
+//         auto state = yolo.createInferenceState(input);
+//         // while (!yolo.inferStep(state)) {
+//         //     // std::cout << "Inference step completed" << std::endl;
+//         // }
+//         for (int i = 0; i < 24; i++) {
+//             yolo.inferStep(state);
+//         }
+//         results.push_back(yolo.finishEarly(state));
+//     }
 
-  for (int i = 0; i < 200; i++) {
-    auto state = yolo.createInferenceState(input);
-    // while (!yolo.inferStep(state)) {
-    //     // std::cout << "Inference step completed" << std::endl;
-    // }
-    for (int i = 0; i < 24; i++) {
-      yolo.inferStep(state);
-    }
-    results.push_back(yolo.finishEarly(state));
-  }
+//     auto end = std::chrono::high_resolution_clock::now();
+//     std::chrono::duration<double> elapsed = end - start;
+//     std::cout << "Inference time (average over 1000 runs): "
+//               << (elapsed.count() / 200.0) * 1000.0 << " ms" << std::endl;
 
-  auto end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed = end - start;
-  std::cout << "Inference time (average over 1000 runs): " << (elapsed.count() / 200.0) * 1000.0
-            << " ms" << std::endl;
+//     const auto result = results[0];
 
-  const auto result = results[0];
+//     for (size_t i = 0; i < 30; i += 6) {
+//         std::cout << "Detection: " << result[i] << " " << result[i + 1] << " "
+//                   << result[i + 2] << " " << result[i + 3] << " "
+//                   << result[i + 4] << " " << result[i + 5] << std::endl;
+//     }
 
-  for (size_t i = 0; i < 30; i += 6) {
-    std::cout << "Detection: " << result[i] << " " << result[i + 1] << " " << result[i + 2]
-              << "
-                 "
-              << result[i + 3] << " " << result[i + 4] << " " << result[i + 5] << std::endl;
-  }
+//     // const auto outputs = yolo.infer(input, {3, 640, 640});
 
-  // const auto outputs = yolo.infer(input, {3, 640, 640});
-
-  return 0;
-}
+//     return 0;
+// }

@@ -45,7 +45,6 @@ AnytimeActionServer::AnytimeActionServer(rclcpp::NodeOptions options)
   RCLCPP_INFO(this->get_logger(), "batch_size: %d", batch_size);
   RCLCPP_INFO(this->get_logger(), "weights_path: %s", weights_path.c_str());
 
-  // Create the MonteCarloPi instance using a factory function
   anytime_management_ = create_anytime_management(
     this, is_reactive_proactive, is_single_multi, batch_size, weights_path);
 }
@@ -78,15 +77,15 @@ AnytimeActionServer::create_anytime_management(
 rclcpp_action::GoalResponse AnytimeActionServer::handle_goal(
   const rclcpp_action::GoalUUID & uuid, const std::shared_ptr<const Anytime::Goal> goal)
 {
+  (void)goal;  // Suppress unused variable warning
   anytime_management_->set_goal_handle_receive_time(this->now());
-  RCLCPP_DEBUG(this->get_logger(), "Received goal request");
+  RCLCPP_INFO(this->get_logger(), "Received goal request");
   (void)uuid;  // Suppress unused variable warning
   if (anytime_management_->is_running()) {
-    RCLCPP_DEBUG(this->get_logger(), "Goal rejected: server is active");
+    RCLCPP_INFO(this->get_logger(), "Goal rejected: server is active");
     return rclcpp_action::GoalResponse::REJECT;
   }
-  RCLCPP_DEBUG(this->get_logger(), "Goal accepted: server is inactive");
-  // set the monte carlo result accept time
+  RCLCPP_INFO(this->get_logger(), "Goal accepted: server is inactive");
   anytime_management_->set_goal_handle_accept_time(this->now());
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -95,10 +94,9 @@ rclcpp_action::GoalResponse AnytimeActionServer::handle_goal(
 rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
   const std::shared_ptr<AnytimeGoalHandle> goal_handle)
 {
-  RCLCPP_DEBUG(this->get_logger(), "Received cancel request");
+  RCLCPP_INFO(this->get_logger(), "Received cancel request");
   (void)goal_handle;  // Suppress unused variable warning
 
-  // Cancel the MonteCarloPi
   anytime_management_->notify_cancel();
 
   return rclcpp_action::CancelResponse::ACCEPT;
@@ -106,17 +104,17 @@ rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
 
 void AnytimeActionServer::handle_accepted(const std::shared_ptr<AnytimeGoalHandle> goal_handle)
 {
-  RCLCPP_DEBUG(this->get_logger(), "Setting goal handle for MonteCarloPi");
+  RCLCPP_INFO(this->get_logger(), "Setting goal handle for AnytimeManagement");
   anytime_management_->set_goal_handle(goal_handle);
 
-  RCLCPP_DEBUG(this->get_logger(), "Resetting MonteCarloPi");
+  RCLCPP_INFO(this->get_logger(), "Resetting AnytimeManagement");
   anytime_management_->reset();
 
-  RCLCPP_DEBUG(this->get_logger(), "Activating MonteCarloPi");
+  RCLCPP_INFO(this->get_logger(), "Activating AnytimeManagement");
   anytime_management_->activate();
 
-  RCLCPP_DEBUG(this->get_logger(), "Start MonteCarloPi");
+  RCLCPP_INFO(this->get_logger(), "Start AnytimeManagement");
 
   anytime_management_->set_goal_processing_start_time(this->now());
-  // anytime_management_->start();
+  anytime_management_->start();
 }

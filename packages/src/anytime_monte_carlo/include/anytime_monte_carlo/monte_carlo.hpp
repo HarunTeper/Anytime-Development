@@ -133,33 +133,33 @@ public:
   void compute() override
   {
     // Start timing
-    auto start_time = std::chrono::high_resolution_clock::now();
+    auto start_time = this->node_->now();
 
-    x = (float)rand() / RAND_MAX;
-    y = (float)rand() / RAND_MAX;
+    for (int i = 0; i < batch_size_; i++) {
+      x = (float)rand() / RAND_MAX;
+      y = (float)rand() / RAND_MAX;
 
-    if (sqrt(pow(x, 2) + pow(y, 2)) <= 1) {
-      count_inside_++;
+      if (sqrt(pow(x, 2) + pow(y, 2)) <= 1) {
+        count_inside_++;
+      }
+      count_total_++;
+
+      loop_count_++;
     }
-    count_total_++;
-
-    loop_count_++;
 
     // End timing
-    auto end_time = std::chrono::high_resolution_clock::now();
+    auto end_time = this->node_->now();
     // Calculate computation time for this batch
-    auto duration = end_time - start_time;
-    auto duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
-    rclcpp::Time computation_time = rclcpp::Time(duration_ns);
+    rclcpp::Duration computation_time = end_time - start_time;
 
     // Update the average computation time
     batch_count_++;
     if (batch_count_ == 1) {
       average_computation_time_ = computation_time;
     } else {
-      average_computation_time_ = rclcpp::Time(
+      average_computation_time_ = rclcpp::Duration(std::chrono::nanoseconds(
         average_computation_time_.nanoseconds() +
-        (computation_time.nanoseconds() - average_computation_time_.nanoseconds()) / batch_count_);
+        (computation_time.nanoseconds() - average_computation_time_.nanoseconds()) / batch_count_));
     }
   }
 
@@ -201,7 +201,7 @@ public:
     this->result_->action_server_start = this->server_goal_start_time_;
 
     batch_count_ = 0;
-    average_computation_time_ = rclcpp::Time(0, 0);
+    average_computation_time_ = rclcpp::Duration(0, 0);
   }
 
 protected:
@@ -220,7 +220,7 @@ protected:
 
   // Batch count and average computation time
   int batch_count_ = 0;
-  rclcpp::Time average_computation_time_;  // in milliseconds
+  rclcpp::Duration average_computation_time_{0, 0};  // in milliseconds
 };
 
 #endif  // MONTE_CARLO_HPP

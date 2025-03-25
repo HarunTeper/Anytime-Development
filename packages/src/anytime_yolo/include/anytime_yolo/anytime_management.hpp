@@ -24,13 +24,8 @@ class AnytimeManagement : public AnytimeBase<double, Anytime, AnytimeGoalHandle>
 public:
   // Constructor
   AnytimeManagement(rclcpp::Node * node, int batch_size = 1, const std::string & weights_path = "")
-  : node_(node), batch_size_(batch_size), weights_path_(weights_path)
+  : node_(node), batch_size_(batch_size), weights_path_(weights_path), yolo_(weights_path, false)
   {
-    // print path
-    RCLCPP_INFO(node_->get_logger(), "Weights path: %s", weights_path_.c_str());
-    // Initialize yolo
-    AnytimeYOLO yolo(weights_path_, false);
-
     // callback group
     compute_callback_group_ =
       node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -81,11 +76,10 @@ public:
 
   bool check_cancel_and_finish_reactive() override
   {
-    // bool should_finish = loop_count_ >= this->goal_handle_->get_goal()->goal;
+    bool should_finish = yolo_state_->isCompleted();
     bool should_cancel = this->goal_handle_->is_canceling();
 
-    // if (should_finish || should_cancel) {
-    if (should_cancel) {
+    if (should_finish || should_cancel) {
       this->result_->action_server_send_result = this->node_->now();
       this->result_->batch_time = this->average_computation_time_;
       this->calculate_result();
@@ -115,11 +109,10 @@ public:
 
   void check_cancel_and_finish_proactive() override
   {
-    // bool should_finish = loop_count_ >= this->goal_handle_->get_goal()->goal;
+    bool should_finish = yolo_state_->isCompleted();
     bool should_cancel = this->goal_handle_->is_canceling() || !this->goal_handle_->is_executing();
 
-    // if ((should_finish || should_cancel) && this->is_running()) {
-    if ((should_cancel) && this->is_running()) {
+    if ((should_finish || should_cancel) && this->is_running()) {
       this->result_->action_server_send_result = this->node_->now();
 
       this->result_->batch_time = average_computation_time_;
@@ -146,36 +139,88 @@ public:
   void compute() override
   {
     // Start timing
-    auto start_time = std::chrono::high_resolution_clock::now();
+    auto start_time = this->node_->now();
 
     for (int i = 0; i < batch_size_; i++) {
-      yolo.inferStep(state);
+      yolo_.inferStep(*yolo_state_, false);
     }
 
     // End timing
-    auto end_time = std::chrono::high_resolution_clock::now();
+    auto end_time = this->node_->now();
     // Calculate computation time for this batch
-    auto duration = end_time - start_time;
-    auto duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
-    rclcpp::Time computation_time = rclcpp::Time(duration_ns);
+    rclcpp::Duration computation_time = end_time - start_time;
 
     // Update the average computation time
     batch_count_++;
     if (batch_count_ == 1) {
       average_computation_time_ = computation_time;
     } else {
-      average_computation_time_ = rclcpp::Time(
+      average_computation_time_ = rclcpp::Duration(std::chrono::nanoseconds(
         average_computation_time_.nanoseconds() +
-        (computation_time.nanoseconds() - average_computation_time_.nanoseconds()) / batch_count_);
+        (computation_time.nanoseconds() - average_computation_time_.nanoseconds()) / batch_count_));
     }
   }
 
   void calculate_result() override
   {
-    std::vector<std::vector<float>> results;
-    results.push_back(yolo.finishEarly(state));
+    std::vector<float> yolo_result;
+    if constexpr (isReactiveProactive) {
+      yolo_result = yolo_.calculateLatestExit(*yolo_state_);
+    } else if constexpr (!isReactiveProactive) {
+      yolo_result = yolo_.finishEarly(*yolo_state_);
+    }
+
+    // Convert the YOLO result vector to Detection2D messages
+    // The vector format is [x(top left), y(top left), x(bottom right), y(bottom right), width,
+    // height, confidence, class_id] repeated for each detection
+    this->result_->detections.clear();
+
+    for (size_t i = 0; i < yolo_result.size(); i += 6) {
+      // skip if confidence is 0.0
+      if (yolo_result[i + 4] == 0.0) {
+        continue;
+      }
+
+      if (i + 5 >= yolo_result.size()) break;  // Safety check to avoid out-of-bounds access
+
+      // Create a new detection
+      vision_msgs::msg::Detection2D detection;
+
+      // Set the bounding box
+      detection.bbox.center.position.x = (yolo_result[i] + yolo_result[i + 2]) / 2;
+      detection.bbox.center.position.y = (yolo_result[i + 1] + yolo_result[i + 3]) / 2;
+      detection.bbox.size_x = yolo_result[i + 2] - yolo_result[i];
+      detection.bbox.size_y = yolo_result[i + 3] - yolo_result[i + 1];
+
+      // Get original image dimensions
+      const auto & image_msg = this->goal_handle_->get_goal()->image;
+      float orig_width = static_cast<float>(image_msg.width);
+      float orig_height = static_cast<float>(image_msg.height);
+
+      // Calculate scaling factors
+      float scale_x = orig_width / 640.0f;
+      float scale_y = orig_height / 640.0f;
+
+      // Adjust bounding box to original image size
+      detection.bbox.center.position.x *= scale_x;
+      detection.bbox.center.position.y *= scale_y;
+      detection.bbox.size_x *= scale_x;
+      detection.bbox.size_y *= scale_y;
+
+      // Set the confidence
+      detection.results.resize(1);
+      detection.results[0].hypothesis.score = yolo_result[i + 4];
+
+      // Set the class ID
+      detection.results[0].hypothesis.class_id =
+        std::to_string(static_cast<int>(yolo_result[i + 5]));
+
+      // Add the detection to the result
+      this->result_->detections.push_back(detection);
+    }
 
     // Add additional information to result
+    this->result_->batch_time = average_computation_time_;
     this->result_->batch_size = batch_size_;
     this->result_->is_reactive_proactive = isReactiveProactive;
     this->result_->is_single_multi = isSingleMulti;
@@ -195,22 +240,26 @@ public:
   // Reset function
   void reset() override
   {
-    input_image_.free();
+    input_cuda_buffer_.free();
 
     // Process image data from the goal handle
     if (this->goal_handle_) {
       const auto & goal = this->goal_handle_->get_goal();
 
-      // Make sure we have image data
-      if (goal->data.empty()) {
-        RCLCPP_ERROR(node_->get_logger(), "No image data in goal");
+      // Get the image from the goal
+      const auto & image_msg = goal->image;
+
+      // Convert ROS Image message to OpenCV image
+      cv_bridge::CvImagePtr cv_ptr;
+      try {
+        cv_ptr = cv_bridge::toCvCopy(image_msg, "bgr8");
+      } catch (cv_bridge::Exception & e) {
+        RCLCPP_ERROR(node_->get_logger(), "cv_bridge exception: %s", e.what());
         return;
       }
 
-      // Create OpenCV matrix from raw data
-      cv::Mat img(
-        goal->height, goal->width, CV_8UC(goal->channels),
-        const_cast<uint8_t *>(goal->data.data()));
+      // Get the OpenCV image
+      cv::Mat img = cv_ptr->image;
 
       // Resize to 640x640
       cv::Mat resized_img;
@@ -240,26 +289,26 @@ public:
 
       // Allocate CUDA buffer and copy data
       const size_t data_size = nchw_data.size() * sizeof(float);
-      if (!input_image_.allocate(data_size)) {
+      if (!input_cuda_buffer_.allocate(data_size)) {
         RCLCPP_ERROR(node_->get_logger(), "Failed to allocate CUDA buffer");
         return;
       }
 
-      if (!input_image_.copyFromHost(nchw_data.data(), data_size)) {
+      if (!input_cuda_buffer_.copyFromHost(nchw_data.data(), data_size)) {
         RCLCPP_ERROR(node_->get_logger(), "Failed to copy data to CUDA buffer");
         return;
       }
     }
 
     // Reset YOLO state
-    yolo_state_ = yolo.createInferenceState(input);
+    yolo_state_ = std::make_unique<InferenceState>(yolo_.createInferenceState(input_cuda_buffer_));
 
     this->result_->action_server_receive = this->server_goal_receive_time_;
     this->result_->action_server_accept = this->server_goal_accept_time_;
     this->result_->action_server_start = this->server_goal_start_time_;
 
     batch_count_ = 0;
-    average_computation_time_ = rclcpp::Time(0, 0);
+    average_computation_time_ = rclcpp::Duration(0, 0);
   }
 
 protected:
@@ -267,12 +316,13 @@ protected:
   int batch_size_;            // Batch size for compute iterations
   std::string weights_path_;  // Path to YOLO weights
 
-  CudaBuffer input_image_;
-  InferenceState yolo_state_;
+  CudaBuffer input_cuda_buffer_;                // Input image buffer
+  std::unique_ptr<InferenceState> yolo_state_;  // YOLO inference state as pointer
+  AnytimeYOLO yolo_;
 
   // Batch count and average computation time
   int batch_count_ = 0;
-  rclcpp::Time average_computation_time_;  // in milliseconds
+  rclcpp::Duration average_computation_time_{0, 0};  // in milliseconds
 };
 
 #endif  // ANYTIME_MANAGEMENT_HPP

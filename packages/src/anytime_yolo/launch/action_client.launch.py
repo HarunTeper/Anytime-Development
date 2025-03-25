@@ -18,7 +18,6 @@ def include_launch_description(context: LaunchContext):
     else:
         raise ValueError('Invalid threading type')
 
-    goal_timer_period = LaunchConfiguration('goal_timer_period_ms')
     cancel_timeout_period = LaunchConfiguration('cancel_timeout_period_ms')
     result_filename = LaunchConfiguration('result_filename')
     image_topic = LaunchConfiguration('image_topic')
@@ -34,7 +33,6 @@ def include_launch_description(context: LaunchContext):
                 plugin='AnytimeActionClient',
                 name='anytime_client',
                 parameters=[{
-                    'goal_timer_period_ms': goal_timer_period,
                     'cancel_timeout_period_ms': cancel_timeout_period,
                     'result_filename': result_filename,
                     'image_topic': image_topic
@@ -59,15 +57,9 @@ def generate_launch_description():
         description='Threading type'
     )
 
-    goal_timer_period_arg = DeclareLaunchArgument(
-        'goal_timer_period_ms',
-        default_value='100',
-        description='Period in milliseconds for the goal request timer'
-    )
-
     cancel_timeout_period_arg = DeclareLaunchArgument(
         'cancel_timeout_period_ms',
-        default_value='50',
+        default_value='20',
         description='Period in milliseconds for the cancel timeout timer'
     )
 
@@ -87,7 +79,6 @@ def generate_launch_description():
     launch_description = LaunchDescription()
 
     launch_description.add_action(threading_type_arg)
-    launch_description.add_action(goal_timer_period_arg)
     launch_description.add_action(cancel_timeout_period_arg)
     launch_description.add_action(result_filename_arg)
     launch_description.add_action(image_topic_arg)

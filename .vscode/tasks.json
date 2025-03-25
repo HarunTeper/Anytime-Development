@@ -6,13 +6,13 @@
         {
             "label": "ROS2-Prepare-Packages-Windows",
             "type": "shell",
-            "command": "unix2dos ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py && chmod +x ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py",
+            "command": "unix2dos ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py && chmod +x ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py && unix2dos ${workspaceFolder}/packages/src/video_publisher/scripts/detection_visualizer.py && chmod +x ${workspaceFolder}/packages/src/video_publisher/scripts/detection_visualizer.py",
             "problemMatcher": []
         },
         {
             "label": "ROS2-Prepare-Packages-Linux",
             "type": "shell",
-            "command": "dos2unix ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py && chmod +x ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py",
+            "command": "dos2unix ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py && chmod +x ${workspaceFolder}/packages/src/video_publisher/scripts/video_publisher.py && dos2unix ${workspaceFolder}/packages/src/video_publisher/scripts/detection_visualizer.py && chmod +x ${workspaceFolder}/packages/src/video_publisher/scripts/detection_visualizer.py",
             "problemMatcher": []
         },
         {
@@ -31,6 +31,12 @@
             "label": "ROS2-Video-Publisher",
             "type": "shell",
             "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch video_publisher video_publisher.launch.py",
+            "problemMatcher": []
+        },
+        {
+            "label": "ROS2-Detection-Visualizer",
+            "type": "shell",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch video_publisher detection_visualizer.launch.py",
             "problemMatcher": []
         },
         {
@@ -87,6 +93,20 @@
                 "panel": "shared",
                 "showReuseMessage": true,
                 "clear": false
+            }
+        },
+        {
+            "label": "ROS2-RViz",
+            "type": "shell",
+            "command": "source /opt/ros/humble/setup.bash && ros2 launch video_publisher rviz.launch.py",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false
             }
         }
     ],

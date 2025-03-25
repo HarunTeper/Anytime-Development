@@ -5,7 +5,7 @@ int32 iterations
 bool is_reactive_proactive
 bool is_single_multi
 int32 batch_size
-builtin_interfaces/Time batch_time
+builtin_interfaces/Duration batch_time
 builtin_interfaces/Time action_server_receive
 builtin_interfaces/Time action_server_accept
 builtin_interfaces/Time action_server_start

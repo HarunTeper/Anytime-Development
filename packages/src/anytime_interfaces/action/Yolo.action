@@ -1,17 +1,12 @@
 # Image data fields for tensor processing
-uint8[] data         # Raw image data array
-uint32 height        # Image height
-uint32 width         # Image width
-uint8 channels     # Number of color channels (default 3 for RGB)
-string encoding   # Optional image encoding format
+sensor_msgs/Image image
 ---
 # Detection results
 vision_msgs/Detection2D[] detections  # Array of detections with bounding boxes
 bool is_reactive_proactive
 bool is_single_multi
-int32 iterations
 int32 batch_size
-builtin_interfaces/Time batch_time
+builtin_interfaces/Duration batch_time
 builtin_interfaces/Time action_server_receive
 builtin_interfaces/Time action_server_accept
 builtin_interfaces/Time action_server_start
