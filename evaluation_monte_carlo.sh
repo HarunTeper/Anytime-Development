@@ -41,13 +41,13 @@ done
 
 source packages/install/setup.bash
 
-declare -a threading_types=("False" "True")
-declare -a anytime_reactives=("False" "True")
-declare -a batch_sizes=(1 16 256 4096 65536 1048576)
+declare -a threading_types=("False")
+declare -a anytime_reactives=("False")
+declare -a batch_sizes=(1)
 
 # Create the results and plots directories
-mkdir -p results
-mkdir -p plots
+mkdir -p results/monte_carlo
+mkdir -p plots/monte_carlo
 
 # Run experiments if mode is "run" or "both"
 if [[ "$mode" == "run" || "$mode" == "both" ]]; then
@@ -72,27 +72,27 @@ if [[ "$mode" == "run" || "$mode" == "both" ]]; then
                     fi
                     
                     config_name="anytime_${batch_size}_${reactive_param}_${threading_param}_run${run}"
-                    result_filename="anytime_raw_timestamps_batch_${batch_size}_${reactive_param}_${threading_param}_run${run}"
+                    result_filename="monte_carlo/anytime_raw_timestamps_batch_${batch_size}_${reactive_param}_${threading_param}_run${run}"
                     
                     echo "Running configuration: $config_name (Run $run of $num_runs)"
 
                     # Start the action server in the background
-                    ros2 launch anytime_monte_carlo action_server.launch.py multi_threading:=$threading is_reactive_proactive:=$reactive_param batch_size:=$batch_size > ./results/${config_name}_server.log & server_pid=$!
+                    ros2 launch anytime_monte_carlo action_server.launch.py multi_threading:=$threading is_reactive_proactive:=$reactive_param batch_size:=$batch_size > ./results/monte_carlo/${config_name}_server.log & server_pid=$!
                     
                     sleep 5
                     
                     # Start the action client in the background and pass result filename
-                    ros2 launch anytime_monte_carlo action_client.launch.py threading_type:=single result_filename:="${result_filename}" > "./results/${config_name}_client.log" & client_pid=$!
+                    ros2 launch anytime_monte_carlo action_client.launch.py threading_type:=single result_filename:="${result_filename}" > "./results/monte_carlo/${config_name}_client.log" & client_pid=$!
                     
                     # Wait for 60 seconds
-                    sleep 300
+                    sleep 30
 
                     # Terminate both processes after 60 seconds
                     kill $server_pid 2>/dev/null
                     kill $client_pid 2>/dev/null
-                    pkill -f '/opt/ros/humble'
-                    
-                    # Wait briefly to ensure processes have terminated
+                    # Force kill any remaining processes
+                    pkill -9 -f 'anytime_monte_carlo' 2>/dev/null
+                    pkill -9 -f '/opt/ros/humble' 2>/dev/null
                     sleep 5
                 done
             done
@@ -133,5 +133,5 @@ if [[ "$mode" == "plot" || "$mode" == "both" ]]; then
     done
     
     echo "Running plotter with all configurations..."
-    python3 evaluation_plotter.py --threading $threading_args --reactive $reactive_args --batch-sizes $batch_args --runs $num_runs
+    python3 evaluation_plotter.py --threading $threading_args --reactive $reactive_args --batch-sizes $batch_args --runs $num_runs --results-dir results/monte_carlo --output-dir plots/monte_carlo
 fi
