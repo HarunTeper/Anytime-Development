@@ -18,13 +18,13 @@
         {
             "label": "ROS2-Build",
             "type": "shell",
-            "command": "cd ${workspaceFolder}/packages && colcon build --symlink-install --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && mv build/compile_commands.json ..",
+            "command": "cd ${workspaceFolder}/packages && colcon build --symlink-install --allow-overriding rclcpp rclcpp_action rclcpp_components rclcpp_lifecycle --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && mv build/compile_commands.json ..",
             "problemMatcher": []
         },
         {
             "label": "ROS2-Build-No-Cuda",
             "type": "shell",
-            "command": "cd ${workspaceFolder}/packages && colcon build --symlink-install --packages-select anytime_interfaces anytime_monte_carlo --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && mv build/compile_commands.json ..",
+            "command": "cd ${workspaceFolder}/packages && colcon build --symlink-install --packages-select vision_msgs rclcpp rclcpp_action rclcpp_components rclcpp_lifecycle anytime_interfaces anytime_monte_carlo --allow-overriding rclcpp rclcpp_action rclcpp_components rclcpp_lifecycle --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && mv build/compile_commands.json ..",
             "problemMatcher": []
         },
         {
