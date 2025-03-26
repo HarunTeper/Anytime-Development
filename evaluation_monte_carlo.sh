@@ -41,9 +41,9 @@ done
 
 source packages/install/setup.bash
 
-declare -a threading_types=("False")
-declare -a anytime_reactives=("False")
-declare -a batch_sizes=(1)
+declare -a threading_types=("False" "True")
+declare -a anytime_reactives=("False" "True")
+declare -a batch_sizes=(1 16 256 4096 65536 1048576)
 
 # Create the results and plots directories
 mkdir -p results/monte_carlo
@@ -85,7 +85,7 @@ if [[ "$mode" == "run" || "$mode" == "both" ]]; then
                     ros2 launch anytime_monte_carlo action_client.launch.py threading_type:=single result_filename:="${result_filename}" > "./results/monte_carlo/${config_name}_client.log" & client_pid=$!
                     
                     # Wait for 60 seconds
-                    sleep 30
+                    sleep 60
 
                     # Terminate both processes after 60 seconds
                     kill $server_pid 2>/dev/null

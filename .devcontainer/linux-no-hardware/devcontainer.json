@@ -7,7 +7,7 @@
 		"dockerfile": "Dockerfile",
 		"args": {
 			"ROS_DOMAIN_ID": "12",
-			"ROS_LOCALHOST_ONLY": "0",
+			"ROS_LOCALHOST_ONLY": "1",
 			"DISPLAY": "${localEnv:DISPLAY}"
 		}
 	},
