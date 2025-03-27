@@ -33,8 +33,8 @@ public:
 
   void notify_check_finish() { anytime_check_finish_waitable_->notify(); }
 
-  void set_goal_handle_accept_time(rclcpp::Time time) { server_goal_accept_time_ = time; }
   void set_goal_handle_receive_time(rclcpp::Time time) { server_goal_receive_time_ = time; }
+  void set_goal_handle_accept_time(rclcpp::Time time) { server_goal_accept_time_ = time; }
   void set_goal_processing_start_time(rclcpp::Time time) { server_goal_start_time_ = time; }
 
 protected:
