@@ -108,6 +108,20 @@
                 "kind": "build",
                 "isDefault": false
             }
+        },
+        {
+            "label": "ROS2-Download-Weights",
+            "type": "shell",
+            "command": "mkdir -p ${workspaceFolder}/packages/src/anytime_yolo/weights_32 && cd ${workspaceFolder}/packages/src/anytime_yolo && wget https://tu-dortmund.sciebo.de/s/Y4aFTfoeRYbWc99/download -O weights.zip && unzip -o weights.zip -d . && rm weights.zip",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
         }
     ],
     "inputs": [

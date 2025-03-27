@@ -145,7 +145,8 @@ RUN apt-get update && apt-get install -y \
     vim \
     wget \
     iputils-ping \
-    net-tools
+    net-tools \
+    zip
 
 # Create the user with proper shell and environment
 RUN groupadd --gid $USER_GID $USERNAME \
