@@ -98,7 +98,7 @@
         {
             "label": "ROS2-RViz",
             "type": "shell",
-            "command": "source /home/vscode/ros2_humble/install/setup.bash && ros2 launch video_publisher rviz.launch.py",
+            "command": "source ${workspaceFolder}/packages/install/setup.bash && ros2 launch video_publisher rviz.launch.py",
             "presentation": {
                 "reveal": "always",
                 "panel": "new"
