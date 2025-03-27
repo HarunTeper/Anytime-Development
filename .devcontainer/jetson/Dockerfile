@@ -73,8 +73,6 @@ RUN . /home/vscode/ros2_humble/install/setup.sh && \
     apt-get install -y lttng-tools liblttng-ust-dev && \
     apt-get install -y python3-babeltrace python3-lttng && \
     apt-get install -y lttng-modules-dkms && \
-    groupadd -f -r tracing && \
-    usermod -a -G tracing vscode && \
     mkdir -p /home/vscode/ros2_tracing_ws/src/ros2_tracing && \
     git clone -b humble https://gitlab.com/ros-tracing/ros2_tracing.git /home/vscode/ros2_tracing_ws/src/ros2_tracing && \
     mkdir -p /home/vscode/ros2_tracing_ws/src/tracetools_analysis && \
@@ -100,37 +98,38 @@ RUN apt-get update && \
     libc++abi-dev && \
     pip install pep8 pylint
 
-# --- Install Realsense ---
+# # --- Install Realsense ---
 
-RUN cd /home/vscode && \
-    git clone https://github.com/IntelRealSense/librealsense.git && \
-    cd librealsense && \
-    mkdir build && cd build && \
-    cmake ../ -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=true -DFORCE_RSUSB_BACKEND=true -DBUILD_WITH_CUDA=true && \
-    make -j$(($(nproc)-1)) && \
-    sudo make install
+# RUN apt-get -y install libxinerama-dev libxcursor-dev
 
-RUN cd /home/vscode && \
-    mkdir -p ros2_realsense_ws/src && \
-    cd ros2_realsense_ws/src && \
-    git clone https://github.com/IntelRealSense/realsense-ros.git -b ros2-master && \
-    cd .. && \
-    . /home/vscode/ros2_humble/install/setup.sh && \
-    sudo apt-get install python3-rosdep -y && \
-    sudo rosdep init && \
-    rosdep update && \
-    rosdep install -i --from-path src --rosdistro $ROS_DISTRO --skip-keys=librealsense2 -y && \
-    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=release
+# RUN cd /home/vscode && \
+#     git clone https://github.com/IntelRealSense/librealsense.git && \
+#     cd librealsense && \
+#     mkdir build && cd build && \
+#     cmake ../ -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=true -DFORCE_RSUSB_BACKEND=true -DBUILD_WITH_CUDA=true && \
+#     make -j$(($(nproc)-1)) && \
+#     sudo make install
+
+# RUN cd /home/vscode && \
+#     mkdir -p ros2_realsense_ws/src && \
+#     cd ros2_realsense_ws/src && \
+#     git clone https://github.com/IntelRealSense/realsense-ros.git -b ros2-master && \
+#     cd .. && \
+#     . /home/vscode/ros2_humble/install/setup.sh && \
+#     sudo apt-get install python3-rosdep -y && \
+#     sudo rosdep init && \
+#     rosdep update && \
+#     rosdep install -i --from-path src --rosdistro $ROS_DISTRO --skip-keys=librealsense2 -y && \
+#     colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=release
 
 # --- Anytime Dependencies ---
 
-RUN apt-get install -y ros-humble-ament-cmake-google-benchmark && \
-    pip install pandas "numpy<2.0" && \
+RUN pip install pandas "numpy<2.0" && \
     pip install --upgrade "numpy<2.0" matplotlib pandas
 
 # --- Yolo Dependencies ---
 
-RUN apt-get -y install nlohmann-json3-dev ros-humble-vision-msgs dos2unix
+RUN apt-get -y install nlohmann-json3-dev dos2unix
 
 # --- Set up user ---
 
@@ -146,18 +145,24 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && apt-get update \
     && apt-get install -y sudo \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME
+    && chmod 0440 /etc/sudoers.d/$USERNAME \
+    #
+    # Fix permissions for vscode user's home directory
+    && chown -R $USERNAME:$USERNAME /home/$USERNAME
 
 # [Optional] Set the default user. Omit if you want to keep the default as root.
 USER $USERNAME
 
 # add user to video group
-RUN sudo usermod -a -G video vscode
+RUN sudo usermod -a -G video vscode && \
+    sudo groupadd -f -r tracing && \
+    sudo usermod -a -G tracing vscode
 
 # source ROS2 setup file and workspace
 RUN echo '. /home/vscode/ros2_humble/install/setup.sh' >> /home/vscode/.bashrc && \
-    echo '. /home/vscode/ros2_tracing_ws/install/setup.sh' >> /home/vscode/.bashrc && \
-    echo '. /home/vscode/ros2_realsense_ws/install/setup.sh' >> /home/vscode/.bashrc
+    echo '. /home/vscode/ros2_tracing_ws/install/setup.sh' >> /home/vscode/.bashrc
+#  && \
+# echo '. /home/vscode/ros2_realsense_ws/install/setup.sh' >> /home/vscode/.bashrc
 
 # configure environment variables
 ARG DISPLAY
