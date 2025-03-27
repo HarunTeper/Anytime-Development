@@ -1,10 +1,7 @@
-"""Single car omnet module launch file"""
-
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import ComposableNodeContainer
-from launch_ros.descriptions import ComposableNode
+from launch_ros.actions import Node
 from launch.launch_context import LaunchContext
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -12,36 +9,28 @@ from ament_index_python.packages import get_package_share_directory
 
 def include_launch_description(context: LaunchContext):
     """Include launch description"""
-
+    is_reactive_proactive = LaunchConfiguration("is_reactive_proactive")
+    batch_size = LaunchConfiguration("batch_size")
+    
+    # Determine the threading mode from launch context
     if context.launch_configurations["multi_threading"].lower() == "false":
-        executable = "component_container"
         is_single_multi = "single"
     elif context.launch_configurations["multi_threading"].lower() == "true":
-        executable = "component_container_mt"
         is_single_multi = "multi"
     else:
         raise ValueError("Invalid threading type")
 
-    anytime_cmd = ComposableNodeContainer(
-        name="anytime_server_component_container",
-        namespace="",
-        package="rclcpp_components",
-        executable=executable,
-        parameters=[{"thread_num": 2}],
-        composable_node_descriptions=[
-            ComposableNode(
-                package="anytime_yolo",
-                plugin="AnytimeActionServer",
-                name="anytime_server",
-                parameters=[
-                    {"is_reactive_proactive": LaunchConfiguration(
-                        "is_reactive_proactive")},
-                    {"batch_size": LaunchConfiguration("batch_size")},
-                    {"is_single_multi": is_single_multi},
-                    {"weights_path": LaunchConfiguration("weights_path")},
-                ]
-            )
-        ]
+    anytime_cmd = Node(
+        package="anytime_yolo",
+        executable="anytime_action_server",
+        name="anytime_server",
+        parameters=[{
+            "is_reactive_proactive": is_reactive_proactive,
+            "batch_size": batch_size,
+            "is_single_multi": is_single_multi,
+            "weights_path": context.launch_configurations["weights_path"]
+        }],
+        arguments=["--is_single_multi", is_single_multi]
     )
 
     cmds = []

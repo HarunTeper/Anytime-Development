@@ -2,7 +2,6 @@
 #include "anytime_yolo/anytime_management.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
-#include "rclcpp_components/register_node_macro.hpp"
 
 class AnytimeActionServer : public rclcpp::Node
 {
@@ -32,5 +31,3 @@ private:
 
   std::shared_ptr<AnytimeBase<double, Anytime, AnytimeGoalHandle>> anytime_management_;
 };
-
-RCLCPP_COMPONENTS_REGISTER_NODE(AnytimeActionServer)

@@ -4,7 +4,6 @@
 #include "anytime_interfaces/action/yolo.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
-#include "rclcpp_components/register_node_macro.hpp"
 
 #include "sensor_msgs/msg/image.hpp"               // Added include for image messages
 #include "vision_msgs/msg/detection2_d_array.hpp"  // Added include for detection messages
@@ -99,7 +98,5 @@ private:
   std::vector<int64_t> intervals6_;
   std::vector<int64_t> iterations_;
 };
-
-RCLCPP_COMPONENTS_REGISTER_NODE(AnytimeActionClient)
 
 #endif  // ANYTIME_CLIENT_HPP
