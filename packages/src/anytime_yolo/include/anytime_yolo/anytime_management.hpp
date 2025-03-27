@@ -59,18 +59,7 @@ public:
       return;
     } else {
       compute();
-      notify_iteration();
-    }
-  }
-
-  void reactive_function_loop()
-  {
-    while (true) {
-      if (check_cancel_and_finish_reactive()) {
-        return;
-      } else {
-        compute();
-      }
+      // notify_iteration();
     }
   }
 
@@ -136,6 +125,15 @@ public:
 
   void start() override { notify_iteration(); }
 
+  // Change to static method for CUDA callback compatibility
+  static void CUDART_CB forward_finished_callback(void * userData)
+  {
+    // Notify the waitable
+    auto this_ptr = static_cast<AnytimeManagement *>(userData);
+    RCLCPP_INFO(this_ptr->node_->get_logger(), "Notifying iteration");
+    this_ptr->notify_iteration();
+  }
+
   void compute() override
   {
     RCLCPP_INFO(node_->get_logger(), "Computing");
@@ -144,7 +142,11 @@ public:
 
     for (int i = 0; i < batch_size_; i++) {
       RCLCPP_INFO(node_->get_logger(), "Computing batch %d", i);
-      yolo_.inferStep(*yolo_state_, true);
+      if constexpr (isSyncAsync) {
+        yolo_.inferStep(*yolo_state_, true, forward_finished_callback, this);
+      } else {
+        yolo_.inferStep(*yolo_state_, false, forward_finished_callback, this);
+      }
     }
     RCLCPP_INFO(node_->get_logger(), "Finished computing");
 

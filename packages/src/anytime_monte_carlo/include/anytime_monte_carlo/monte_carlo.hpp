@@ -57,17 +57,6 @@ public:
     }
   }
 
-  void reactive_function_loop()
-  {
-    while (true) {
-      if (check_cancel_and_finish_reactive()) {
-        return;
-      } else {
-        compute();
-      }
-    }
-  }
-
   bool check_cancel_and_finish_reactive() override
   {
     bool should_finish = loop_count_ >= this->goal_handle_->get_goal()->goal;

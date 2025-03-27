@@ -192,7 +192,7 @@ std::vector<float> convertToNCHW(const cv::Mat & img)
 }
 
 bool loadImageFromFile(
-  const std::string & imagePath, CudaBuffer & buffer, bool halfPrecision = false)
+  const std::string & imagePath, CudaBuffer & buffer, [[maybe_unused]] bool halfPrecision = false)
 {
   cv::Mat img = cv::imread(imagePath);
   if (img.empty()) {
@@ -345,8 +345,9 @@ public:
   enum Stage { LAYER_PROCESSING, EXIT_PROCESSING, NMS_PROCESSING, COMPLETED };
 
   InferenceState(
-    const CudaBuffer & inputBuffer, cudaStream_t stream, bool halfPrecision, int chunkCount,
-    int exitIndexToProcess = 0)
+    const CudaBuffer & inputBuffer, [[maybe_unused]] cudaStream_t stream,
+    [[maybe_unused]] bool halfPrecision, int chunkCount,
+    [[maybe_unused]] int exitIndexToProcess = 0)
   : currentStage(LAYER_PROCESSING), currentIndex(0)
   {
     this->inputBuffer.allocate(inputBuffer.getSize());
@@ -706,7 +707,9 @@ public:
     return InferenceState(inputBuffer, stream, halfPrecision, chunks.size());
   }
 
-  bool inferStep(InferenceState & state, bool async = true)
+  bool inferStep(
+    InferenceState & state, bool async = true, void (*callback)(void *) = nullptr,
+    void * userData = nullptr)
   {
     // Check if inference is already complete
     if (state.isCompleted()) {
@@ -775,8 +778,7 @@ public:
     }
 
     auto stream = this->stream;
-    // @Harun: I don't know how you did this before
-    // cudaLaunchHostFunc(stream, forward_finished_callback, state);
+    cudaLaunchHostFunc(stream, callback, userData);
 
     return state.isCompleted();
   }
@@ -796,7 +798,7 @@ public:
     for (auto & exit : exits) {
       bool ready = true;
       for (auto & f : exit.f) {
-        if (f < state.currentIndex) {
+        if (static_cast<size_t>(f) < state.currentIndex) {
           continue;
         }
         ready = false;
@@ -836,7 +838,7 @@ public:
     for (auto & exit : exits) {
       bool ready = true;
       for (auto & f : exit.f) {
-        if (f < state.currentIndex) {
+        if (static_cast<size_t>(f) < state.currentIndex) {
           continue;
         }
         ready = false;
