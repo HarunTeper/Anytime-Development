@@ -6,7 +6,8 @@ vision_msgs/Detection2D[] detections  # Array of detections with bounding boxes
 bool is_reactive_proactive
 bool is_single_multi
 int32 batch_size
-builtin_interfaces/Duration batch_time
+builtin_interfaces/Duration average_batch_time
+int32 processed_layers
 builtin_interfaces/Time action_server_receive
 builtin_interfaces/Time action_server_accept
 builtin_interfaces/Time action_server_start

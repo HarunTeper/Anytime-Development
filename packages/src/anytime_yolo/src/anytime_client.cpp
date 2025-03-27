@@ -163,7 +163,6 @@ void AnytimeActionClient::result_callback(const AnytimeGoalHandle::WrappedResult
       break;
   }
   current_image_.reset();
-  rclcpp::shutdown();
 }
 
 void AnytimeActionClient::post_processing(const AnytimeGoalHandle::WrappedResult & result)
@@ -208,7 +207,10 @@ void AnytimeActionClient::print_time_differences(const AnytimeGoalHandle::Wrappe
   rclcpp::Time action_server_send_result_time(
     result.result->action_server_send_result.sec, result.result->action_server_send_result.nanosec);
 
-  rclcpp::Time batch_time(result.result->batch_time.sec, result.result->batch_time.nanosec);
+  rclcpp::Time batch_time(
+    result.result->average_batch_time.sec, result.result->average_batch_time.nanosec);
+
+  int processed_layers = result.result->processed_layers;
 
   // Log raw timestamps in nanoseconds
   RCLCPP_INFO(this->get_logger(), "Raw timestamp data (nanoseconds):");
@@ -239,7 +241,7 @@ void AnytimeActionClient::print_time_differences(const AnytimeGoalHandle::Wrappe
     this->get_logger(), "action_server_send_result_time: %ld",
     action_server_send_result_time.nanoseconds());
   RCLCPP_INFO(this->get_logger(), "batch_time_ns: %ld", batch_time.nanoseconds());
-  RCLCPP_INFO(this->get_logger(), "batch_size: %d", result.result->batch_size);
+  RCLCPP_INFO(this->get_logger(), "processed_layers: %d", processed_layers);
 
   // Create results directory if it doesn't exist
   std::string results_dir = "results";
@@ -260,7 +262,7 @@ void AnytimeActionClient::print_time_differences(const AnytimeGoalHandle::Wrappe
     file << "client_goal_start,client_send_start,client_send_end,client_goal_response,"
          << "client_send_cancel_start,client_send_cancel_end,client_result,"
          << "server_receive,server_accept,server_start,server_cancel,server_send_result,"
-         << "batch_time_ns,iterations,batch_size\n";
+         << "batch_time_ns,processed_layers\n";
   }
 
   // Write raw timestamp data
@@ -273,8 +275,7 @@ void AnytimeActionClient::print_time_differences(const AnytimeGoalHandle::Wrappe
        << action_server_accept_time.nanoseconds() << "," << action_server_start_time.nanoseconds()
        << "," << action_server_cancel_time.nanoseconds() << ","
        << action_server_send_result_time.nanoseconds() << "," << batch_time.nanoseconds() << ","
-
-       << "," << result.result->batch_size << "\n";
+       << processed_layers << "\n";
 
   file.close();
 

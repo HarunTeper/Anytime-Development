@@ -70,7 +70,7 @@ public:
 
     if (should_finish || should_cancel) {
       this->result_->action_server_send_result = this->node_->now();
-      this->result_->batch_time = this->average_computation_time_;
+      this->result_->average_batch_time = this->average_computation_time_;
       this->calculate_result();
 
       if (should_cancel) {
@@ -104,7 +104,7 @@ public:
     if ((should_finish || should_cancel) && this->is_running()) {
       this->result_->action_server_send_result = this->node_->now();
 
-      this->result_->batch_time = average_computation_time_;
+      this->result_->average_batch_time = average_computation_time_;
 
       if (should_cancel) {
         this->goal_handle_->canceled(this->result_);
@@ -131,6 +131,14 @@ public:
     // Notify the waitable
     auto this_ptr = static_cast<AnytimeManagement *>(userData);
     RCLCPP_INFO(this_ptr->node_->get_logger(), "Notifying iteration");
+
+    // Increment processed layers counter for async mode
+    if constexpr (isSyncAsync) {
+      this_ptr->processed_layers_++;
+      RCLCPP_INFO(
+        this_ptr->node_->get_logger(), "Processed layers: %d", this_ptr->processed_layers_);
+    }
+
     this_ptr->notify_iteration();
   }
 
@@ -142,11 +150,26 @@ public:
     // Determine synchronicity before the loop
     constexpr bool is_sync_async = isSyncAsync;
 
-    void (*callback)(void *) = isPassiveCooperative ? forward_finished_callback : nullptr;
+    // void (*callback)(void *) = isPassiveCooperative ? forward_finished_callback : nullptr;
 
     for (int i = 0; i < batch_size_; i++) {
-      RCLCPP_INFO(node_->get_logger(), "Computing batch %d", i);
+      RCLCPP_INFO(node_->get_logger(), "Computing batch part %d", i);
+
+      void (*callback)(void *);
+      // only set forward_finished_callback for the last batch
+      if (i == batch_size_ - 1) {
+        callback = forward_finished_callback;
+      } else {
+        callback = nullptr;
+      }
+
       yolo_.inferStep(*yolo_state_, is_sync_async, callback, this);
+
+      // Increment processed layers counter for sync mode
+      if constexpr (!isSyncAsync) {
+        processed_layers_++;
+        RCLCPP_INFO(node_->get_logger(), "Processed layers: %d", processed_layers_);
+      }
     }
     RCLCPP_INFO(node_->get_logger(), "Finished computing");
 
@@ -155,7 +178,7 @@ public:
     // Calculate computation time for this batch
     rclcpp::Duration computation_time = end_time - start_time;
     RCLCPP_INFO(
-      node_->get_logger(), "Computation time: %f ms", computation_time.nanoseconds() / 1e6);
+      node_->get_logger(), "Batch computation time: %f ms", computation_time.nanoseconds() / 1e6);
 
     // Update the average computation time
     batch_count_++;
@@ -227,8 +250,9 @@ public:
     }
 
     // Add additional information to result
-    this->result_->batch_time = average_computation_time_;
+    this->result_->average_batch_time = average_computation_time_;
     this->result_->batch_size = batch_size_;
+    this->result_->processed_layers = processed_layers_;
   }
 
   // Cancel function
@@ -313,6 +337,7 @@ public:
     this->result_->action_server_start = this->server_goal_start_time_;
 
     batch_count_ = 0;
+    processed_layers_ = 0;  // Reset processed layers counter
     average_computation_time_ = rclcpp::Duration(0, 0);
   }
 
@@ -327,6 +352,7 @@ protected:
 
   // Batch count and average computation time
   int batch_count_ = 0;
+  int processed_layers_ = 0;                         // Counter for processed network layers
   rclcpp::Duration average_computation_time_{0, 0};  // in milliseconds
 };
 
