@@ -104,28 +104,14 @@ def combine_run_data(file_pattern):
     return combined_df
 
 
-def plot_raw_timestamps(csv_files, output_dir):
-    """Plot metrics from multiple raw timestamp CSV files"""
+def get_time_diff_pairs():
+    """
+    Returns a dictionary of timestamp pairs used to calculate latencies.
 
-    # Combine all runs into a single DataFrame
-    combined_pattern = csv_files.replace('_run1', '_run*')
-    combined_df = combine_run_data(combined_pattern)
-
-    if combined_df is None:
-        print(f"No data to plot for pattern: {combined_pattern}")
-        return
-
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Extract base filename for plot titles
-    base_name = os.path.basename(csv_files).replace('_run1.csv', '')
-
-    # Convert index to numpy array for plotting
-    x_values = np.array(combined_df.index)
-
-    # Define timestamp pairs to calculate latencies
-    time_diff_pairs = {
+    Returns:
+        Dictionary mapping latency metric names to tuples of (start_column, end_column)
+    """
+    return {
         'total_client_start': ('client_goal_start', 'server_receive'),
         'client_start': ('client_goal_start', 'client_send_start'),
         'client_send_receive': ('client_send_start', 'server_receive'),
@@ -148,6 +134,30 @@ def plot_raw_timestamps(csv_files, output_dir):
         'client_send_latency': ('client_send_start', 'client_send_end'),
         'client_cancel_latency': ('client_send_cancel_start', 'client_send_cancel_end'),
     }
+
+
+def plot_raw_timestamps(csv_files, output_dir):
+    """Plot metrics from multiple raw timestamp CSV files"""
+
+    # Combine all runs into a single DataFrame
+    combined_pattern = csv_files.replace('_run1', '_run*')
+    combined_df = combine_run_data(combined_pattern)
+
+    if combined_df is None:
+        print(f"No data to plot for pattern: {combined_pattern}")
+        return
+
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Extract base filename for plot titles
+    base_name = os.path.basename(csv_files).replace('_run1.csv', '')
+
+    # Convert index to numpy array for plotting
+    x_values = np.array(combined_df.index)
+
+    # Get timestamp pairs to calculate latencies
+    time_diff_pairs = get_time_diff_pairs()
 
     # Calculate all time differences
     time_diffs = {}
@@ -172,12 +182,6 @@ def plot_raw_timestamps(csv_files, output_dir):
         # Calculate iterations per batch unit if both metrics are available
         if 'iterations' in combined_df.columns:
             time_diffs['iterations_per_batch'] = iterations / batch_size
-
-    # Calculate efficiency if we have both iterations and batch time
-    if 'iterations' in combined_df.columns and 'batch_time_ns' in combined_df.columns:
-        # iterations per millisecond
-        time_diffs['efficiency'] = iterations / \
-            (combined_df['batch_time_ns'].to_numpy() / 1e6)
 
     # Add run information to metrics
     if 'run' in combined_df.columns:
@@ -296,16 +300,6 @@ def plot_raw_timestamps(csv_files, output_dir):
             f'{output_dir}/{base_name}_iterations_per_batch.png'
         )
 
-    # Plot efficiency (iterations per millisecond)
-    if 'efficiency' in time_diffs:
-        plot_metrics_generic(
-            x_values,
-            {'efficiency': time_diffs['efficiency']},
-            f'Processing Efficiency - {base_name} (Combined Runs)',
-            'Iterations per millisecond',
-            f'{output_dir}/{base_name}_processing_efficiency.png'
-        )
-
 
 def plot_batch_size_comparison(threading_types, reactive_types, batch_sizes, num_runs, output_dir):
     """
@@ -324,7 +318,6 @@ def plot_batch_size_comparison(threading_types, reactive_types, batch_sizes, num
     metrics_to_compare = [
         'batch_time',
         'iterations',
-        'efficiency',
         'iterations_per_batch'
     ]
 
@@ -414,30 +407,8 @@ def plot_batch_size_comparison(threading_types, reactive_types, batch_sizes, num
                 # Calculate metrics for this batch size across all runs
                 metrics = {}
 
-                # Complete time difference pairs for all latency metrics
-                time_diff_pairs = {
-                    'total_client_start': ('client_goal_start', 'server_receive'),
-                    'client_start': ('client_goal_start', 'client_send_start'),
-                    'client_send_receive': ('client_send_start', 'server_receive'),
-
-                    'total_server_start': ('server_receive', 'server_start'),
-                    'server_accept': ('server_receive', 'server_accept'),
-                    'server_start': ('server_accept', 'server_start'),
-
-                    'server_start_finish': ('server_start', 'server_send_result'),
-                    'server_start_cancel': ('server_start', 'server_cancel'),
-                    'client_start_cancel': ('client_send_start', 'client_send_cancel_start'),
-                    'client_start_receive': ('client_send_start', 'client_result'),
-
-                    'total_client_cancel': ('client_send_cancel_start', 'client_result'),
-                    'client_cancel_receive': ('client_send_cancel_start', 'server_cancel'),
-                    'client_cancel_result_send': ('server_cancel', 'server_send_result'),
-                    'client_cancel_result_receive': ('server_send_result', 'client_result'),
-
-                    'server_start_response': ('server_accept', 'client_goal_response'),
-                    'client_send_latency': ('client_send_start', 'client_send_end'),
-                    'client_cancel_latency': ('client_send_cancel_start', 'client_send_cancel_end'),
-                }
+                # Get time difference pairs for all latency metrics
+                time_diff_pairs = get_time_diff_pairs()
 
                 for diff_name, (start_col, end_col) in time_diff_pairs.items():
                     if start_col in combined_df.columns and end_col in combined_df.columns:
@@ -455,10 +426,6 @@ def plot_batch_size_comparison(threading_types, reactive_types, batch_sizes, num
                 if 'iterations' in combined_df.columns and 'batch_size' in combined_df.columns:
                     metrics['iterations_per_batch'] = combined_df['iterations'].to_numpy(
                     ) / combined_df['batch_size'].to_numpy()
-
-                if 'iterations' in combined_df.columns and 'batch_time_ns' in combined_df.columns:
-                    metrics['efficiency'] = combined_df['iterations'].to_numpy(
-                    ) / (combined_df['batch_time_ns'].to_numpy() / 1e6)
 
                 print(f"Calculated metrics for batch_size={batch_size}")
 
@@ -683,8 +650,8 @@ def main():
                 plot_raw_timestamps(file_pattern, output_dir)
 
     # After plotting individual files, create batch size comparison plots
-    plot_batch_size_comparison(
-        args.threading, args.reactive, args.batch_sizes, args.runs, output_dir)
+    # plot_batch_size_comparison(
+    #     args.threading, args.reactive, args.batch_sizes, args.runs, output_dir)
 
     print("Plotting completed.")
 

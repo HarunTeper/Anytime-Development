@@ -133,5 +133,5 @@ if [[ "$mode" == "plot" || "$mode" == "both" ]]; then
     done
     
     echo "Running plotter with all configurations..."
-    python3 evaluation_plotter.py --threading $threading_args --reactive $reactive_args --batch-sizes $batch_args --runs $num_runs --results-dir results/monte_carlo --output-dir plots/monte_carlo
+    python3 evaluation_plotter_monte_carlo.py --threading $threading_args --reactive $reactive_args --batch-sizes $batch_args --runs $num_runs --results-dir results/monte_carlo --output-dir plots/monte_carlo
 fi
