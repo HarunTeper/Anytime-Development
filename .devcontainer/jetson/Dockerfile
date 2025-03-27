@@ -130,7 +130,7 @@ RUN pip install pandas "numpy<2.0" && \
 # --- Yolo Dependencies ---
 
 RUN apt-get -y install nlohmann-json3-dev dos2unix
-RUN pip install opencv-python
+RUN pip install opencv-python cv_bridge
 
 # --- Set up user ---
 
