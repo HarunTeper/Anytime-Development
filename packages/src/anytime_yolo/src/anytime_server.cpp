@@ -178,6 +178,7 @@ rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
 
 void AnytimeActionServer::handle_accepted(const std::shared_ptr<AnytimeGoalHandle> goal_handle)
 {
+  anytime_management_->set_goal_processing_start_time(this->now());
   RCLCPP_INFO(this->get_logger(), "Setting goal handle for AnytimeManagement");
   anytime_management_->set_goal_handle(goal_handle);
 
@@ -189,6 +190,5 @@ void AnytimeActionServer::handle_accepted(const std::shared_ptr<AnytimeGoalHandl
 
   RCLCPP_INFO(this->get_logger(), "Start AnytimeManagement");
 
-  anytime_management_->set_goal_processing_start_time(this->now());
   anytime_management_->start();
 }
