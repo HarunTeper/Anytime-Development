@@ -889,16 +889,19 @@ private:
 
   bool loadNMS(const json & nmsConfig, const std::string & folderPath)
   {
-    const std::string nmsEnginePath = folderPath + "/" + nmsConfig["weights"].get<std::string>();
-    if (loadEngine(nmsEnginePath, runtime, nmsEngine)) {
-      std::cout << "Successfully loaded cached NMS engine from: " << nmsEnginePath << std::endl;
+    const std::string weightsPath = folderPath + "/" + nmsConfig["weights"].get<std::string>();
+    const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) + ".engine";
+    std::cout << "Engine path: " << enginePath << std::endl;
+
+    if (loadEngine(enginePath, runtime, nmsEngine)) {
+      std::cout << "Successfully loaded cached NMS engine from: " << enginePath << std::endl;
       return true;
     } else {
       std::cerr << "Failed to load cached NMS engine, falling back to build" << std::endl;
-      buildOnnxEngine(folderPath + "/nms.onnx", nmsEnginePath);
+      buildOnnxEngine(weightsPath, enginePath);
 
       std::cout << "Successfully built NMS engine" << std::endl;
-      if (!loadEngine(nmsEnginePath, runtime, nmsEngine)) {
+      if (!loadEngine(enginePath, runtime, nmsEngine)) {
         throw std::runtime_error("Failed to load NMS engine");
       }
       return true;
