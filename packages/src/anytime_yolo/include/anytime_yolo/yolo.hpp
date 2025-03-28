@@ -907,8 +907,7 @@ private:
       }
     }
     nmsContext = std::unique_ptr<IExecutionContext>(nmsEngine->createExecutionContext());
-      return true;
-    }
+    return true;
   }
 
   bool loadLayer(const json & layerConfig, const std::string & folderPath)
