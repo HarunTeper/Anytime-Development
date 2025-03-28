@@ -512,44 +512,44 @@ def plot_batch_size_comparison(threading_types, reactive_types, batch_sizes, num
             for median, color in zip(boxes['medians'], box_colors):
                 median.set(color='black', linewidth=1.5)
 
-            # Add lines connecting mean values across batch sizes
-            # First, collect mean values by configuration and batch size
-            config_means = {config: {} for config in all_data.keys()}
-            config_stderrs = {config: {} for config in all_data.keys()}
+            # # Add lines connecting mean values across batch sizes
+            # # First, collect mean values by configuration and batch size
+            # config_means = {config: {} for config in all_data.keys()}
+            # config_stderrs = {config: {} for config in all_data.keys()}
 
-            for i, batch_size in enumerate(all_batch_sizes):
-                for config, metrics in all_data.items():
-                    if metric_name in metrics and batch_size in metrics[metric_name]:
-                        data = metrics[metric_name][batch_size]
-                        if len(data) > 0:
-                            config_means[config][batch_size] = np.mean(data)
-                            # Standard error for error bars
-                            config_stderrs[config][batch_size] = np.std(
-                                data) / np.sqrt(len(data))
+            # for i, batch_size in enumerate(all_batch_sizes):
+            #     for config, metrics in all_data.items():
+            #         if metric_name in metrics and batch_size in metrics[metric_name]:
+            #             data = metrics[metric_name][batch_size]
+            #             if len(data) > 0:
+            #                 config_means[config][batch_size] = np.mean(data)
+            #                 # Standard error for error bars
+            #                 config_stderrs[config][batch_size] = np.std(
+            #                     data) / np.sqrt(len(data))
 
-            # Now plot lines connecting the means with error bars
-            for config, means in config_means.items():
-                if len(means) > 1:  # Only plot if we have at least two points
-                    x_values = []
-                    y_values = []
-                    errors = []
-                    for batch_size in sorted(means.keys()):
-                        # Find the x-position for this batch size
-                        batch_idx = all_batch_sizes.index(batch_size)
-                        config_idx = sorted(all_data.keys()).index(config)
-                        x_pos = batch_idx * \
-                            (len(config_colors) + group_space) + \
-                            1 + config_idx * box_space
+            # # Now plot lines connecting the means with error bars
+            # for config, means in config_means.items():
+            #     if len(means) > 1:  # Only plot if we have at least two points
+            #         x_values = []
+            #         y_values = []
+            #         errors = []
+            #         for batch_size in sorted(means.keys()):
+            #             # Find the x-position for this batch size
+            #             batch_idx = all_batch_sizes.index(batch_size)
+            #             config_idx = sorted(all_data.keys()).index(config)
+            #             x_pos = batch_idx * \
+            #                 (len(config_colors) + group_space) + \
+            #                 1 + config_idx * box_space
 
-                        x_values.append(x_pos)
-                        y_values.append(means[batch_size])
-                        errors.append(config_stderrs[config][batch_size])
+            #             x_values.append(x_pos)
+            #             y_values.append(means[batch_size])
+            #             errors.append(config_stderrs[config][batch_size])
 
-                    # Plot the line connecting means with the same color as the boxes
-                    plt.errorbar(x_values, y_values, yerr=errors,
-                                 fmt='-o', color=config_colors.get(config, 'gray'),
-                                 linewidth=2, alpha=0.7,
-                                 capsize=4, elinewidth=1.5)
+            #         # Plot the line connecting means with the same color as the boxes
+            #         plt.errorbar(x_values, y_values, yerr=errors,
+            #                      fmt='-o', color=config_colors.get(config, 'gray'),
+            #                      linewidth=2, alpha=0.7,
+            #                      capsize=4, elinewidth=1.5)
 
             # Set x-ticks at the middle of each group
             group_positions = [i * (len(config_colors) + group_space) + 1 + (len(config_colors) * box_space) / 2
@@ -650,8 +650,8 @@ def main():
                 plot_raw_timestamps(file_pattern, output_dir)
 
     # After plotting individual files, create batch size comparison plots
-    # plot_batch_size_comparison(
-    #     args.threading, args.reactive, args.batch_sizes, args.runs, output_dir)
+    plot_batch_size_comparison(
+        args.threading, args.reactive, args.batch_sizes, args.runs, output_dir)
 
     print("Plotting completed.")
 
