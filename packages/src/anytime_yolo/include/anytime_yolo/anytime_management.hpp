@@ -99,6 +99,9 @@ public:
   void check_cancel_and_finish_proactive() override
   {
     calculate_result();
+    auto feedback = std::make_shared<Anytime::Feedback>();
+    feedback->processed_layers = processed_layers_;
+    this->goal_handle_->publish_feedback(feedback);
     // Print number of detected objects and processed layers
     RCLCPP_INFO(
       node_->get_logger(), "Detected objects: %zu, Processed layers: %d",

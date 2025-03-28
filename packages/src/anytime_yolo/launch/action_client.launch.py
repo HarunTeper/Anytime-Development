@@ -46,7 +46,7 @@ def generate_launch_description():
 
     cancel_after_layers_arg = DeclareLaunchArgument(
         'cancel_after_layers',
-        default_value='7',
+        default_value='15',
         description='Number of processed layers before triggering cancellation'
     )
 
