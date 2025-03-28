@@ -307,13 +307,15 @@ def plot_raw_timestamps(csv_files, output_dir):
         )
 
 
-def plot_batch_size_comparison(threading_types, reactive_types, batch_sizes, num_runs, output_dir):
+def plot_batch_size_comparison(threading_types, reactive_types, passive_cooperative_types, sync_async_types, batch_sizes, num_runs, output_dir):
     """
     Plot comparisons of latency metrics across different batch sizes.
 
     Args:
         threading_types: List of threading types (single, multi)
         reactive_types: List of reactive types (reactive, proactive)
+        passive_cooperative_types: List of passive/cooperative types (passive, cooperative)
+        sync_async_types: List of sync/async types (sync, async)
         batch_sizes: List of batch sizes
         num_runs: Number of runs per configuration
         output_dir: Directory to save output plots
@@ -359,122 +361,123 @@ def plot_batch_size_comparison(threading_types, reactive_types, batch_sizes, num
     # Collect data for all configurations
     for threading in threading_types:
         for reactive in reactive_types:
-            config = f"{threading}-{reactive}"
-            all_data[config] = {}
+            for passive_cooperative in passive_cooperative_types:
+                for sync_async in sync_async_types:
+                    config = f"{threading}-{reactive}-{passive_cooperative}-{sync_async}"
+                    all_data[config] = {}
 
-            print(f"Collecting data for {config}...")
+                    print(f"Collecting data for {config}...")
 
-            # Collect data for each batch size
-            for batch_size in batch_sizes:
-                # Match all runs for this configuration
-                pattern = f"results/monte_carlo/anytime_raw_timestamps_batch_{batch_size}_{reactive}_{threading}_run*.csv"
-                matching_files = glob.glob(pattern)
+                    # Collect data for each batch size
+                    for batch_size in batch_sizes:
+                        # Match all runs for this configuration
+                        pattern = f"results/yolo/yolo_raw_timestamps_batch_{batch_size}_{reactive}_{threading}_{passive_cooperative}_{sync_async}_run*.csv"
+                        matching_files = glob.glob(pattern)
 
-                if not matching_files:
-                    # Try the old timing data pattern as fallback
-                    pattern = f"results/monte_carlo/anytime_timing_data_batch_{batch_size}_{reactive}_{threading}_run*.csv"
-                    matching_files = glob.glob(pattern)
+                        if not matching_files:
+                            print(
+                                f"Warning: No data files found for batch_size={batch_size}, threading={threading}, reactive={reactive}, passive/cooperative={passive_cooperative}, sync/async={sync_async}")
+                            continue
 
-                if not matching_files:
-                    print(
-                        f"Warning: No data files found for batch_size={batch_size}, threading={threading}, reactive={reactive}")
-                    continue
+                        print(
+                            f"Found {len(matching_files)} files for batch_size={batch_size}")
 
-                print(
-                    f"Found {len(matching_files)} files for batch_size={batch_size}")
+                        # Read and combine data from all runs
+                        dfs = []
+                        for file in matching_files:
+                            try:
+                                df = pd.read_csv(file, comment='#')
+                                # Fix to handle .csv extension
+                                run_num = int(file.split('_run')
+                                              [-1].split('.')[0])
+                                df['run'] = run_num
+                                print(f"Read {len(df)} rows from {file}")
+                                dfs.append(df)
+                            except Exception as e:
+                                try:
+                                    df = pd.read_csv(file)
+                                    # Fix to handle .csv extension
+                                    run_num = int(file.split(
+                                        '_run')[-1].split('.')[0])
+                                    df['run'] = run_num
+                                    dfs.append(df)
+                                except Exception as e2:
+                                    print(f"Error reading file {file}: {e2}")
 
-                # Read and combine data from all runs
-                dfs = []
-                for file in matching_files:
-                    try:
-                        df = pd.read_csv(file, comment='#')
-                        # Fix to handle .csv extension
-                        run_num = int(file.split('_run')[-1].split('.')[0])
-                        df['run'] = run_num
-                        print(f"Read {len(df)} rows from {file}")
-                        dfs.append(df)
-                    except Exception as e:
-                        try:
-                            df = pd.read_csv(file)
-                            # Fix to handle .csv extension
-                            run_num = int(file.split('_run')[-1].split('.')[0])
-                            df['run'] = run_num
-                            dfs.append(df)
-                        except Exception as e2:
-                            print(f"Error reading file {file}: {e2}")
+                        if not dfs:
+                            continue
 
-                if not dfs:
-                    continue
+                        # Combine all runs for this configuration
+                        combined_df = pd.concat(dfs, ignore_index=True)
+                        print(
+                            f"Combined {len(dfs)} runs with total {len(combined_df)} rows for batch_size={batch_size}")
 
-                # Combine all runs for this configuration
-                combined_df = pd.concat(dfs, ignore_index=True)
-                print(
-                    f"Combined {len(dfs)} runs with total {len(combined_df)} rows for batch_size={batch_size}")
+                        # Calculate metrics for this batch size across all runs
+                        metrics = {}
 
-                # Calculate metrics for this batch size across all runs
-                metrics = {}
+                        # Complete time difference pairs for all latency metrics
+                        time_diff_pairs = {
+                            'total_client_start': ('client_goal_start', 'server_receive'),
+                            'client_start': ('client_goal_start', 'client_send_start'),
+                            'client_send_receive': ('client_send_start', 'server_receive'),
 
-                # Complete time difference pairs for all latency metrics
-                time_diff_pairs = {
-                    'total_client_start': ('client_goal_start', 'server_receive'),
-                    'client_start': ('client_goal_start', 'client_send_start'),
-                    'client_send_receive': ('client_send_start', 'server_receive'),
+                            'total_server_start': ('server_receive', 'server_start'),
+                            'server_accept': ('server_receive', 'server_accept'),
+                            'server_start': ('server_accept', 'server_start'),
 
-                    'total_server_start': ('server_receive', 'server_start'),
-                    'server_accept': ('server_receive', 'server_accept'),
-                    'server_start': ('server_accept', 'server_start'),
+                            'server_start_finish': ('server_start', 'server_send_result'),
+                            'server_start_cancel': ('server_start', 'server_cancel'),
+                            'client_start_cancel': ('client_send_start', 'client_send_cancel_start'),
+                            'client_start_receive': ('client_send_start', 'client_result'),
 
-                    'server_start_finish': ('server_start', 'server_send_result'),
-                    'server_start_cancel': ('server_start', 'server_cancel'),
-                    'client_start_cancel': ('client_send_start', 'client_send_cancel_start'),
-                    'client_start_receive': ('client_send_start', 'client_result'),
+                            'total_client_cancel': ('client_send_cancel_start', 'client_result'),
+                            'client_cancel_receive': ('client_send_cancel_start', 'server_cancel'),
+                            'client_cancel_result_send': ('server_cancel', 'server_send_result'),
+                            'client_cancel_result_receive': ('server_send_result', 'client_result'),
 
-                    'total_client_cancel': ('client_send_cancel_start', 'client_result'),
-                    'client_cancel_receive': ('client_send_cancel_start', 'server_cancel'),
-                    'client_cancel_result_send': ('server_cancel', 'server_send_result'),
-                    'client_cancel_result_receive': ('server_send_result', 'client_result'),
+                            'server_start_response': ('server_accept', 'client_goal_response'),
+                            'client_send_latency': ('client_send_start', 'client_send_end'),
+                            'client_cancel_latency': ('client_send_cancel_start', 'client_send_cancel_end'),
+                        }
 
-                    'server_start_response': ('server_accept', 'client_goal_response'),
-                    'client_send_latency': ('client_send_start', 'client_send_end'),
-                    'client_cancel_latency': ('client_send_cancel_start', 'client_send_cancel_end'),
-                }
+                        for diff_name, (start_col, end_col) in time_diff_pairs.items():
+                            if start_col in combined_df.columns and end_col in combined_df.columns:
+                                metrics[diff_name] = calculate_time_difference(
+                                    combined_df, start_col, end_col)
 
-                for diff_name, (start_col, end_col) in time_diff_pairs.items():
-                    if start_col in combined_df.columns and end_col in combined_df.columns:
-                        metrics[diff_name] = calculate_time_difference(
-                            combined_df, start_col, end_col)
+                        # Extract additional metrics
+                        if 'batch_time_ns' in combined_df.columns:
+                            metrics['batch_time'] = combined_df['batch_time_ns'].to_numpy(
+                            ) / 1e6
 
-                # Extract additional metrics
-                if 'batch_time_ns' in combined_df.columns:
-                    metrics['batch_time'] = combined_df['batch_time_ns'].to_numpy() / \
-                        1e6
+                        if 'iterations' in combined_df.columns:
+                            metrics['iterations'] = combined_df['iterations'].to_numpy()
 
-                if 'iterations' in combined_df.columns:
-                    metrics['iterations'] = combined_df['iterations'].to_numpy()
+                        if 'iterations' in combined_df.columns and 'batch_size' in combined_df.columns:
+                            metrics['iterations_per_batch'] = combined_df['iterations'].to_numpy(
+                            ) / combined_df['batch_size'].to_numpy()
 
-                if 'iterations' in combined_df.columns and 'batch_size' in combined_df.columns:
-                    metrics['iterations_per_batch'] = combined_df['iterations'].to_numpy(
-                    ) / combined_df['batch_size'].to_numpy()
+                        if 'iterations' in combined_df.columns and 'batch_time_ns' in combined_df.columns:
+                            metrics['efficiency'] = combined_df['iterations'].to_numpy(
+                            ) / (combined_df['batch_time_ns'].to_numpy() / 1e6)
 
-                if 'iterations' in combined_df.columns and 'batch_time_ns' in combined_df.columns:
-                    metrics['efficiency'] = combined_df['iterations'].to_numpy(
-                    ) / (combined_df['batch_time_ns'].to_numpy() / 1e6)
+                        print(
+                            f"Calculated metrics for batch_size={batch_size}")
 
-                print(f"Calculated metrics for batch_size={batch_size}")
-
-                # For each metric, store the batch size data
-                for metric_name, metric_data in metrics.items():
-                    if metric_name not in all_data[config]:
-                        all_data[config][metric_name] = {}
-                    all_data[config][metric_name][batch_size] = metric_data
+                        # For each metric, store the batch size data
+                        for metric_name, metric_data in metrics.items():
+                            if metric_name not in all_data[config]:
+                                all_data[config][metric_name] = {}
+                            all_data[config][metric_name][batch_size] = metric_data
 
     # Define colors for different configurations
-    config_colors = {
-        'single-reactive': 'blue',
-        'single-proactive': 'green',
-        'multi-reactive': 'red',
-        'multi-proactive': 'purple'
-    }
+    # Expanded color scheme to handle more combinations
+    colors = ['blue', 'green', 'red', 'purple', 'orange', 'brown', 'pink', 'gray',
+              'cyan', 'magenta', 'olive', 'navy', 'teal', 'coral', 'maroon', 'gold']
+
+    config_colors = {}
+    for i, config in enumerate(sorted(all_data.keys())):
+        config_colors[config] = colors[i % len(colors)]
 
     def create_boxplots_for_metrics(metrics_list, is_latency_metric=False):
         """
@@ -648,19 +651,25 @@ def main():
                         help='Threading types (single, multi)', required=True)
     parser.add_argument('--reactive', nargs='+',
                         help='Reactive types (reactive, proactive)', required=True)
+    parser.add_argument('--passive-cooperative', nargs='+',
+                        help='Passive/cooperative types (passive, cooperative)', required=True)
+    parser.add_argument('--sync-async', nargs='+',
+                        help='Sync/async types (sync, async)', required=True)
     parser.add_argument('--batch-sizes', nargs='+', type=int,
                         help='Batch sizes', required=True)
     parser.add_argument('--runs', type=int, default=1,
                         help='Number of runs per configuration')
-    parser.add_argument('--results-dir', type=str, default='results/monte_carlo',
+    parser.add_argument('--results-dir', type=str, default='results/yolo',
                         help='Directory containing result files')
-    parser.add_argument('--output-dir', type=str, default='plots/monte_carlo',
+    parser.add_argument('--output-dir', type=str, default='plots/yolo',
                         help='Directory to save output plots')
 
     args = parser.parse_args()
 
     print(f"Thread types: {args.threading}")
     print(f"Reactive types: {args.reactive}")
+    print(f"Passive/cooperative types: {args.passive_cooperative}")
+    print(f"Sync/async types: {args.sync_async}")
     print(f"Batch sizes: {args.batch_sizes}")
     print(f"Number of runs: {args.runs}")
     print(f"Results directory: {args.results_dir}")
@@ -672,19 +681,21 @@ def main():
     # Process each configuration
     for threading in args.threading:
         for reactive in args.reactive:
-            for batch_size in args.batch_sizes:
-                print(
-                    f"Processing configuration: threading={threading}, reactive={reactive}, batch_size={batch_size}")
+            for passive_cooperative in args.passive_cooperative:
+                for sync_async in args.sync_async:
+                    for batch_size in args.batch_sizes:
+                        print(
+                            f"Processing configuration: threading={threading}, reactive={reactive}, passive_cooperative={passive_cooperative}, sync_async={sync_async}, batch_size={batch_size}")
 
-                # Use first run file as reference, but will combine all runs
-                file_pattern = f"{args.results_dir}/anytime_raw_timestamps_batch_{batch_size}_{reactive}_{threading}_run1.csv"
+                        # Use first run file as reference, but will combine all runs
+                        file_pattern = f"{args.results_dir}/yolo_raw_timestamps_batch_{batch_size}_{reactive}_{threading}_{passive_cooperative}_{sync_async}_run1.csv"
 
-                # Plot combined data from all runs
-                plot_raw_timestamps(file_pattern, output_dir)
+                        # Plot combined data from all runs
+                        plot_raw_timestamps(file_pattern, output_dir)
 
     # After plotting individual files, create batch size comparison plots
     plot_batch_size_comparison(
-        args.threading, args.reactive, args.batch_sizes, args.runs, output_dir)
+        args.threading, args.reactive, args.passive_cooperative, args.sync_async, args.batch_sizes, args.runs, output_dir)
 
     print("Plotting completed.")
 

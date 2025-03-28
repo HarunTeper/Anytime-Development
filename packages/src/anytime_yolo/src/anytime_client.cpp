@@ -116,8 +116,9 @@ void AnytimeActionClient::feedback_callback(
   AnytimeGoalHandle::SharedPtr goal_handle, const std::shared_ptr<const Anytime::Feedback> feedback)
 {
   (void)goal_handle;
-  // Log the feedback received from the action server
-  RCLCPP_INFO(this->get_logger(), "Next number in the sequence: %f", feedback->feedback);
+  // Log the feedback message
+  RCLCPP_INFO(this->get_logger(), "Feedback received");
+  RCLCPP_INFO(this->get_logger(), "Processed layers: %d", feedback->processed_layers);
 }
 
 void AnytimeActionClient::cancel_timeout_callback()

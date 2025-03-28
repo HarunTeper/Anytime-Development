@@ -41,11 +41,11 @@ done
 
 source packages/install/setup.bash
 
-declare -a is_single_multi=("False" "True")
-declare -a is_reactive_proactive=("False" "True")
-declare -a is_passive_cooperative=("False" "True")
-declare -a is_sync_async=("False" "True")
-declare -a batch_sizes=(1 16 256 4096 65536 1048576)
+declare -a is_single_multi=("False")
+declare -a is_reactive_proactive=("False")
+declare -a is_passive_cooperative=("True")
+declare -a is_sync_async=("False")
+declare -a batch_sizes=(1)
 
 # Create the results and plots directories
 mkdir -p results/yolo
@@ -173,5 +173,5 @@ if [[ "$mode" == "plot" || "$mode" == "both" ]]; then
     done
     
     echo "Running plotter with all configurations..."
-    # python3 evaluation_plotter_yolo.py --threading $threading_args --reactive $reactive_args --passive-cooperative $passive_args --sync-async $sync_args --batch-sizes $batch_args --runs $num_runs --results-dir results/yolo --output-dir plots/yolo
+    python3 evaluation_plotter_yolo.py --threading $threading_args --reactive $reactive_args --passive-cooperative $passive_args --sync-async $sync_args --batch-sizes $batch_args --runs $num_runs --results-dir results/yolo --output-dir plots/yolo
 fi

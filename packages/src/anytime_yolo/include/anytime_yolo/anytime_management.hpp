@@ -6,11 +6,13 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 
 #include <opencv2/opencv.hpp>
+#include <rclcpp/logging.hpp>
 
 #include <cv_bridge/cv_bridge.h>
 
 #include <cstdint>
 #include <future>
+#include <memory>
 #include <random>
 
 // Aliases for better readability
@@ -55,11 +57,13 @@ public:
 
   void reactive_function()
   {
+    auto feedback = std::make_shared<Anytime::Feedback>();
+    feedback->processed_layers = processed_layers_;
+    this->goal_handle_->publish_feedback(feedback);
     if (check_cancel_and_finish_reactive()) {
       return;
     } else {
       compute();
-      // notify_iteration();
     }
   }
 
@@ -72,6 +76,7 @@ public:
       this->result_->action_server_send_result = this->node_->now();
       this->result_->average_batch_time = this->average_computation_time_;
       this->calculate_result();
+      this->result_->action_server_cancel = this->node_->now();
 
       if (should_cancel) {
         this->goal_handle_->canceled(this->result_);
@@ -89,15 +94,15 @@ public:
   // ----------------- Proactive Functions -----------------
 
   // proactive function to approximate Pi
-  void proactive_function()
-  {
-    compute();
-    calculate_result();
-    notify_check_finish();
-  }
+  void proactive_function() { compute(); }
 
   void check_cancel_and_finish_proactive() override
   {
+    calculate_result();
+    // Print number of detected objects and processed layers
+    RCLCPP_INFO(
+      node_->get_logger(), "Detected objects: %zu, Processed layers: %d",
+      this->result_->detections.size(), processed_layers_);
     bool should_finish = yolo_state_->isCompleted();
     bool should_cancel = this->goal_handle_->is_canceling() || !this->goal_handle_->is_executing();
 
@@ -105,6 +110,7 @@ public:
       this->result_->action_server_send_result = this->node_->now();
 
       this->result_->average_batch_time = average_computation_time_;
+      this->result_->action_server_cancel = this->node_->now();
 
       if (should_cancel) {
         this->goal_handle_->canceled(this->result_);
@@ -117,7 +123,6 @@ public:
     } else if (!this->is_running()) {
       return;
     }
-
     notify_iteration();
   }
 
@@ -128,25 +133,35 @@ public:
   // Change to static method for CUDA callback compatibility
   static void CUDART_CB forward_finished_callback(void * userData)
   {
-    // Notify the waitable
-    auto this_ptr = static_cast<AnytimeManagement *>(userData);
-    RCLCPP_INFO(this_ptr->node_->get_logger(), "Notifying iteration");
+    RCLCPP_INFO(
+      static_cast<AnytimeManagement *>(userData)->node_->get_logger(), "Forward finished");
 
-    // Increment processed layers counter for async mode
+    auto this_ptr = static_cast<AnytimeManagement *>(userData);
+
     if constexpr (isSyncAsync) {
+      // Increment processed layers counter for async mode
       this_ptr->processed_layers_++;
       RCLCPP_INFO(
         this_ptr->node_->get_logger(), "Processed layers: %d", this_ptr->processed_layers_);
+    } else if constexpr (!isSyncAsync) {
+      // nothing to do for sync mode
     }
 
-    this_ptr->notify_iteration();
+    // Notify the waitable
+    if constexpr (isReactiveProactive) {
+      this_ptr->notify_check_finish();
+    } else if constexpr (!isReactiveProactive) {
+      this_ptr->notify_iteration();
+    }
   }
 
   void compute() override
   {
     RCLCPP_INFO(node_->get_logger(), "Computing");
+
     // Start timing
     auto start_time = this->node_->now();
+
     // Determine synchronicity before the loop
     constexpr bool is_sync_async = isSyncAsync;
 
@@ -156,19 +171,25 @@ public:
       RCLCPP_INFO(node_->get_logger(), "Computing batch part %d", i);
 
       void (*callback)(void *);
-      // only set forward_finished_callback for the last batch
-      if (i == batch_size_ - 1) {
-        callback = forward_finished_callback;
-      } else {
-        callback = nullptr;
-      }
+      // // only set forward_finished_callback for the last batch
+      // if (i == batch_size_ - 1) {
+      //   callback = forward_finished_callback;
+      // } else {
+      //   callback = nullptr;
+      // }
+
+      callback = forward_finished_callback;
 
       yolo_.inferStep(*yolo_state_, is_sync_async, callback, this);
 
-      // Increment processed layers counter for sync mode
+      RCLCPP_INFO(node_->get_logger(), "Finished batch part %d", i);
+
       if constexpr (!isSyncAsync) {
+        // Increment processed layers counter for sync mode
         processed_layers_++;
         RCLCPP_INFO(node_->get_logger(), "Processed layers: %d", processed_layers_);
+      } else if constexpr (isSyncAsync) {
+        // nothing to do for async mode
       }
     }
     RCLCPP_INFO(node_->get_logger(), "Finished computing");
@@ -193,6 +214,8 @@ public:
 
   void calculate_result() override
   {
+    this->result_ = std::make_shared<Anytime::Result>();
+    RCLCPP_INFO(node_->get_logger(), "Calculating result");
     std::vector<float> yolo_result;
     if constexpr (isReactiveProactive) {
       yolo_result = yolo_.calculateLatestExit(*yolo_state_);
@@ -262,13 +285,15 @@ public:
     if constexpr (isReactiveProactive) {
       notify_check_finish();
     } else if constexpr (!isReactiveProactive) {
-      // nothing to do
+      // nothing to do for reactive mode
     }
   }
 
   // Reset function
   void reset() override
   {
+    this->result_ = std::make_shared<Anytime::Result>();
+
     input_cuda_buffer_.free();
 
     // Process image data from the goal handle

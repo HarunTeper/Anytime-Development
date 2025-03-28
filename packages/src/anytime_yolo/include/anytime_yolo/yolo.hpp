@@ -124,6 +124,7 @@ public:
     free();
     this->size = size;
     cudaError_t status = cudaMalloc(&device_ptr, size);
+    cudaMemset(device_ptr, 0, size);
     if (status != cudaSuccess) {
       std::cerr << "Error allocating CUDA memory: " << cudaGetErrorString(status) << std::endl;
     }
@@ -1009,6 +1010,8 @@ public:
 
   std::vector<float> calculateLatestExit(InferenceState & state)
   {
+    synchronize();
+
     CudaBuffer nmsOutputBuffer;
 
     // check the farthest exits for which all inputs are ready

@@ -14,4 +14,4 @@ builtin_interfaces/Time action_server_start
 builtin_interfaces/Time action_server_cancel
 builtin_interfaces/Time action_server_send_result
 ---
-float32 feedback
+int32 processed_layers
