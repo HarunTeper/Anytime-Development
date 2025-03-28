@@ -112,7 +112,7 @@
         {
             "label": "ROS2-Download-Weights",
             "type": "shell",
-            "command": "mkdir -p ${workspaceFolder}/packages/src/anytime_yolo/weights_32 && cd ${workspaceFolder}/packages/src/anytime_yolo && wget https://tu-dortmund.sciebo.de/s/Y4aFTfoeRYbWc99/download -O weights.zip && unzip -o weights.zip -d . && rm weights.zip",
+            "command": "cd ${workspaceFolder}/packages/src/anytime_yolo && wget https://tu-dortmund.sciebo.de/s/BxRxI1VDES07emH/download -O weights.zip && unzip -o weights.zip -d . && rm weights.zip",
             "problemMatcher": [],
             "presentation": {
                 "echo": true,

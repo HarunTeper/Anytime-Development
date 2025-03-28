@@ -34,7 +34,7 @@ def generate_launch_description():
 
     cancel_timeout_period_arg = DeclareLaunchArgument(
         'cancel_timeout_period_ms',
-        default_value='100',
+        default_value='900',
         description='Period in milliseconds for the cancel timeout timer'
     )
 
