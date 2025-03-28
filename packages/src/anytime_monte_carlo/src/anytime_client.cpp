@@ -13,8 +13,8 @@ AnytimeActionClient::AnytimeActionClient(const rclcpp::NodeOptions & options)
   RCLCPP_DEBUG(this->get_logger(), "Starting Anytime action client");
 
   // Declare parameters with default values
-  this->declare_parameter("goal_timer_period_ms", 1000);
-  this->declare_parameter("cancel_timeout_period_ms", 500);
+  this->declare_parameter("goal_timer_period_ms", 100);
+  this->declare_parameter("cancel_timeout_period_ms", 50);
   this->declare_parameter("result_filename", "anytime_results");
 
   int goal_timer_period = this->get_parameter("goal_timer_period_ms").as_int();
