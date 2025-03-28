@@ -30,8 +30,7 @@ Start the container using the following command:
 
 > tmux new-session -s evaluation-session
 
-> cd /home/vscode/workspace
-docker build \
+> docker build \
   -t ros2-anytime-jetson:latest \
   -f .devcontainer/jetson/Dockerfile \
   --build-arg ROS_DOMAIN_ID=12 \
