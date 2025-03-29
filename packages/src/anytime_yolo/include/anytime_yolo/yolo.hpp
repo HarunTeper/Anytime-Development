@@ -723,6 +723,14 @@ public:
           } else {
             inputPtr = prevLayerOutputs[chunk.index - 1].getDevicePtr();
           }
+        } else if (f < 0) {
+          // relative index
+          auto relativeIndex = f + chunk.index;
+          if (relativeIndex < 0 || static_cast<size_t>(relativeIndex) >= prevLayerOutputs.size()) {
+            std::cerr << "Invalid relative index: " << relativeIndex << std::endl;
+            throw std::runtime_error("Invalid relative index");
+          }
+          inputPtr = prevLayerOutputs[relativeIndex].getDevicePtr();
         } else
           inputPtr = prevLayerOutputs[f].getDevicePtr();
       } else {
