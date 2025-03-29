@@ -74,7 +74,6 @@ public:
     if (should_finish || should_cancel) {
       this->calculate_result();
       this->result_->action_server_send_result = this->node_->now();
-      this->result_->action_server_cancel = this->node_->now();
 
       if (should_cancel) {
         this->goal_handle_->canceled(this->result_);
@@ -118,7 +117,6 @@ public:
 
     if ((should_finish || should_cancel) && this->is_running()) {
       this->result_->action_server_send_result = this->node_->now();
-      this->result_->action_server_cancel = this->node_->now();
 
       if (should_cancel) {
         this->goal_handle_->canceled(this->result_);

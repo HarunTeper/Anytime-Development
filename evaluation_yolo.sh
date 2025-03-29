@@ -44,7 +44,7 @@ source packages/install/setup.bash
 declare -a is_single_multi=("False" "True")
 declare -a is_reactive_proactive=("False" "True")
 declare -a is_sync_async=("False" "True")
-declare -a batch_sizes=(1 5)
+declare -a batch_sizes=(1 5 25)
 
 # Create the results and plots directories
 mkdir -p results/yolo
