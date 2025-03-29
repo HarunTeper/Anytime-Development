@@ -13,7 +13,7 @@ class VideoPublisher(Node):
     def __init__(self):
         super().__init__('video_publisher')
         self.publisher_ = self.create_publisher(Image, 'video_frames', 10)
-        self.timer = self.create_timer(1.0, self.timer_callback)  # 10Hz
+        self.timer = self.create_timer(0.2, self.timer_callback)  # 10Hz
         self.bridge = cv_bridge.CvBridge()
 
         # Declare parameters

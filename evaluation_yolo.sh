@@ -41,11 +41,11 @@ done
 
 source packages/install/setup.bash
 
-declare -a is_single_multi=("False")
-declare -a is_reactive_proactive=("False")
-declare -a is_passive_cooperative=("True")
-declare -a is_sync_async=("False")
-declare -a batch_sizes=(1)
+declare -a is_single_multi=("False" "True")
+declare -a is_reactive_proactive=("False" "True")
+declare -a is_passive_cooperative=("False" "True")
+declare -a is_sync_async=("False" "True")
+declare -a batch_sizes=(1 5 25)
 
 # Create the results and plots directories
 mkdir -p results/yolo
@@ -103,7 +103,7 @@ if [[ "$mode" == "run" || "$mode" == "both" ]]; then
                             ros2 launch anytime_yolo action_client.launch.py threading_type:=single result_filename:="${result_filename}" > "./results/yolo/${config_name}_client.log" & client_pid=$!
                             
                             # Wait for 60 seconds
-                            sleep 60
+                            sleep 20
 
                             # Terminate both processes after 60 seconds
                             kill $server_pid 2>/dev/null

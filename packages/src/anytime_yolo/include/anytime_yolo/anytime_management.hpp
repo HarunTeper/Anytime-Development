@@ -60,6 +60,7 @@ public:
     auto feedback = std::make_shared<Anytime::Feedback>();
     feedback->processed_layers = processed_layers_;
     this->goal_handle_->publish_feedback(feedback);
+
     if (check_cancel_and_finish_reactive()) {
       return;
     } else {
@@ -73,9 +74,8 @@ public:
     bool should_cancel = this->goal_handle_->is_canceling();
 
     if (should_finish || should_cancel) {
-      this->result_->action_server_send_result = this->node_->now();
-      this->result_->average_batch_time = this->average_computation_time_;
       this->calculate_result();
+      this->result_->action_server_send_result = this->node_->now();
       this->result_->action_server_cancel = this->node_->now();
 
       if (should_cancel) {
@@ -102,6 +102,7 @@ public:
     auto feedback = std::make_shared<Anytime::Feedback>();
     feedback->processed_layers = processed_layers_;
     this->goal_handle_->publish_feedback(feedback);
+
     // Print number of detected objects and processed layers
     RCLCPP_INFO(
       node_->get_logger(), "Detected objects: %zu, Processed layers: %d",
@@ -111,8 +112,6 @@ public:
 
     if ((should_finish || should_cancel) && this->is_running()) {
       this->result_->action_server_send_result = this->node_->now();
-
-      this->result_->average_batch_time = average_computation_time_;
       this->result_->action_server_cancel = this->node_->now();
 
       if (should_cancel) {
@@ -147,14 +146,20 @@ public:
       RCLCPP_INFO(
         this_ptr->node_->get_logger(), "Processed layers: %d", this_ptr->processed_layers_);
     } else if constexpr (!isSyncAsync) {
-      // nothing to do for sync mode
+      // sync does not call this function
     }
 
     // Notify the waitable
-    if constexpr (isReactiveProactive) {
-      this_ptr->notify_check_finish();
-    } else if constexpr (!isReactiveProactive) {
-      this_ptr->notify_iteration();
+    if constexpr (!isReactiveProactive) {
+      if (this_ptr->processed_layers_ % this_ptr->batch_size_ == 0) {
+        this_ptr->notify_iteration();
+      } else {
+        // nothing to do for reactive mode
+      }
+    } else if constexpr (isReactiveProactive) {
+      if (this_ptr->processed_layers_ % this_ptr->batch_size_ == 0) {
+        this_ptr->notify_check_finish();
+      }
     }
   }
 
@@ -174,14 +179,11 @@ public:
       RCLCPP_INFO(node_->get_logger(), "Computing batch part %d", i);
 
       void (*callback)(void *);
-      // // only set forward_finished_callback for the last batch
-      // if (i == batch_size_ - 1) {
-      //   callback = forward_finished_callback;
-      // } else {
-      //   callback = nullptr;
-      // }
-
-      callback = forward_finished_callback;
+      if constexpr (!isSyncAsync) {
+        callback = nullptr;
+      } else if constexpr (isSyncAsync) {
+        callback = forward_finished_callback;
+      }
 
       yolo_.inferStep(*yolo_state_, is_sync_async, callback, this);
 
@@ -213,11 +215,18 @@ public:
         average_computation_time_.nanoseconds() +
         (computation_time.nanoseconds() - average_computation_time_.nanoseconds()) / batch_count_));
     }
+
+    if constexpr (!isSyncAsync) {
+      notify_iteration();
+    } else if constexpr (isSyncAsync) {
+      // nothing to do for async mode
+    }
   }
 
   void calculate_result() override
   {
     RCLCPP_INFO(node_->get_logger(), "Calculating result");
+    result_processed_layers_ = processed_layers_;
     std::vector<float> yolo_result;
     if constexpr (isReactiveProactive) {
       yolo_result = yolo_.calculateLatestExit(*yolo_state_);
@@ -278,6 +287,7 @@ public:
     this->result_->average_batch_time = average_computation_time_;
     this->result_->batch_size = batch_size_;
     this->result_->processed_layers = processed_layers_;
+    this->result_->result_processed_layers = result_processed_layers_;
   }
 
   // Cancel function
@@ -365,6 +375,7 @@ public:
 
     batch_count_ = 0;
     processed_layers_ = 0;  // Reset processed layers counter
+    result_processed_layers_ = 0;
     average_computation_time_ = rclcpp::Duration(0, 0);
   }
 
@@ -379,7 +390,8 @@ protected:
 
   // Batch count and average computation time
   int batch_count_ = 0;
-  int processed_layers_ = 0;                         // Counter for processed network layers
+  int processed_layers_ = 0;         // Counter for processed network layers
+  int result_processed_layers_ = 0;  // Counter for processed network layers in result
   rclcpp::Duration average_computation_time_{0, 0};  // in milliseconds
 };
 

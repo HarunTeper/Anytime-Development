@@ -8,6 +8,7 @@ bool is_single_multi
 int32 batch_size
 builtin_interfaces/Duration average_batch_time
 int32 processed_layers
+int32 result_processed_layers
 builtin_interfaces/Time action_server_receive
 builtin_interfaces/Time action_server_accept
 builtin_interfaces/Time action_server_start
