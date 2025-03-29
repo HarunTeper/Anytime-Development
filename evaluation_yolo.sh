@@ -85,6 +85,15 @@ if [[ "$mode" == "run" || "$mode" == "both" ]]; then
                         
                         echo "Running configuration: $config_name (Run $run of $num_runs)"
 
+                        # Start the video publisher in the background
+                        ros2 launch video_publisher video_publisher.launch.py > ./results/yolo/${config_name}_publisher.log & publisher_pid=$!
+
+                        # Start the detection visualizer in the background
+                        ros2 launch video_publisher detection_visualizer.launch.py > ./results/yolo/${config_name}_visualizer.log & visualizer_pid=$!
+
+                        # Give them time to initialize
+                        sleep 5
+
                         # Start the action server in the background
                         ros2 launch anytime_yolo action_server.launch.py multi_threading:=$threading is_reactive_proactive:=$reactive_param batch_size:=$batch_size is_sync_async:=$sync_param > ./results/yolo/${config_name}_server.log & server_pid=$!
                         
@@ -99,8 +108,13 @@ if [[ "$mode" == "run" || "$mode" == "both" ]]; then
                         # Terminate both processes after 60 seconds
                         kill $server_pid 2>/dev/null
                         kill $client_pid 2>/dev/null
+                        kill $visualizer_pid 2>/dev/null
+                        kill $publisher_pid 2>/dev/null
+                        sleep 5
                         # Force kill any remaining processes
                         pkill -9 -f 'anytime_yolo' 2>/dev/null
+                        pkill -9 -f 'video_publisher' 2>/dev/null
+                        pkill -9 -f 'detection_visualizer' 2>/dev/null
                         pkill -9 -f '/opt/ros/humble' 2>/dev/null
                         sleep 5
                     done
