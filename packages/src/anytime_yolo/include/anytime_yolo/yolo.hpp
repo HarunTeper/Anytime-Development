@@ -8,9 +8,11 @@
 #include <cuda_runtime_api.h>
 
 #include <algorithm>
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <ratio>
 #include <string>
 #include <variant>
 #include <vector>
@@ -122,6 +124,7 @@ public:
     free();
     this->size = size;
     cudaError_t status = cudaMalloc(&device_ptr, size);
+    cudaMemset(device_ptr, 0, size);
     if (status != cudaSuccess) {
       std::cerr << "Error allocating CUDA memory: " << cudaGetErrorString(status) << std::endl;
     }
@@ -168,6 +171,23 @@ public:
     size = 0;
   }
 
+  void printFirstN(size_t n) const
+  {
+    if (size == 0) {
+      std::cout << "Empty buffer" << std::endl;
+      return;
+    }
+
+    size_t elements = std::min(n, size / sizeof(float));
+    std::vector<float> host_data(elements);
+    copyToHost(host_data.data(), elements * sizeof(float));
+
+    for (size_t i = 0; i < elements; i++) {
+      std::cout << host_data[i] << " ";
+    }
+    std::cout << std::endl;
+  }
+
 private:
   void * device_ptr;
   size_t size;
@@ -192,7 +212,7 @@ std::vector<float> convertToNCHW(const cv::Mat & img)
 }
 
 bool loadImageFromFile(
-  const std::string & imagePath, CudaBuffer & buffer, [[maybe_unused]] bool halfPrecision = false)
+  const std::string & imagePath, CudaBuffer & buffer, bool halfPrecision [[maybe_unused]] = false)
 {
   cv::Mat img = cv::imread(imagePath);
   if (img.empty()) {
@@ -339,15 +359,41 @@ struct AnytimeYOLOChunk
   std::unique_ptr<ICudaEngine> engine;
   std::unique_ptr<IExecutionContext> context;
 };
+
+class Subexit
+{
+public:
+  Subexit(std::unique_ptr<AnytimeYOLOChunk> chunk, int exit, int subexit)
+  : chunk(std::move(chunk)), exit(exit), subexit(subexit)
+  {
+  }
+
+  const std::unique_ptr<AnytimeYOLOChunk> chunk;
+  const int exit;
+  const int subexit;
+};
+
+class SubexitCombiner
+{
+public:
+  SubexitCombiner(
+    std::unique_ptr<ICudaEngine> engine, std::unique_ptr<IExecutionContext> context, int exit)
+  : engine(std::move(engine)), context(std::move(context)), exit(exit)
+  {
+  }
+
+  std::unique_ptr<ICudaEngine> engine;
+  std::unique_ptr<IExecutionContext> context;
+
+  const int exit;
+};
+
 class InferenceState
 {
 public:
   enum Stage { LAYER_PROCESSING, EXIT_PROCESSING, NMS_PROCESSING, COMPLETED };
 
-  InferenceState(
-    const CudaBuffer & inputBuffer, [[maybe_unused]] cudaStream_t stream,
-    [[maybe_unused]] bool halfPrecision, int chunkCount,
-    [[maybe_unused]] int exitIndexToProcess = 0)
+  InferenceState(const CudaBuffer & inputBuffer, int chunkCount)
   : currentStage(LAYER_PROCESSING), currentIndex(0)
   {
     this->inputBuffer.allocate(inputBuffer.getSize());
@@ -364,6 +410,10 @@ public:
     // Initialize NMS output buffers
     finalOutput.resize(1);
   }
+
+  std::vector<std::vector<int>> possibleExits = {
+    {3, -1, -1}, {4, -1, -1}, {4, 5, -1},  {4, 6, -1},   {4, 6, 7},   {4, 6, 8},
+    {14, 12, 9}, {15, 12, 9}, {15, 18, 9}, {15, 18, 20}, {15, 18, 21}};
 
   // Current processing state
   Stage currentStage;
@@ -418,9 +468,15 @@ public:
 
     std::cout << "Loading exits..." << std::endl;
 
-    for (const auto & exitConfig : config["exits"]) {
+    for (const auto & exitConfig : config["subexits"]) {
       std::cout << "Loading exit: " << exitConfig["index"] << std::endl;
-      loadExit(exitConfig, folderPath);
+      loadSubexit(exitConfig, folderPath);
+    }
+
+    std::cout << config["combine_subheads"].size() << " heads" << std::endl;
+
+    for (const auto & combiner : config["combine_subheads"]) {
+      loadSubexitCombiners(combiner, folderPath);
     }
 
     std::cout << "Loading NMS engine..." << std::endl;
@@ -432,7 +488,7 @@ public:
 
     // report lengths of layers and exits
     std::cout << "Loaded " << chunks.size() << " layers" << std::endl;
-    std::cout << "Loaded " << exits.size() << " exits" << std::endl;
+    std::cout << "Loaded " << subexits.size() << " exits" << std::endl;
   }
 
   // Helper function to get binding information from an engine
@@ -511,6 +567,8 @@ public:
     const std::vector<std::pair<std::string, void *>> & inputs,
     const std::vector<std::pair<std::string, void *>> & outputs, cudaStream_t stream)
   {
+    context->getEngine();
+
     // Set input bindings
     for (const auto & input : inputs) {
       context->setTensorAddress(input.first.c_str(), input.second);
@@ -529,22 +587,13 @@ public:
     return true;
   }
 
-  bool processChunk(
+  std::vector<std::pair<std::string, void *>> prepareInputs(
     const AnytimeYOLOChunk & chunk, const CudaBuffer & inputBuffer,
-    const std::vector<CudaBuffer> & prevLayerOutputs, CudaBuffer & outputBuffer,
-    std::vector<int> & outputDims, cudaStream_t stream,
-    bool isLayer = true  // true for Layer, false for Exit
-  )
+    const std::vector<CudaBuffer> & prevLayerOutputs, const std::vector<std::string> & inputNames,
+    bool isLayer)
   {
-    // std::cout << "Running " << (isLayer ? "layer " : "exit ") <<
-    // block.index
-    //   << (isLayer ? " (" + block.type + ")" : "") << std::endl;
-
-    // Get binding information
-    auto bindingInfo = getBindingInfo(chunk.engine.get());
-
-    // Prepare inputs
     std::vector<std::pair<std::string, void *>> inputs;
+
     for (size_t j = 0; j < chunk.f.size(); j++) {
       void * inputPtr;
       if (isLayer) {
@@ -561,8 +610,25 @@ public:
         inputPtr = prevLayerOutputs[chunk.f[j]].getDevicePtr();
       }
 
-      inputs.push_back({bindingInfo.inputNames[j], inputPtr});
+      inputs.push_back({inputNames[j], inputPtr});
     }
+
+    return inputs;
+  }
+
+  bool processChunk(
+    const AnytimeYOLOChunk & chunk, const CudaBuffer & inputBuffer,
+    const std::vector<CudaBuffer> & prevLayerOutputs, CudaBuffer & outputBuffer,
+    std::vector<int> & outputDims, cudaStream_t stream,
+    bool isLayer = true  // true for Layer, false for Exit
+  )
+  {
+    // Get binding information
+    auto bindingInfo = getBindingInfo(chunk.engine.get());
+
+    // Prepare inputs
+    std::vector<std::pair<std::string, void *>> inputs =
+      prepareInputs(chunk, inputBuffer, prevLayerOutputs, bindingInfo.inputNames, isLayer);
 
     // Get output info
     auto outputInfo = getOutputInfo(chunk.engine.get(), bindingInfo.outputNames[0]);
@@ -589,6 +655,90 @@ public:
     return true;
   }
 
+  bool processExit(
+    const InferenceState & state, const std::vector<Subexit *> & subexits,
+    const std::vector<CudaBuffer> & layerOutputs, const SubexitCombiner & head,
+    const CudaBuffer & inputBuffer, CudaBuffer & outputBuffer, cudaStream_t stream)
+  {
+    // subexit outputs
+    std::vector<CudaBuffer> subexitOutputs;
+
+    // Process each subexit
+    for (const auto & subexit : subexits) {
+      if (subexit == nullptr) {
+        auto zeroBuffer = CudaBuffer();
+        zeroBuffer.allocate(144 * 80 * 80);
+        subexitOutputs.push_back(zeroBuffer);
+        continue;
+      }
+
+      std::cout << "Processing subexit " << subexit->exit << "-" << subexit->subexit << " "
+                << subexit->chunk->f[0] << std::endl;
+      const AnytimeYOLOChunk & subexitChunk = *subexit->chunk;
+
+      // check if all inputs are ready
+      for (auto & f : subexitChunk.f) {
+        if (static_cast<size_t>(f) >= state.currentIndex) {
+          throw std::runtime_error(
+            "Subexit input " + std::to_string(f) + " not ready, but exit " +
+            std::to_string(subexit->exit) + " is being processed");
+        }
+      }
+
+      auto inputs = prepareInputs(
+        subexitChunk, inputBuffer, layerOutputs,
+        getBindingInfo(subexitChunk.engine.get()).inputNames, false);
+
+      // Allocate output buffer
+      auto outputInfo = getOutputInfo(
+        subexitChunk.engine.get(), getBindingInfo(subexitChunk.engine.get()).outputNames[0]);
+      CudaBuffer outputBuffer;
+
+      if (!outputBuffer.allocate(outputInfo.bufferSize)) {
+        std::cerr << "Failed to allocate output buffer for subexit" << std::endl;
+        return false;
+      }
+
+      // Prepare outputs
+      std::vector<std::pair<std::string, void *>> outputs = {
+        {getBindingInfo(subexitChunk.engine.get()).outputNames[0], outputBuffer.getDevicePtr()}};
+
+      if (!executeEngine(subexitChunk.context.get(), inputs, outputs, stream)) {
+        std::cerr << "Subexit execution failed" << std::endl;
+        return false;
+      }
+      subexitOutputs.push_back(outputBuffer);
+    }
+
+    auto bindingInfo = getBindingInfo(head.engine.get());
+    // combine subexit outputs
+    std::vector<std::pair<std::string, void *>> inputs;
+
+    auto inputNames = bindingInfo.inputNames;
+    for (size_t j = 0; j < subexitOutputs.size(); j++) {
+      inputs.push_back({inputNames[j], subexitOutputs[j].getDevicePtr()});
+    }
+
+    // Allocate output buffer
+    auto outputInfo =
+      getOutputInfo(head.engine.get(), getBindingInfo(head.engine.get()).outputNames[0]);
+    if (!outputBuffer.allocate(outputInfo.bufferSize)) {
+      std::cerr << "Failed to allocate output buffer for head" << std::endl;
+      return false;
+    }
+
+    // Prepare outputs
+    std::vector<std::pair<std::string, void *>> outputs = {
+      {getBindingInfo(head.engine.get()).outputNames[0], outputBuffer.getDevicePtr()}};
+
+    if (!executeEngine(head.context.get(), inputs, outputs, stream)) {
+      std::cerr << "Head execution failed" << std::endl;
+      return false;
+    }
+
+    return true;
+  }
+
   // Process NMS on exit outputs
   bool processNMS(
     const CudaBuffer & exitOutputBuffer, CudaBuffer & nmsOutputBuffer, cudaStream_t stream)
@@ -606,14 +756,15 @@ public:
       return false;
     }
 
+    auto inputBuffer = exitOutputBuffer;
+
     // Prepare inputs and outputs
     std::vector<std::pair<std::string, void *>> inputs = {
-      {bindingInfo.inputNames[0], exitOutputBuffer.getDevicePtr()}};
+      {bindingInfo.inputNames[0], inputBuffer.getDevicePtr()}};
 
     std::vector<std::pair<std::string, void *>> outputs = {
       {bindingInfo.outputNames[0], nmsOutputBuffer.getDevicePtr()}};
 
-    auto nmsContext = std::unique_ptr<IExecutionContext>(nmsEngine->createExecutionContext());
     // Execute NMS
     if (!executeEngine(nmsContext.get(), inputs, outputs, stream)) {
       std::cerr << "NMS execution failed" << std::endl;
@@ -704,7 +855,7 @@ public:
 
   InferenceState createInferenceState(const CudaBuffer & inputBuffer)
   {
-    return InferenceState(inputBuffer, stream, halfPrecision, chunks.size());
+    return InferenceState(inputBuffer, chunks.size());
   }
 
   bool inferStep(
@@ -741,14 +892,18 @@ public:
       }
 
       case InferenceState::EXIT_PROCESSING: {
-        std::cout << "Processing exit" << std::endl;
+        std::cout << "Reached exit" << std::endl;
 
         // Process exit using layers output
-        const auto & exit = exits[0];
+        const std::vector<Subexit *> exitPtrs = {
+          subexits[0].get(), subexits[1].get(), subexits[2].get()};
+        const SubexitCombiner & head = heads[0];
 
-        if (!processChunk(
-              exit, state.inputBuffer, state.layerOutputBuffers, state.exitOutputBuffer,
-              state.exitOutputDims, stream, false)) {
+        std::cout << "Processing exit " << 0 << std::endl;
+
+        if (!processExit(
+              state, exitPtrs, state.layerOutputBuffers, head, state.inputBuffer,
+              state.exitOutputBuffer, stream)) {
           throw std::runtime_error("Exit processing failed");
         }
 
@@ -786,81 +941,103 @@ public:
   std::vector<float> infer(const CudaBuffer & inputBuffer)
   {
     auto state = createInferenceState(inputBuffer);
-    while (!inferStep(state)) {
+    while (state.currentStage != InferenceState::NMS_PROCESSING) {
+      inferStep(state);
     }
     return finishEarly(state);
   }
 
-  // 6 outputs, coordinates 4, confidence 1, class 1
-  std::vector<float> calculateLatestExit(InferenceState & state)
+  std::optional<std::vector<Subexit *>> findBestExit(
+    const std::vector<std::vector<int>> & possibleCombinations, int currentIndex)
   {
-    int lastExit = -1;
-    for (auto & exit : exits) {
-      bool ready = true;
-      for (auto & f : exit.f) {
-        if (static_cast<size_t>(f) < state.currentIndex) {
+    std::cout << "Looking for best exit for index " << currentIndex << std::endl;
+
+    // Create a map for quick lookup of Subexit by f
+    std::map<int, Subexit *> exitMap;
+    for (const auto & subexit : subexits) {
+      exitMap[subexit->chunk->f[0]] = subexit.get();
+    }
+    exitMap[-1] = nullptr;
+
+    std::optional<std::vector<Subexit *>> earliestCombination;
+    int earliestMaxF0 = 0;
+
+    // Check each possible combination
+    for (const auto & combination : possibleCombinations) {
+      // Ensure the combination has exactly 3 elements
+      if (combination.size() != 3) {
+        continue;
+      }
+
+      std::vector<Subexit *> currentCombo;
+      bool allValid = true;
+      int maxF0 = std::numeric_limits<int>::min();
+
+      // Process each subexit in the combination
+      for (int subexitF : combination) {
+        auto it = exitMap.find(subexitF);
+        if (it == exitMap.end()) {  // Subexit not found
+          allValid = false;
+          break;
+        }
+
+        Subexit * subexitPtr = it->second;
+
+        if (subexitPtr == nullptr) {
+          currentCombo.push_back(nullptr);
           continue;
         }
-        ready = false;
-        break;
+
+        // Check if this subexit satisfies the condition
+        if (subexitPtr->chunk->f[0] >= currentIndex) {
+          allValid = false;
+          break;
+        }
+
+        maxF0 = std::max(maxF0, subexitPtr->chunk->f[0]);
+        currentCombo.push_back(subexitPtr);
       }
-      if (ready) {
-        lastExit = exit.index;
-        break;
+
+      // If all subexits are valid and this combination is later than previous best
+      if (allValid && maxF0 > earliestMaxF0) {
+        earliestMaxF0 = maxF0;
+        earliestCombination = currentCombo;
       }
     }
-    std::cout << "Calculating result of exit: " << lastExit << std::endl;
 
-    if (lastExit == -1) {
-      return {};  // terminated too early
-    }
-
-    // process the exit
-    const auto & exit = exits[lastExit];
-    if (!processChunk(
-          exit, state.inputBuffer, state.layerOutputBuffers, state.exitOutputBuffer,
-          state.exitOutputDims, stream, false)) {
-      throw std::runtime_error("Exit processing failed");
-    }
-
-    // nms
-    CudaBuffer & input = state.exitOutputBuffer;
-    std::vector<float> results = processNMSAndGetResults(input);
-    return results;
+    return earliestCombination;
   }
 
-  std::vector<float> finishEarly(InferenceState & state)
+  std::vector<float> calculateLatestExit(InferenceState & state)
   {
+    synchronize();
+
     CudaBuffer nmsOutputBuffer;
 
-    // check the farthest exit for which all inputs are ready
-    int lastExit = -1;
-    for (auto & exit : exits) {
-      bool ready = true;
-      for (auto & f : exit.f) {
-        if (static_cast<size_t>(f) < state.currentIndex) {
-          continue;
-        }
-        ready = false;
-        break;
-      }
-      if (ready) {
-        lastExit = exit.index;
-        break;
-      }
+    // check the farthest exits for which all inputs are ready
+    auto exitPtrs = findBestExit(state.possibleExits, state.currentIndex);
+    if (!exitPtrs.has_value()) {
+      std::cout << "No valid exit found" << std::endl;
+      return {};
     }
+    std::cout << "Found exit :";
 
-    std::cout << "Finishing at exit: " << lastExit << std::endl;
-
-    if (lastExit == -1) {
-      return {};  // terminated too early
+    for (auto & subexit : exitPtrs.value()) {
+      if (subexit == nullptr) {
+        std::cout << "-1 ";
+      } else
+        std::cout << subexit->chunk->f[0] << " ";
     }
+    std::cout << std::endl;
+
+    int exit = heads.size() - 1;  // last exit
+    if (exitPtrs.value()[0] != nullptr) exit = exitPtrs.value()[0]->exit;
+    const SubexitCombiner & head = heads[exit];
 
     // process the exit
-    const auto & exit = exits[lastExit];
-    if (!processChunk(
-          exit, state.inputBuffer, state.layerOutputBuffers, state.exitOutputBuffer,
-          state.exitOutputDims, stream, false)) {
+    if (!processExit(
+          state, exitPtrs.value(), state.layerOutputBuffers, head, state.inputBuffer,
+          state.exitOutputBuffer, stream)) {
       throw std::runtime_error("Exit processing failed");
     }
 
@@ -868,12 +1045,26 @@ public:
     CudaBuffer & input = state.exitOutputBuffer;
 
     // Use the new function to process NMS and get results
-    state.finalOutput = processNMSAndGetResults(input);
+    auto result = processNMSAndGetResults(input);
 
+    return result;
+  }
+
+  std::vector<float> finishEarly(InferenceState & state)
+  {
+    if (state.currentStage == InferenceState::COMPLETED) {
+      return state.getResults();
+    }
+
+    auto result = calculateLatestExit(state);
+
+    state.finalOutput = result;
     state.currentStage = InferenceState::COMPLETED;
 
     return state.getResults();
   }
+
+  void synchronize() { cudaStreamSynchronize(stream); }
 
 private:
   bool halfPrecision = false;
@@ -881,28 +1072,34 @@ private:
   std::unique_ptr<IRuntime> runtime;
 
   std::vector<AnytimeYOLOChunk> chunks;
-  std::vector<AnytimeYOLOChunk> exits;
+  std::vector<std::unique_ptr<Subexit>> subexits;
+  std::vector<SubexitCombiner> heads;
 
   std::unique_ptr<ICudaEngine> nmsEngine;
+  std::unique_ptr<IExecutionContext> nmsContext;
 
   cudaStream_t stream;
 
   bool loadNMS(const json & nmsConfig, const std::string & folderPath)
   {
-    const std::string nmsEnginePath = folderPath + "/" + nmsConfig["weights"].get<std::string>();
-    if (loadEngine(nmsEnginePath, runtime, nmsEngine)) {
-      std::cout << "Successfully loaded cached NMS engine from: " << nmsEnginePath << std::endl;
-      return true;
+    const std::string weightsPath = folderPath + "/" + nmsConfig["weights"].get<std::string>();
+    const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) + ".engine";
+    std::cout << "Engine path: " << enginePath << std::endl;
+
+    if (loadEngine(enginePath, runtime, nmsEngine)) {
+      std::cout << "Successfully loaded cached NMS engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached NMS engine, falling back to build" << std::endl;
-      buildOnnxEngine(folderPath + "/nms.onnx", nmsEnginePath);
+      buildOnnxEngine(weightsPath, enginePath);
 
       std::cout << "Successfully built NMS engine" << std::endl;
-      if (!loadEngine(nmsEnginePath, runtime, nmsEngine)) {
+      if (!loadEngine(enginePath, runtime, nmsEngine)) {
         throw std::runtime_error("Failed to load NMS engine");
       }
-      return true;
     }
+    nmsContext = std::unique_ptr<nvinfer1::IExecutionContext>(nmsEngine->createExecutionContext());
+
+    return true;
   }
 
   bool loadLayer(const json & layerConfig, const std::string & folderPath)
@@ -946,7 +1143,7 @@ private:
     return true;
   }
 
-  bool loadExit(const json & exitConfig, const std::string & folderPath)
+  bool loadSubexit(const json & exitConfig, const std::string & folderPath)
   {
     const std::string type = "exit";
     const int index = exitConfig["index"];
@@ -977,7 +1174,45 @@ private:
 
     auto context = std::unique_ptr<nvinfer1::IExecutionContext>(engine->createExecutionContext());
 
-    exits.push_back({type, index, f, std::move(engine), std::move(context)});
+    auto subexit = std::make_unique<Subexit>(
+      std::make_unique<AnytimeYOLOChunk>(
+        AnytimeYOLOChunk{type, index, f, std::move(engine), std::move(context)}),
+      exitConfig["exit"], exitConfig["subexit"]);
+
+    subexits.push_back(std::move(subexit));
+
+    return true;
+  }
+
+public:
+  bool loadSubexitCombiners(const json & layerConfig, const std::string & folderPath)
+  {
+    std::cout << "Loading subexit combiner" << std::endl;
+
+    const std::string weightsPath = folderPath + "/" + layerConfig["weights"].get<std::string>();
+
+    const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) + ".engine";
+
+    std::cout << "Engine path: " << enginePath << std::endl;
+
+    std::unique_ptr<ICudaEngine> engine;
+    if (loadEngine(enginePath, runtime, engine)) {
+      std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
+    } else {
+      std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
+      buildOnnxEngine(weightsPath, enginePath);
+
+      std::cout << "Successfully built subexit combiner" << std::endl;
+
+      if (!loadEngine(enginePath, runtime, engine)) {
+        throw std::runtime_error("Failed to load engine");
+      }
+    }
+
+    auto context = std::unique_ptr<nvinfer1::IExecutionContext>(engine->createExecutionContext());
+
+    heads.push_back(SubexitCombiner(std::move(engine), std::move(context), layerConfig["exit"]));
+
     return true;
   }
 };
@@ -1008,10 +1243,14 @@ private:
 //         // while (!yolo.inferStep(state)) {
 //         //     // std::cout << "Inference step completed" << std::endl;
 //         // }
-//         for (int i = 0; i < 24; i++) {
+//         for (int i = 0; i < 7; i++) {
 //             yolo.inferStep(state);
 //         }
+//         // auto result = yolo.infer(input);
+//         std::cout << "Inference step completed" << std::endl;
 //         results.push_back(yolo.finishEarly(state));
+
+//         // results.push_back(result);
 //     }
 
 //     auto end = std::chrono::high_resolution_clock::now();
