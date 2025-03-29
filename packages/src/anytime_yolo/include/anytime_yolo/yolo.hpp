@@ -43,6 +43,81 @@ public:
   }
 } logger;
 
+class CudaHostBuffer
+{
+public:
+  CudaHostBuffer(size_t size) : host_ptr(nullptr), size(size)
+  {
+    // Allocate pinned memory
+    cudaError_t status = cudaMallocHost(&host_ptr, size);
+        if (status != cudaSuccess) {
+      std::cerr << "Error allocating pinned memory: " << cudaGetErrorString(status) << std::endl;
+    }
+  }
+
+  ~CudaHostBuffer() { free(); }
+
+  CudaHostBuffer(const CudaHostBuffer & other) = delete;
+
+  CudaHostBuffer & operator=(const CudaHostBuffer & other) = delete;
+
+  CudaHostBuffer(CudaHostBuffer && other) noexcept : host_ptr(nullptr), size(0)
+  {
+    // Steal resources from other
+    host_ptr = other.host_ptr;
+    size = other.size;
+
+    // Leave other in a valid but empty state
+    other.host_ptr = nullptr;
+    other.size = 0;
+  }
+
+  // Move assignment operator
+  CudaHostBuffer & operator=(CudaHostBuffer && other) noexcept
+  {
+    if (this != &other) {  // Self-assignment check
+      // Free existing resources
+      free();
+
+      // Steal resources from other
+      host_ptr = other.host_ptr;
+      size = other.size;
+
+      // Leave other in a valid but empty state
+      other.host_ptr = nullptr;
+      other.size = 0;
+    }
+    return *this;
+  }
+
+  void * host_ptr;
+  size_t size;
+
+  void free()
+  {
+    if (host_ptr != nullptr) {
+      cudaFreeHost(host_ptr);
+      host_ptr = nullptr;
+    }
+    size = 0;
+  }
+
+  bool copyFromHost(const void * src, size_t copy_size)
+  {
+    if (host_ptr == nullptr || copy_size > size) {
+      std::cerr << "Error: Invalid destination buffer or size mismatch" << std::endl;
+      return false;
+    }
+
+    cudaError_t status = cudaMemcpy(host_ptr, src, copy_size, cudaMemcpyHostToHost);
+          if (status != cudaSuccess) {
+      std::cerr << "Error copying data to host buffer: " << cudaGetErrorString(status) << std::endl;
+      return false;
+    }
+    return true;
+  }
+};
+
 class CudaBuffer
 {
 public:
@@ -50,44 +125,9 @@ public:
 
   ~CudaBuffer() { free(); }
 
-  CudaBuffer(const CudaBuffer & other) : device_ptr(nullptr), size(0)
-  {
-    if (other.size > 0) {
-      // Allocate memory of the same size
-      if (allocate(other.size)) {
-        // Copy data from other's device memory to this device memory
-        cudaError_t status =
-          cudaMemcpy(device_ptr, other.device_ptr, size, cudaMemcpyDeviceToDevice);
-        if (status != cudaSuccess) {
-          std::cerr << "Error copying data in copy constructor: " << cudaGetErrorString(status)
-                    << std::endl;
-          free();  // Clean up if copy failed
-        }
-      }
-    }
-  }
+  CudaBuffer(const CudaBuffer & other) = delete;
 
-  CudaBuffer & operator=(const CudaBuffer & other)
-  {
-    if (this != &other) {  // Self-assignment check
-      // Free existing resources
-      free();
-
-      // Allocate and copy if the source has data
-      if (other.size > 0) {
-        if (allocate(other.size)) {
-          cudaError_t status =
-            cudaMemcpy(device_ptr, other.device_ptr, size, cudaMemcpyDeviceToDevice);
-          if (status != cudaSuccess) {
-            std::cerr << "Error copying data in assignment operator: " << cudaGetErrorString(status)
-                      << std::endl;
-            free();  // Clean up if copy failed
-          }
-        }
-      }
-    }
-    return *this;
-  }
+  CudaBuffer & operator=(const CudaBuffer & other) = delete;
 
   CudaBuffer(CudaBuffer && other) noexcept : device_ptr(nullptr), size(0)
   {
@@ -125,6 +165,7 @@ public:
     this->size = size;
     cudaError_t status = cudaMalloc(&device_ptr, size);
     cudaMemset(device_ptr, 0, size);
+
     if (status != cudaSuccess) {
       std::cerr << "Error allocating CUDA memory: " << cudaGetErrorString(status) << std::endl;
     }
@@ -137,7 +178,20 @@ public:
     if (size > this->size || device_ptr == nullptr) {
       return false;
     }
+    // cudaMallocHost(&h_data, size); // Allocates pinned memory
+
     cudaError_t status = cudaMemcpy(device_ptr, host_ptr, size, cudaMemcpyHostToDevice);
+    return (status == cudaSuccess);
+  }
+
+  // Copy from host buffer to device buffer
+  bool copyFromHostBuffer(const CudaHostBuffer & host_buffer)
+  {
+    if (host_buffer.size > this->size || device_ptr == nullptr) {
+      return false;
+    }
+    cudaError_t status =
+      cudaMemcpyAsync(device_ptr, host_buffer.host_ptr, host_buffer.size, cudaMemcpyHostToDevice);
     return (status == cudaSuccess);
   }
 
@@ -171,7 +225,7 @@ public:
     size = 0;
   }
 
-  void printFirstN(size_t n) const
+  void printFirstN(size_t n, int lineBreakInterval = 0) const
   {
     if (size == 0) {
       std::cout << "Empty buffer" << std::endl;
@@ -184,6 +238,10 @@ public:
 
     for (size_t i = 0; i < elements; i++) {
       std::cout << host_data[i] << " ";
+
+      if (lineBreakInterval > 0 && (i + 1) % lineBreakInterval == 0) {
+        std::cout << std::endl;
+      }
     }
     std::cout << std::endl;
   }
@@ -211,40 +269,48 @@ std::vector<float> convertToNCHW(const cv::Mat & img)
   return nchw_data;
 }
 
-bool loadImageFromFile(
-  const std::string & imagePath, CudaBuffer & buffer, bool halfPrecision [[maybe_unused]] = false)
+cv::Mat loadImageFromFile(const std::string & imagePath)
 {
   cv::Mat img = cv::imread(imagePath);
   if (img.empty()) {
     std::cerr << "Failed to load image: " << imagePath << std::endl;
+    return cv::Mat();
+  }
+  return img;
+}
+
+
+
+bool prepareImage(const cv::Mat & img, CudaHostBuffer & buffer, bool halfPrecision)
+{
+
+  cv::Mat blob = cv::dnn::blobFromImage(
+    img,                  // input image
+    1.0 / 255.0,          // scale factor (normalization)
+    cv::Size(640, 640),   // output size
+    cv::Scalar(0, 0, 0),  // mean subtraction (none here)
+    true,                 // swapRB - converts BGR to RGB
+    false                 // crop - no cropping
+  );
+
+  if (halfPrecision) {
+    blob.convertTo(blob, CV_16F);  // Convert to half precision
+  } else {
+    blob.convertTo(blob, CV_32F);  // Convert to float
+  }
+
+
+  const size_t data_size =
+    blob.total() * blob.elemSize();  // Total number of elements * size of each element
+
+  // check if the buffer is large enough
+  if (data_size > buffer.size) {
+    std::cerr << "Buffer size is not large enough" << std::endl;
     return false;
   }
-
-  cv::Mat resized_img;
-  cv::resize(img, resized_img, cv::Size(640, 640));
-
-  cv::cvtColor(resized_img, resized_img, cv::COLOR_BGR2RGB);
-
-  cv::Mat float_img;
-  resized_img.convertTo(float_img, CV_32FC3, 1.0 / 255.0);
-
-  const auto nchw_data = convertToNCHW(float_img);
-
-  std::vector<__half> nchw_half_data(nchw_data.size());
-  for (size_t i = 0; i < nchw_data.size(); i++) {
-    nchw_half_data[i] = __float2half(nchw_data[i]);
-  }
-
-  // const size_t data_size = nchw_data.size() * sizeof(__half);
-  const size_t data_size = nchw_data.size() * sizeof(float);
-
-  if (!buffer.allocate(data_size)) {
-    std::cerr << "Failed to allocate CUDA buffer" << std::endl;
-    return false;
-  }
-
-  if (!buffer.copyFromHost(nchw_data.data(), data_size)) {
-    std::cerr << "Failed to copy image to CUDA buffer" << std::endl;
+  // Copy data to the buffer
+  if (!buffer.copyFromHost(blob.data, data_size)) {
+    std::cerr << "Error copying data to buffer" << std::endl;
     return false;
   }
 
@@ -272,22 +338,45 @@ bool saveEngineToFile(const std::string & enginePath, const IHostMemory & serial
   return true;
 }
 
-bool buildOnnxEngine(const std::string & onnx_path, const std::string & output_path)
+bool buildOnnxEngine(
+  const std::string & onnx_path, const std::string & output_path, const bool halfPrecision = false)
 {
   // setup the builder and network, then parse the model
+
+  std::cout << "Building engine from ONNX model: " << onnx_path << std::endl;
+  if (halfPrecision) {
+    std::cout << "Using half precision" << std::endl;
+  } else {
+    std::cout << "Using full precision" << std::endl;
+  }
 
   const std::unique_ptr<IBuilder> builder(createInferBuilder(logger));
 
   if (!builder) {
+    std::cerr << "Failed to create builder" << std::endl;
+    cudaError_t status = cudaGetLastError();
+    if (status != cudaSuccess) {
+      std::cerr << "CUDA Error: " << cudaGetErrorString(status) << std::endl;
+    }
     return false;
   }
   const std::unique_ptr<INetworkDefinition> network(builder->createNetworkV2(0));
   if (!network) {
+    std::cerr << "Failed to create network definition" << std::endl;
+    cudaError_t status = cudaGetLastError();
+    if (status != cudaSuccess) {
+      std::cerr << "CUDA Error: " << cudaGetErrorString(status) << std::endl;
+    }
     return false;
   }
 
   const std::unique_ptr<IParser> parser(createParser(*network, logger));
   if (!parser) {
+    std::cerr << "Failed to create parser" << std::endl;
+    cudaError_t status = cudaGetLastError();
+    if (status != cudaSuccess) {
+      std::cerr << "CUDA Error: " << cudaGetErrorString(status) << std::endl;
+    }
     return false;
   }
 
@@ -298,15 +387,31 @@ bool buildOnnxEngine(const std::string & onnx_path, const std::string & output_p
 
   const std::unique_ptr<IBuilderConfig> config(builder->createBuilderConfig());
   if (!config) {
+    std::cerr << "Failed to create builder config" << std::endl;
+    cudaError_t status = cudaGetLastError();
+    if (status != cudaSuccess) {
+      std::cerr << "CUDA Error: " << cudaGetErrorString(status) << std::endl;
+    }
     return false;
+  }
+
+  if (halfPrecision) {
+    config->setFlag(BuilderFlag::kFP16);
   }
 
   std::unique_ptr<IHostMemory> serializedEngine(builder->buildSerializedNetwork(*network, *config));
   if (!serializedEngine) {
+    std::cerr << "Failed to build serialized network" << std::endl;
+    // print cuda errors
+    cudaError_t status = cudaGetLastError();
+    if (status != cudaSuccess) {
+      std::cerr << "CUDA Error: " << cudaGetErrorString(status) << std::endl;
+    }
     return false;
   }
 
   if (!saveEngineToFile(output_path, *serializedEngine)) {
+    std::cerr << "Failed to save engine to file" << std::endl;
     return false;
   }
   return true;
@@ -393,11 +498,10 @@ class InferenceState
 public:
   enum Stage { LAYER_PROCESSING, EXIT_PROCESSING, NMS_PROCESSING, COMPLETED };
 
-  InferenceState(const CudaBuffer & inputBuffer, int chunkCount)
+  InferenceState(size_t chunkCount, int image_x = 640, int image_y = 640)
   : currentStage(LAYER_PROCESSING), currentIndex(0)
   {
-    this->inputBuffer.allocate(inputBuffer.getSize());
-    this->inputBuffer.copyFromHost(inputBuffer.getDevicePtr(), inputBuffer.getSize());
+    this->inputBuffer.allocate(image_x * image_y * 3 * sizeof(float));
 
     // Initialize output buffers for each layer
     layerOutputBuffers.resize(chunkCount);
@@ -440,6 +544,21 @@ public:
     }
     return finalOutput;
   }
+
+  void restart(const CudaHostBuffer & inputBuffer)
+  {
+    currentStage = LAYER_PROCESSING;
+    currentIndex = 0;
+
+    if (inputBuffer.size > this->inputBuffer.getSize()) {
+      this->inputBuffer.free();
+      this->inputBuffer.allocate(inputBuffer.size);
+    }
+
+    if (!this->inputBuffer.copyFromHostBuffer(inputBuffer)) {
+      throw std::runtime_error("Failed to copy input buffer");
+    }
+  }
 };
 
 class AnytimeYOLO
@@ -463,25 +582,25 @@ public:
     for (const auto & layerConfig : config["layers"]) {
       std::cout << "Loading layer: " << layerConfig["index"] << " - " << layerConfig["type"]
                 << std::endl;
-      loadLayer(layerConfig, folderPath);
+      loadLayer(layerConfig, folderPath, false);
     }
 
     std::cout << "Loading exits..." << std::endl;
 
     for (const auto & exitConfig : config["subexits"]) {
       std::cout << "Loading exit: " << exitConfig["index"] << std::endl;
-      loadSubexit(exitConfig, folderPath);
+      loadSubexit(exitConfig, folderPath, false);
     }
 
     std::cout << config["combine_subheads"].size() << " heads" << std::endl;
 
     for (const auto & combiner : config["combine_subheads"]) {
-      loadSubexitCombiners(combiner, folderPath);
+      loadSubexitCombiners(combiner, folderPath, false);
     }
 
     std::cout << "Loading NMS engine..." << std::endl;
 
-    if (!loadNMS(config["nms"], folderPath)) {
+    if (!loadNMS(config["nms"], folderPath, false)) {
       std::cerr << "Failed to load NMS engine" << std::endl;
       throw std::runtime_error("Failed to load NMS engine");
     }
@@ -668,7 +787,7 @@ public:
       if (subexit == nullptr) {
         auto zeroBuffer = CudaBuffer();
         zeroBuffer.allocate(144 * 80 * 80);
-        subexitOutputs.push_back(zeroBuffer);
+        subexitOutputs.push_back(std::move(zeroBuffer));
         continue;
       }
 
@@ -707,7 +826,7 @@ public:
         std::cerr << "Subexit execution failed" << std::endl;
         return false;
       }
-      subexitOutputs.push_back(outputBuffer);
+      subexitOutputs.push_back(std::move(outputBuffer));
     }
 
     auto bindingInfo = getBindingInfo(head.engine.get());
@@ -756,7 +875,7 @@ public:
       return false;
     }
 
-    auto inputBuffer = exitOutputBuffer;
+    auto & inputBuffer = exitOutputBuffer;
 
     // Prepare inputs and outputs
     std::vector<std::pair<std::string, void *>> inputs = {
@@ -853,10 +972,7 @@ public:
     return finalOutput;
   }
 
-  InferenceState createInferenceState(const CudaBuffer & inputBuffer)
-  {
-    return InferenceState(inputBuffer, chunks.size());
-  }
+  InferenceState createInferenceState() { return InferenceState(chunks.size()); }
 
   bool inferStep(
     InferenceState & state, bool async = true, void (*callback)(void *) = nullptr,
@@ -938,9 +1054,13 @@ public:
     return state.isCompleted();
   }
 
-  std::vector<float> infer(const CudaBuffer & inputBuffer)
+  std::vector<float> infer(const CudaHostBuffer & inputBuffer)
   {
-    auto state = createInferenceState(inputBuffer);
+    // Prepare input buffer
+    CudaBuffer input;
+    auto state = createInferenceState();
+    state.restart(inputBuffer);
+
     while (state.currentStage != InferenceState::NMS_PROCESSING) {
       inferStep(state);
     }
@@ -1011,7 +1131,6 @@ public:
   std::vector<float> calculateLatestExit(InferenceState & state)
   {
     synchronize();
-
     CudaBuffer nmsOutputBuffer;
 
     // check the farthest exits for which all inputs are ready
@@ -1080,17 +1199,18 @@ private:
 
   cudaStream_t stream;
 
-  bool loadNMS(const json & nmsConfig, const std::string & folderPath)
+  bool loadNMS(const json & nmsConfig, const std::string & folderPath, bool halfPrecision = false)
   {
     const std::string weightsPath = folderPath + "/" + nmsConfig["weights"].get<std::string>();
-    const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) + ".engine";
+    const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) +
+                                   (halfPrecision ? "_fp16.engine" : ".engine");
     std::cout << "Engine path: " << enginePath << std::endl;
 
     if (loadEngine(enginePath, runtime, nmsEngine)) {
       std::cout << "Successfully loaded cached NMS engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached NMS engine, falling back to build" << std::endl;
-      buildOnnxEngine(weightsPath, enginePath);
+      buildOnnxEngine(weightsPath, enginePath, halfPrecision);
 
       std::cout << "Successfully built NMS engine" << std::endl;
       if (!loadEngine(enginePath, runtime, nmsEngine)) {
@@ -1102,7 +1222,8 @@ private:
     return true;
   }
 
-  bool loadLayer(const json & layerConfig, const std::string & folderPath)
+  bool loadLayer(
+    const json & layerConfig, const std::string & folderPath, bool halfPrecision = false)
   {
     const std::string type = layerConfig["type"];
     const int index = layerConfig["index"];
@@ -1118,7 +1239,8 @@ private:
     const std::string weightsPath = folderPath + "/" + layerConfig["weights"].get<std::string>();
 
     // engine path is the same as weights path but with .engine extension
-    const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) + ".engine";
+    const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) +
+                                   (halfPrecision ? "_fp16.engine" : ".engine");
     std::cout << "Engine path: " << enginePath << std::endl;
 
     std::unique_ptr<ICudaEngine> engine;
@@ -1126,7 +1248,7 @@ private:
       std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
-      buildOnnxEngine(weightsPath, enginePath);
+      buildOnnxEngine(weightsPath, enginePath, halfPrecision);
 
       std::cout << "Successfully built layer" << std::endl;
 
@@ -1143,7 +1265,8 @@ private:
     return true;
   }
 
-  bool loadSubexit(const json & exitConfig, const std::string & folderPath)
+  bool loadSubexit(
+    const json & exitConfig, const std::string & folderPath, bool halfPrecision = false)
   {
     const std::string type = "exit";
     const int index = exitConfig["index"];
@@ -1156,14 +1279,15 @@ private:
     const std::string weightsPath = folderPath + "/" + exitConfig["weights"].get<std::string>();
 
     // engine path is the same as weights path but with .engine extension
-    const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) + ".engine";
+    const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) +
+                                   (halfPrecision ? "_fp16.engine" : ".engine");
 
     std::unique_ptr<ICudaEngine> engine;
     if (loadEngine(enginePath, runtime, engine)) {
       std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
-      buildOnnxEngine(weightsPath, enginePath);
+      buildOnnxEngine(weightsPath, enginePath, halfPrecision);
 
       std::cout << "Successfully built exit" << std::endl;
 
@@ -1185,13 +1309,15 @@ private:
   }
 
 public:
-  bool loadSubexitCombiners(const json & layerConfig, const std::string & folderPath)
+  bool loadSubexitCombiners(
+    const json & layerConfig, const std::string & folderPath, bool halfPrecision = false)
   {
     std::cout << "Loading subexit combiner" << std::endl;
 
     const std::string weightsPath = folderPath + "/" + layerConfig["weights"].get<std::string>();
 
-    const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) + ".engine";
+    const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) +
+                                   (halfPrecision ? "_fp16.engine" : ".engine");
 
     std::cout << "Engine path: " << enginePath << std::endl;
 
@@ -1200,7 +1326,7 @@ public:
       std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
-      buildOnnxEngine(weightsPath, enginePath);
+      buildOnnxEngine(weightsPath, enginePath, halfPrecision);
 
       std::cout << "Successfully built subexit combiner" << std::endl;
 
