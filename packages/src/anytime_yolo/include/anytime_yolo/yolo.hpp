@@ -161,6 +161,10 @@ public:
   // Allocate device memory
   bool allocate(size_t size)
   {
+    if (size == this->size) {
+      return true;
+    }
+
     free();
     this->size = size;
     cudaError_t status = cudaMalloc(&device_ptr, size);
