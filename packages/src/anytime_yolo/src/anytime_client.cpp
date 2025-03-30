@@ -62,6 +62,8 @@ void AnytimeActionClient::image_callback(const sensor_msgs::msg::Image::SharedPt
   if (!current_image_) {
     current_image_ = std::make_shared<sensor_msgs::msg::Image>(*msg);
     current_image_->header.stamp = msg->header.stamp;
+  } else {
+    return;
   }
 
   send_goal(goal_msg);
