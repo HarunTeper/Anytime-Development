@@ -173,16 +173,18 @@ public:
       this_ptr->processed_layers_++;
       RCLCPP_INFO(
         this_ptr->node_->get_logger(), "Processed layers: %d", this_ptr->processed_layers_);
+
+      if constexpr (!isReactiveProactive) {
+        auto feedback = std::make_shared<Anytime::Feedback>();
+        feedback->processed_layers = this_ptr->processed_layers_;
+        this_ptr->goal_handle_->publish_feedback(feedback);
+        RCLCPP_INFO(
+          this_ptr->node_->get_logger(), "Proactive function feedback sent, processed layers: %d",
+          this_ptr->processed_layers_);
+      }
     } else if constexpr (!isSyncAsync) {
       // sync does not call this function
     }
-
-    auto feedback = std::make_shared<Anytime::Feedback>();
-    feedback->processed_layers = this_ptr->processed_layers_;
-    this_ptr->goal_handle_->publish_feedback(feedback);
-    RCLCPP_INFO(
-      this_ptr->node_->get_logger(), "Proactive function feedback sent, processed layers: %d",
-      this_ptr->processed_layers_);
 
     // Notify the waitable
     if constexpr (!isReactiveProactive) {
@@ -233,12 +235,14 @@ public:
         processed_layers_++;
         RCLCPP_INFO(node_->get_logger(), "Processed layers: %d", processed_layers_);
 
-        auto feedback = std::make_shared<Anytime::Feedback>();
-        feedback->processed_layers = processed_layers_;
-        this->goal_handle_->publish_feedback(feedback);
-        RCLCPP_INFO(
-          node_->get_logger(), "Proactive function feedback sent, processed layers: %d",
-          processed_layers_);
+        if constexpr (!isReactiveProactive) {
+          auto feedback = std::make_shared<Anytime::Feedback>();
+          feedback->processed_layers = processed_layers_;
+          this->goal_handle_->publish_feedback(feedback);
+          RCLCPP_INFO(
+            node_->get_logger(), "Proactive function feedback sent, processed layers: %d",
+            processed_layers_);
+        }
       } else if constexpr (isSyncAsync) {
         // nothing to do for async mode
       }
@@ -346,6 +350,15 @@ public:
     new_result->action_server_cancel = this->result_->action_server_cancel;
 
     this->result_ = new_result;
+
+    if constexpr (isReactiveProactive) {
+      auto feedback = std::make_shared<Anytime::Feedback>();
+      feedback->processed_layers = result_processed_layers_;
+      this->goal_handle_->publish_feedback(feedback);
+      RCLCPP_INFO(
+        node_->get_logger(), "Proactive function feedback sent, processed layers: %d",
+        result_processed_layers_);
+    }
 
     // if constexpr (isSyncAsync && isReactiveProactive) {
     //   // Notify the waitable for async mode
