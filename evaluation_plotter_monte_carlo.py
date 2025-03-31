@@ -72,12 +72,13 @@ def plot_metrics_generic(x_values, metrics_dict, title, ylabel, output_path, fig
     plt.close()
 
 
-def combine_run_data(file_pattern):
+def combine_run_data(file_pattern, cut_samples=0):
     """
     Combine data from multiple runs into a single DataFrame
 
     Args:
         file_pattern: Pattern to match multiple run files
+        cut_samples: Number of samples to cut from the beginning of each run
 
     Returns:
         Combined DataFrame or None if no files found
@@ -96,6 +97,17 @@ def combine_run_data(file_pattern):
             # Add run identifier from filename - Fix to handle .csv extension
             run_num = int(file.split('_run')[-1].split('.')[0])
             df['run'] = run_num
+
+            # Cut the first N samples from this run if requested
+            if cut_samples > 0:
+                # Group by run and cut samples from each run
+                if len(df) > cut_samples:
+                    df = df.iloc[cut_samples:]
+                    print(f"Cut {cut_samples} samples from {file}")
+                else:
+                    print(
+                        f"Warning: File {file} has fewer than {cut_samples} samples - keeping all data")
+
             all_dfs.append(df)
             print(f"Successfully read {file} with {len(df)} rows")
         except Exception as e:
@@ -104,6 +116,16 @@ def combine_run_data(file_pattern):
                 # Fix to handle .csv extension
                 run_num = int(file.split('_run')[-1].split('.')[0])
                 df['run'] = run_num
+
+                # Cut the first N samples from this run if requested
+                if cut_samples > 0:
+                    if len(df) > cut_samples:
+                        df = df.iloc[cut_samples:]
+                        print(f"Cut {cut_samples} samples from {file}")
+                    else:
+                        print(
+                            f"Warning: File {file} has fewer than {cut_samples} samples - keeping all data")
+
                 all_dfs.append(df)
                 print(f"Successfully read {file} without comment parameter")
             except Exception as e2:
@@ -151,12 +173,12 @@ def get_time_diff_pairs():
     }
 
 
-def plot_raw_timestamps(csv_files, output_dir):
+def plot_raw_timestamps(csv_files, output_dir, cut_samples=0):
     """Plot metrics from multiple raw timestamp CSV files"""
 
     # Combine all runs into a single DataFrame
     combined_pattern = csv_files.replace('_run1', '_run*')
-    combined_df = combine_run_data(combined_pattern)
+    combined_df = combine_run_data(combined_pattern, cut_samples)
 
     if combined_df is None:
         print(f"No data to plot for pattern: {combined_pattern}")
@@ -316,7 +338,7 @@ def plot_raw_timestamps(csv_files, output_dir):
         )
 
 
-def plot_batch_size_comparison(threading_types, reactive_types, batch_sizes, num_runs, output_dir):
+def plot_batch_size_comparison(threading_types, reactive_types, batch_sizes, num_runs, output_dir, cut_samples=0):
     """
     Plot comparisons of latency metrics across different batch sizes.
 
@@ -326,6 +348,7 @@ def plot_batch_size_comparison(threading_types, reactive_types, batch_sizes, num
         batch_sizes: List of batch sizes
         num_runs: Number of runs per configuration
         output_dir: Directory to save output plots
+        cut_samples: Number of samples to cut from the beginning of each run
     """
     print("Creating batch size comparison plots combining data from multiple runs...")
 
@@ -399,6 +422,16 @@ def plot_batch_size_comparison(threading_types, reactive_types, batch_sizes, num
                         # Fix to handle .csv extension
                         run_num = int(file.split('_run')[-1].split('.')[0])
                         df['run'] = run_num
+
+                        # Cut the first N samples from this run if requested
+                        if cut_samples > 0:
+                            if len(df) > cut_samples:
+                                df = df.iloc[cut_samples:]
+                                print(f"Cut {cut_samples} samples from {file}")
+                            else:
+                                print(
+                                    f"Warning: File {file} has fewer than {cut_samples} samples - keeping all data")
+
                         print(f"Read {len(df)} rows from {file}")
                         dfs.append(df)
                     except Exception as e:
@@ -407,6 +440,17 @@ def plot_batch_size_comparison(threading_types, reactive_types, batch_sizes, num
                             # Fix to handle .csv extension
                             run_num = int(file.split('_run')[-1].split('.')[0])
                             df['run'] = run_num
+
+                            # Cut the first N samples from this run if requested
+                            if cut_samples > 0:
+                                if len(df) > cut_samples:
+                                    df = df.iloc[cut_samples:]
+                                    print(
+                                        f"Cut {cut_samples} samples from {file}")
+                                else:
+                                    print(
+                                        f"Warning: File {file} has fewer than {cut_samples} samples - keeping all data")
+
                             dfs.append(df)
                         except Exception as e2:
                             print(f"Error reading file {file}: {e2}")
@@ -604,6 +648,8 @@ def main():
                         help='Directory containing result files')
     parser.add_argument('--output-dir', type=str, default='plots/monte_carlo',
                         help='Directory to save output plots')
+    parser.add_argument('--cut-samples', type=int, default=1,
+                        help='Number of samples to cut from the beginning of each run (default: 0)')
 
     args = parser.parse_args()
 
@@ -613,6 +659,7 @@ def main():
     print(f"Number of runs: {args.runs}")
     print(f"Results directory: {args.results_dir}")
     print(f"Output directory: {args.output_dir}")
+    print(f"Cut samples: {args.cut_samples}")
 
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
@@ -628,11 +675,11 @@ def main():
                 file_pattern = f"{args.results_dir}/anytime_raw_timestamps_batch_{batch_size}_{reactive}_{threading}_run1.csv"
 
                 # Plot combined data from all runs
-                # plot_raw_timestamps(file_pattern, output_dir)
+                plot_raw_timestamps(file_pattern, output_dir, args.cut_samples)
 
     # After plotting individual files, create batch size comparison plots
     plot_batch_size_comparison(
-        args.threading, args.reactive, args.batch_sizes, args.runs, output_dir)
+        args.threading, args.reactive, args.batch_sizes, args.runs, output_dir, args.cut_samples)
 
     print("Plotting completed.")
 
