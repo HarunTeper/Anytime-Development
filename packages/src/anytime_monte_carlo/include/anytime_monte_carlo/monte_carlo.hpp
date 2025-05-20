@@ -13,7 +13,7 @@ using Anytime = anytime_interfaces::action::MonteCarlo;
 using AnytimeGoalHandle = rclcpp_action::ServerGoalHandle<Anytime>;
 
 // Monte Carlo Pi class template
-template <bool isReactiveProactive, bool isSingleMulti>
+template <bool isReactiveProactive>
 class MonteCarloPi : public AnytimeBase<double, Anytime, AnytimeGoalHandle>
 {
 public:

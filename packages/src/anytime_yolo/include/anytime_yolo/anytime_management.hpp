@@ -22,7 +22,7 @@ using AnytimeGoalHandle = rclcpp_action::ServerGoalHandle<Anytime>;
 bool f16 = false;  // Flag for half precision
 
 // Anytime Management class template
-template <bool isReactiveProactive, bool isSingleMulti, bool isPassiveCooperative, bool isSyncAsync>
+template <bool isReactiveProactive, bool isPassiveCooperative, bool isSyncAsync>
 class AnytimeManagement : public AnytimeBase<double, Anytime, AnytimeGoalHandle>
 {
 public:

@@ -28,24 +28,18 @@ AnytimeActionServer::AnytimeActionServer(rclcpp::NodeOptions options)
 
   // Read the ros2 parameters
   std::string reactive_proactive_str = this->declare_parameter("is_reactive_proactive", "reactive");
-  std::string single_multi_str = this->declare_parameter("is_single_multi", "single");
   int batch_size = this->declare_parameter("batch_size", 1);
 
   // Convert strings to booleans
   bool is_reactive_proactive = (reactive_proactive_str == "proactive");
-  bool is_single_multi = (single_multi_str == "multi");
 
   RCLCPP_INFO(
     this->get_logger(), "is_reactive_proactive: %s",
     is_reactive_proactive ? "proactive" : "reactive");
-  RCLCPP_INFO(
-    this->get_logger(), "is_single_multi: %s",
-    is_single_multi ? "multi-threaded" : "single-threaded");
   RCLCPP_INFO(this->get_logger(), "batch_size: %d", batch_size);
 
   // Create the Anytime management object based on the parameters
-  anytime_management_ =
-    create_anytime_management(this, is_reactive_proactive, is_single_multi, batch_size);
+  anytime_management_ = create_anytime_management(this, is_reactive_proactive, batch_size);
 }
 
 // Destructor for the AnytimeActionServer class
@@ -54,20 +48,12 @@ AnytimeActionServer::~AnytimeActionServer() {}
 // factory function
 std::shared_ptr<AnytimeBase<double, Anytime, AnytimeGoalHandle>>
 AnytimeActionServer::create_anytime_management(
-  rclcpp::Node * node, bool is_reactive_proactive, bool is_single_multi, int batch_size)
+  rclcpp::Node * node, bool is_reactive_proactive, int batch_size)
 {
   if (is_reactive_proactive) {
-    if (is_single_multi) {
-      return std::make_shared<AnytimeManagement<true, true>>(node, batch_size);
-    } else {
-      return std::make_shared<AnytimeManagement<true, false>>(node, batch_size);
-    }
+    return std::make_shared<AnytimeManagement<true>>(node, batch_size);
   } else {
-    if (is_single_multi) {
-      return std::make_shared<AnytimeManagement<false, true>>(node, batch_size);
-    } else {
-      return std::make_shared<AnytimeManagement<false, false>>(node, batch_size);
-    }
+    return std::make_shared<AnytimeManagement<false>>(node, batch_size);
   }
 }
 

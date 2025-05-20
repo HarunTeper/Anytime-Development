@@ -26,7 +26,7 @@ private:
 
   // factory function for creating anytime management
   std::shared_ptr<AnytimeBase<double, Anytime, AnytimeGoalHandle>> create_anytime_management(
-    rclcpp::Node * node, bool is_reactive_proactive, bool is_single_multi, int batch_size);
+    rclcpp::Node * node, bool is_reactive_proactive, int batch_size);
 
   std::shared_ptr<AnytimeBase<double, Anytime, AnytimeGoalHandle>> anytime_management_;
 };  // Added missing semicolon here

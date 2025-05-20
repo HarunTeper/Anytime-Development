@@ -13,7 +13,7 @@ using Anytime = anytime_interfaces::action::MonteCarlo;
 using AnytimeGoalHandle = rclcpp_action::ServerGoalHandle<Anytime>;
 
 // Anytime Management class template
-template <bool isReactiveProactive, bool isSingleMulti>
+template <bool isReactiveProactive>
 class AnytimeManagement : public AnytimeBase<double, Anytime, AnytimeGoalHandle>
 {
 public:
