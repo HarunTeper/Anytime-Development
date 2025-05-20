@@ -63,19 +63,6 @@ private:
   rclcpp::Time client_result_time_;             // When result was received
   rclcpp::Time client_send_cancel_start_time_;  // Before sending cancel request
   rclcpp::Time client_send_cancel_end_time_;    // After sending cancel request
-
-  // Data structures to store timing intervals for statistics
-  std::vector<int64_t> intervals_;        // Store time intervals in nanoseconds
-  std::vector<int32_t> iterations_data_;  // Store iteration counts
-
-  // Legacy data structures (kept for compatibility)
-  std::vector<int64_t> intervals1_;
-  std::vector<int64_t> intervals2_;
-  std::vector<int64_t> intervals3_;
-  std::vector<int64_t> intervals4_;
-  std::vector<int64_t> intervals5_;
-  std::vector<int64_t> intervals6_;
-  std::vector<int64_t> iterations_;
 };
 
 #endif  // ANYTIME_CLIENT_HPP
