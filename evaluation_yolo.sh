@@ -85,35 +85,45 @@ if [[ "$mode" == "run" || "$mode" == "both" ]]; then
                         
                         echo "Running configuration: $config_name (Run $run of $num_runs)"
 
-                        # Start the detection visualizer in the background
-                        ros2 launch video_publisher detection_visualizer.launch.py > ./results/yolo/${config_name}_visualizer.log & visualizer_pid=$!
-
-                        # Give it time to initialize
-                        sleep 5
-
                         # Start the action server in the background
                         ros2 launch anytime_yolo action_server.launch.py multi_threading:=$threading is_reactive_proactive:=$reactive_param batch_size:=$batch_size is_sync_async:=$sync_param > ./results/yolo/${config_name}_server.log & server_pid=$!
-                        
+
                         sleep 5
-                        
+
                         # Start the action client in the background and pass result filename
                         ros2 launch anytime_yolo action_client.launch.py threading_type:=single result_filename:="${result_filename}" > "./results/yolo/${config_name}_client.log" & client_pid=$!
+
+                        # Start the detection visualizer in the background
+                        ros2 launch video_publisher detection_visualizer.launch.py > ./results/yolo/${config_name}_visualizer.log & visualizer_pid=$!
                         
+                        sleep 5
+
                         # Run the video publisher (blocking, foreground)
                         ros2 launch video_publisher video_publisher.launch.py > ./results/yolo/${config_name}_publisher.log
+
+                        # Wait for video_publisher process to finish if still running
+                        while ps -p $(pgrep -f "video_publisher.launch.py") > /dev/null 2>&1; do
+                            sleep 1
+                        done
 
                         # Terminate the processes after the video publisher finishes
                         kill $server_pid 2>/dev/null
                         kill $client_pid 2>/dev/null
                         kill $visualizer_pid 2>/dev/null
                         kill $publisher_pid 2>/dev/null
-                        sleep 5
-                        # Force kill any remaining processes
-                        pkill -9 -f 'anytime_yolo' 2>/dev/null
-                        pkill -9 -f 'video_publisher' 2>/dev/null
-                        pkill -9 -f 'detection_visualizer' 2>/dev/null
-                        pkill -9 -f '/opt/ros/humble' 2>/dev/null
-                        sleep 5
+
+                        # Wait for specific processes to terminate
+                        for process in 'anytime_yolo' 'video_publisher' 'detection_visualizer'; do
+                            while pgrep -f "$process" > /dev/null 2>&1; do
+                                pkill -9 -f 'anytime_yolo' 2>/dev/null
+                                pkill -9 -f 'video_publisher' 2>/dev/null
+                                pkill -9 -f 'detection_visualizer' 2>/dev/null
+                                pkill -9 -f '/opt/ros/humble' 2>/dev/null
+                                sleep 1
+                            done
+                        done
+
+                        sleep 1
                     done
                 done
             done
