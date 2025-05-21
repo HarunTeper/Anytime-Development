@@ -159,7 +159,7 @@
                 "passive",
                 "cooperative"
             ],
-            "default": "passive"
+            "default": "cooperative"
         },
         {
             "id": "is_sync_async",
