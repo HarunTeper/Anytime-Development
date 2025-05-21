@@ -144,7 +144,7 @@ public:
   {
     RCLCPP_INFO(node_->get_logger(), "Check cancel and finish proactive function called");
     bool should_finish = yolo_state_->isCompleted();
-    bool should_cancel = this->goal_handle_->is_canceling() || !this->goal_handle_->is_executing();
+    bool should_cancel = this->goal_handle_->is_canceling();
 
     if ((should_finish || should_cancel) && this->is_running()) {
       this->result_->action_server_cancel = this->server_goal_cancel_time_;
@@ -173,6 +173,16 @@ public:
       static_cast<AnytimeManagement *>(userData)->node_->get_logger(), "Forward finished");
 
     auto this_ptr = static_cast<AnytimeManagement *>(userData);
+
+    if constexpr (isReactiveProactive) {
+      if (
+        this_ptr->goal_handle_->is_canceling() || !this_ptr->goal_handle_->is_executing() ||
+        !this_ptr->is_running()) {
+        RCLCPP_INFO(
+          this_ptr->node_->get_logger(), "Goal handle is canceling, stopping computation");
+        return;
+      }
+    }
 
     if constexpr (isSyncAsync) {
       // Increment processed layers counter for async mode
@@ -211,6 +221,13 @@ public:
     constexpr bool is_sync_async = isSyncAsync;
 
     for (int i = 0; i < batch_size_; i++) {
+      if (
+        this->goal_handle_->is_canceling() || !this->goal_handle_->is_executing() ||
+        !this->is_running()) {
+        RCLCPP_INFO(node_->get_logger(), "Goal handle is canceling, stopping computation");
+        return;
+      }
+
       RCLCPP_INFO(node_->get_logger(), "Computing batch part %d", i);
 
       void (*callback)(void *);
@@ -253,6 +270,10 @@ public:
         average_computation_time_.nanoseconds() +
         (computation_time.nanoseconds() - average_computation_time_.nanoseconds()) / batch_count_));
     }
+
+    RCLCPP_INFO(
+      node_->get_logger(), "Average computation time: %f ms",
+      average_computation_time_.nanoseconds() / 1e6);
   }
 
   void send_feedback() override
@@ -263,10 +284,12 @@ public:
     feedback->processed_layers = processed_layers_;
     // --- CUSTOM ---
     RCLCPP_INFO(node_->get_logger(), "Sending feedback, processed layers: %d", processed_layers_);
-    this->goal_handle_->publish_feedback(feedback);
-    RCLCPP_INFO(
-      node_->get_logger(), "Proactive function feedback sent, processed layers: %d",
-      processed_layers_);
+    if (this->goal_handle_) {
+      this->goal_handle_->publish_feedback(feedback);
+      RCLCPP_INFO(node_->get_logger(), "Feedback sent, processed layers: %d", processed_layers_);
+    } else {
+      RCLCPP_WARN(node_->get_logger(), "Goal handle is null, cannot send feedback");
+    }
   }
 
   void calculate_result() override
@@ -401,7 +424,9 @@ public:
 
       // check if the buffer is large enough
       if (data_size > input_cuda_buffer_.size) {
-        std::cerr << "Buffer size is not large enough" << std::endl;
+        RCLCPP_ERROR(
+          node_->get_logger(), "Buffer size is not large enough: %zu > %zu", data_size,
+          input_cuda_buffer_.size);
         throw std::runtime_error("Buffer size is not large enough");
       }
       // Copy data to the buffer
