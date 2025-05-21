@@ -24,7 +24,9 @@ AnytimeActionServer::AnytimeActionServer(rclcpp::NodeOptions options)
     // Lambda function to handle accepted goals
     [this](const std::shared_ptr<AnytimeGoalHandle> goal_handle) {
       return this->handle_accepted(goal_handle);
-    });
+    },
+    rcl_action_server_get_default_options(),
+    this->get_node_base_interface()->get_default_callback_group());
 
   // Read the ros2 parameters
   std::string reactive_proactive_str = this->declare_parameter("is_reactive_proactive", "reactive");
