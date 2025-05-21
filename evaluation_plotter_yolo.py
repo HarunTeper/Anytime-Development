@@ -698,12 +698,12 @@ def plot_batch_size_comparison(threading_types, reactive_types, sync_async_types
             positions = []
             labels = []
             box_data = []
-            box_colors = []
+            bar_colors = []
 
             # Space between groups of boxplots
             group_space = 2
             # Space between boxplots in a group
-            box_space = 0.6
+            bar_space = 0.6
 
             pos = 0
             # For each batch size, plot boxplots for each configuration
@@ -714,36 +714,36 @@ def plot_batch_size_comparison(threading_types, reactive_types, sync_async_types
                     if metric_name in metrics and batch_size in metrics[metric_name]:
                         data = metrics[metric_name][batch_size]
                         if len(data) > 0:
-                            current_pos = pos + j * box_space
+                            current_pos = pos + j * bar_space
                             positions.append(current_pos)
                             box_data.append(data)
-                            box_colors.append(
+                            bar_colors.append(
                                 config_colors.get(config, 'gray'))
                             labels.append(f"{config}")
 
             # Create boxplots
-            boxes = ax.boxplot(box_data, positions=positions, patch_artist=True,
-                               widths=0.4, showfliers=False, notch=False)
+            bars = ax.boxplot(box_data, positions=positions, patch_artist=True,
+                              widths=0.4, showfliers=False, notch=False)
 
             # Customize boxplot colors
-            for box, color in zip(boxes['boxes'], box_colors):
+            for box, color in zip(bars['bars'], bar_colors):
                 box.set(facecolor=color, alpha=0.6)
                 box.set(edgecolor=color, linewidth=1.5)
 
-            for whisker, color in zip(boxes['whiskers'], [c for c in box_colors for _ in range(2)]):
+            for whisker, color in zip(bars['whiskers'], [c for c in bar_colors for _ in range(2)]):
                 whisker.set(color=color, linewidth=1.5)
 
-            for cap, color in zip(boxes['caps'], [c for c in box_colors for _ in range(2)]):
+            for cap, color in zip(bars['caps'], [c for c in bar_colors for _ in range(2)]):
                 cap.set(color=color, linewidth=1.5)
 
-            for median, color in zip(boxes['medians'], box_colors):
+            for median, color in zip(bars['medians'], bar_colors):
                 median.set(color='black', linewidth=1.5)
 
             # Always show zero on y-axis
             ax.set_ylim(bottom=0)
 
             # Set x-ticks at the middle of each group
-            group_positions = [i * (len(config_colors) + group_space) + 1 + (len(config_colors) * box_space) / 2
+            group_positions = [i * (len(config_colors) + group_space) + 1 + (len(config_colors) * bar_space) / 2
                                for i in range(len(all_batch_sizes))]
 
             # Add vertical lines between batch size groups
@@ -751,9 +751,9 @@ def plot_batch_size_comparison(threading_types, reactive_types, sync_async_types
                 for i in range(len(all_batch_sizes) - 1):
                     # Calculate position between current batch size group and next one
                     current_group_end = group_positions[i] + \
-                        (len(config_colors) * box_space) / 2
+                        (len(config_colors) * bar_space) / 2
                     next_group_start = group_positions[i+1] - \
-                        (len(config_colors) * box_space) / 2
+                        (len(config_colors) * bar_space) / 2
                     line_pos = (current_group_end + next_group_start) / 2
 
                     # Draw a vertical line
@@ -793,11 +793,154 @@ def plot_batch_size_comparison(threading_types, reactive_types, sync_async_types
             plt.close()
             print(f"Saved boxplot to {filename}")
 
+    def create_stacked_bar_charts_for_metrics(metrics_list, is_latency_metric=False):
+        # Helper function to create stacked bar charts for a list of metrics
+
+        latency_stacks = [['client_start_cancel', 'total_client_cancel']]
+
+        for stack in latency_stacks:
+            print(f"Creating stacked bar chart for metrics: {stack}")
+
+            # Get all batch sizes that have data
+            all_batch_sizes = sorted(set(bs for config in all_data.values()
+                                         if stack[0] in config
+                                         for bs in config[stack[0]].keys()))
+
+            print(f"All batch sizes: {all_batch_sizes}")
+
+            if not all_batch_sizes:
+                print(f"No data available for metrics {stack}")
+                continue
+
+            # Create figure with appropriate size
+            fig, ax = plt.subplots(
+                figsize=(max(12, len(all_batch_sizes) * 2), 8))
+
+            # Track positions for bar charts and labels
+            positions = []
+            labels = []
+            bar_data = []
+            bar_colors = []
+
+            # Space between groups of bar charts
+            group_space = 2
+            # Space between bar charts in a group
+            bar_space = 0.6
+
+            pos = 0
+            # For each batch size, plot bar charts for each configuration
+            for i, batch_size in enumerate(all_batch_sizes):
+                pos = i * (len(config_colors) + group_space) + 1
+
+                for j, (config, metrics) in enumerate(sorted(all_data.items())):
+                    if stack[0] in metrics and batch_size in metrics[stack[0]]:
+                        data1 = metrics[stack[0]][batch_size]
+                        data2 = metrics[stack[1]][batch_size]
+                        if len(data1) > 0 and len(data2) > 0:
+                            current_pos = pos + j * bar_space
+                            positions.append(current_pos)
+                            bar_data.append([data1, data2])
+                            bar_colors.append(
+                                config_colors.get(config, 'gray'))
+                            labels.append(f"{config}")
+
+            # Create stacked bar charts
+            # Draw stacked bar charts by plotting each bar charts individually and stacking them
+            bars = []
+            prev_heights = np.zeros(len(positions))
+            n_stacks = len(stack)
+            for stack_idx in range(n_stacks):
+                # For each stack level, collect the data for all configs/batch_sizes at this level
+                level_data = [data[stack_idx] for data in bar_data]
+                # Calculate the mean for this level
+                level_means = np.array(
+                    [np.mean(d) if len(d) > 0 else 0 for d in level_data])
+                # Calculate the std for error bars
+                level_stds = np.array(
+                    [np.std(d) if len(d) > 0 else 0 for d in level_data])
+                # Plot the bar for this stack level
+                bar = ax.bar(
+                    positions,
+                    level_means,
+                    width=0.4,
+                    bottom=prev_heights,
+                    color=bar_colors,
+                    alpha=0.6 if stack_idx == 0 else 0.9,
+                    label=stack[stack_idx].replace('_', ' ').title(
+                    ) if stack_idx < len(stack) else f"Stack {stack_idx+1}"
+                )
+                # # Add error bars at the top of the current bar
+                # ax.errorbar(
+                #     positions,
+                #     prev_heights + level_means,
+                #     yerr=level_stds,
+                #     fmt='none',
+                #     color='black',
+                #     capsize=3
+                # )
+                bars.append(bar)
+                # Update prev_heights for next stack level
+                prev_heights += level_means
+
+            # Customize bar colors for the first stack level
+            for rect, color in zip(bars[0], bar_colors):
+                rect.set_facecolor(color)
+                rect.set_alpha(0.6)
+                rect.set_edgecolor(color)
+                rect.set_linewidth(1.5)
+            # Always show zero on y-axis
+            ax.set_ylim(bottom=0)
+            # Set x-ticks at the middle of each group
+            group_positions = [i * (len(config_colors) + group_space) + 1 + (len(config_colors) * bar_space) / 2
+                               for i in range(len(all_batch_sizes))]
+            # Add vertical lines between batch size groups
+            if len(all_batch_sizes) > 1:
+                for i in range(len(all_batch_sizes) - 1):
+                    # Calculate position between current batch size group and next one
+                    current_group_end = group_positions[i] + \
+                        (len(config_colors) * bar_space) / 2
+                    next_group_start = group_positions[i+1] - \
+                        (len(config_colors) * bar_space) / 2
+                    line_pos = (current_group_end + next_group_start) / 2
+
+                    # Draw a vertical line
+                    plt.axvline(x=line_pos, color='gray',
+                                linestyle='--', alpha=0.5)
+            ax.set_xticks(group_positions)
+            ax.set_xticklabels([str(bs) for bs in all_batch_sizes])
+            # Add block size labels instead of batch size
+            plt.xlabel('Block Size')
+            # Set y-axis label based on metric type
+            if is_latency_metric:
+                plt.ylabel('Time (ms)')
+            else:
+                plt.ylabel(f'{stack[0].replace("_", " ").title()}')
+            # Remove title
+            # plt.title(
+            #     f'{stack[0].replace("_", " ").title()} vs Batch Size - All Configurations (Combined Runs)')
+            plt.grid(True, axis='y')
+            # Add legend for configurations
+            legend_handles = [plt.Rectangle((0, 0), 1, 1, color=color, alpha=0.6)
+                              for color in config_colors.values()]
+
+            legend_labels = list(config_colors.keys())
+            plt.legend(legend_handles, legend_labels, loc='best')
+            # Adjust layout for better display
+            plt.tight_layout()
+            # Save the plot
+            filename = f'{output_dir}/{stack[0]}_stacked_boxplot_batch_size_combined.pdf'
+            plt.savefig(filename)
+            plt.close()
+            print(f"Saved stacked boxplot to {filename}")
+
     # Plot regular performance metrics as bar charts with error bars
     create_bar_charts_for_metrics(metrics_to_compare, is_latency_metric=False)
 
     # Plot latency metrics as boxplots (showing distribution)
     create_boxplots_for_metrics(latency_metrics, is_latency_metric=True)
+
+    create_stacked_bar_charts_for_metrics(
+        latency_metrics, is_latency_metric=True)
 
 
 def main():
