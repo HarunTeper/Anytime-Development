@@ -44,6 +44,9 @@ AnytimeActionClient::AnytimeActionClient(const rclcpp::NodeOptions & options)
   // Initialize the detection image publisher
   detection_image_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("images", 10);
 
+  detection_publisher_ =
+    this->create_publisher<vision_msgs::msg::Detection2DArray>("/detections", 10);
+
   // Initialize the action client
   action_client_ = rclcpp_action::create_client<Anytime>(this, "anytime");
 }
@@ -199,27 +202,21 @@ void AnytimeActionClient::post_processing(const AnytimeGoalHandle::WrappedResult
   RCLCPP_INFO(
     this->get_logger(), "Time between start and receive: %ld ms",
     (client_result_time_ - client_goal_start_time_).nanoseconds() / 1000000);
-  // RCLCPP_INFO(this->get_logger(), "Publishing detection image");
-  // detection_image_publisher_->publish(*current_image_);
+  RCLCPP_INFO(this->get_logger(), "Publishing detection image");
+  detection_image_publisher_->publish(*current_image_);
 
-  // // Create a Detection2DArray message for publishing
-  // vision_msgs::msg::Detection2DArray detection_array;
-  // detection_array.header.stamp = current_image_->header.stamp;
+  // Create a Detection2DArray message for publishing
+  vision_msgs::msg::Detection2DArray detection_array;
+  detection_array.header.stamp = current_image_->header.stamp;
 
-  // // Copy detections from the result
-  // detection_array.detections = result.result->detections;
+  // Copy detections from the result
+  detection_array.detections = result.result->detections;
 
   // Log number of detections
   RCLCPP_INFO(this->get_logger(), "Publishing %ld detections", result.result->detections.size());
 
-  // // Create publisher on first call if it doesn't exist
-  // if (!detection_publisher_) {
-  //   detection_publisher_ =
-  //     this->create_publisher<vision_msgs::msg::Detection2DArray>("/detections", 10);
-  // }
-
-  // // Publish detections
-  // detection_publisher_->publish(detection_array);
+  // Publish detections
+  detection_publisher_->publish(detection_array);
 }
 
 void AnytimeActionClient::print_time_differences(const AnytimeGoalHandle::WrappedResult & result)

@@ -8,7 +8,7 @@ import os
 
 def generate_launch_description():
     pkg_path = get_package_share_directory('video_publisher')
-    default_image_path = os.path.join(pkg_path, 'images', 'sample.png')
+    default_image_path = os.path.join(pkg_path, 'images')
 
     return LaunchDescription([
         DeclareLaunchArgument(

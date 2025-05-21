@@ -12,9 +12,6 @@ import os
 class VideoPublisher(Node):
     def __init__(self):
         super().__init__('video_publisher')
-        self.publisher_ = self.create_publisher(Image, 'video_frames', 10)
-        self.timer = self.create_timer(1.0, self.timer_callback)  # 1Hz
-        self.bridge = cv_bridge.CvBridge()
 
         # Declare parameters
         self.declare_parameter('image_path', '')
@@ -26,24 +23,72 @@ class VideoPublisher(Node):
             rclpy.shutdown()
             return
 
-        self.image = cv2.imread(self.image_path)
-        if self.image is None:
-            self.get_logger().error('Failed to load image!')
+        # List all filenames in the image_path directory
+        filenames = os.listdir(self.image_path)
+        self.get_logger().info(
+            f'Files in directory "{self.image_path}": {filenames}')
+
+        # Filter for files in the format image_*.jpg
+        self.image_files = [f for f in filenames if f.startswith(
+            'image_') and f.endswith('.jpg')]
+        self.get_logger().info(
+            f'Filtered image files: {self.image_files}')
+
+        if not self.image_files:
+            self.get_logger().error('No valid image files found!')
             rclpy.shutdown()
             return
 
-        self.get_logger().info('Setup complete, publishing video frames...')
+        # Subscribe to the images topic
+        self.subscription = self.create_subscription(
+            Image,
+            'images',
+            self.image_callback,
+            10
+        )
 
-    def timer_callback(self):
-        msg = self.bridge.cv2_to_imgmsg(self.image, "bgr8")
+        self.publisher_ = self.create_publisher(Image, 'video_frames', 10)
+        self.bridge = cv_bridge.CvBridge()
+        self.current_index = 0
+
+        # Publish the first image
+        self.publish_image()
+
+    def publish_image(self):
+
+        if self.current_index >= len(self.image_files):
+            self.get_logger().info('All images published. Shutting down.')
+            raise SystemExit
+
+        image_path = os.path.join(
+            self.image_path, self.image_files[self.current_index])
+        self.get_logger().info(f'Publishing image: {image_path}')
+
+        image = cv2.imread(image_path)
+        if image is None:
+            self.get_logger().error(f'Failed to load image: {image_path}')
+            rclpy.shutdown()
+            return
+
+        msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
         msg.header.stamp = self.get_clock().now().to_msg()
         self.publisher_.publish(msg)
+        self.get_logger().info(
+            f'Published image: {self.image_files[self.current_index]}')
+
+    def image_callback(self, msg):
+        self.get_logger().info('Received image, publishing next one.')
+        self.current_index += 1
+        self.publish_image()
 
 
 def main(args=None):
     rclpy.init(args=args)
     video_publisher = VideoPublisher()
-    rclpy.spin(video_publisher)
+    try:
+        rclpy.spin(video_publisher)
+    except SystemExit:
+        rclpy.logging.get_logger("Quitting").info('Done')
     video_publisher.destroy_node()
     rclpy.shutdown()
 
