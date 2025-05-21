@@ -71,6 +71,7 @@ public:
     if ((should_finish || should_cancel) && this->is_running()) {
       this->calculate_result();
 
+      this->result_->action_server_cancel = this->server_goal_cancel_time_;
       this->result_->action_server_send_result = this->node_->now();
       if (should_cancel) {
         this->goal_handle_->canceled(this->result_);
@@ -108,6 +109,7 @@ public:
     bool should_cancel = this->goal_handle_->is_canceling();
 
     if ((should_finish || should_cancel) && this->is_running()) {
+      this->result_->action_server_cancel = this->server_goal_cancel_time_;
       this->result_->action_server_send_result = this->node_->now();
       if (should_cancel) {
         this->goal_handle_->canceled(this->result_);
@@ -202,7 +204,7 @@ public:
   // Cancel function
   void notify_cancel() override
   {
-    this->result_->action_server_cancel = this->node_->now();
+    server_goal_cancel_time_ = this->node_->now();
     RCLCPP_INFO(node_->get_logger(), "Notify cancel function");
     notify_check_finish();
     RCLCPP_INFO(node_->get_logger(), "Notify cancel function finished");
@@ -224,6 +226,8 @@ public:
     this->result_->action_server_receive = this->server_goal_receive_time_;
     this->result_->action_server_accept = this->server_goal_accept_time_;
     this->result_->action_server_start = this->server_goal_start_time_;
+
+    this->server_goal_cancel_time_ = this->node_->now();
 
     batch_count_ = 0;
     average_computation_time_ = rclcpp::Duration(0, 0);

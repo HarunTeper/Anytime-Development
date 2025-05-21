@@ -100,6 +100,7 @@ public:
     if ((should_finish || should_cancel) && this->is_running()) {
       this->calculate_result();
 
+      this->result_->action_server_cancel = this->server_goal_cancel_time_;
       this->result_->action_server_send_result = this->node_->now();
       if (should_cancel) {
         this->goal_handle_->canceled(this->result_);
@@ -144,6 +145,7 @@ public:
     bool should_cancel = this->goal_handle_->is_canceling() || !this->goal_handle_->is_executing();
 
     if ((should_finish || should_cancel) && this->is_running()) {
+      this->result_->action_server_cancel = this->server_goal_cancel_time_;
       this->result_->action_server_send_result = this->node_->now();
       if (should_cancel) {
         this->goal_handle_->canceled(this->result_);
@@ -332,7 +334,6 @@ public:
     new_result->action_server_receive = this->server_goal_receive_time_;
     new_result->action_server_accept = this->server_goal_accept_time_;
     new_result->action_server_start = this->server_goal_start_time_;
-    new_result->action_server_cancel = this->result_->action_server_cancel;
 
     this->result_ = new_result;
   }
@@ -340,7 +341,7 @@ public:
   // Cancel function
   void notify_cancel() override
   {
-    this->result_->action_server_cancel = this->node_->now();
+    this->server_goal_cancel_time_ = this->node_->now();
     RCLCPP_INFO(node_->get_logger(), "Notify cancel function");
     notify_check_finish();
     RCLCPP_INFO(node_->get_logger(), "Notify cancel function finished");
@@ -403,6 +404,12 @@ public:
 
     // Reset YOLO state
     yolo_state_->restart(input_cuda_buffer_);
+
+    this->result_->action_server_receive = this->server_goal_receive_time_;
+    this->result_->action_server_accept = this->server_goal_accept_time_;
+    this->result_->action_server_start = this->server_goal_start_time_;
+
+    server_goal_cancel_time_ = this->node_->now();
 
     batch_count_ = 0;
     processed_layers_ = 0;  // Reset processed layers counter

@@ -59,6 +59,7 @@ protected:
   rclcpp::Time server_goal_accept_time_;
   rclcpp::Time server_goal_receive_time_;
   rclcpp::Time server_goal_start_time_;
+  rclcpp::Time server_goal_cancel_time_;
 
   double average_computation_time_ = 0.0;  // Store in milliseconds
   uint64_t batch_count_ = 0;
