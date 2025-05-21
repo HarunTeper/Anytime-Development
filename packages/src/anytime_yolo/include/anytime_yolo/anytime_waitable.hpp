@@ -8,9 +8,13 @@
 #include <rcl/event.h>
 #include <rcl/wait.h>
 
+#include <atomic>  // Include atomic header for thread-safe operations
+
 class AnytimeWaitable : public rclcpp::Waitable
 {
 public:
+  RCLCPP_SMART_PTR_DEFINITIONS(AnytimeWaitable)
+
   AnytimeWaitable(std::function<void(void)> on_execute_callback)
   : execute_callback_(on_execute_callback)
   {
@@ -18,17 +22,19 @@ public:
     guard_condition_ = std::make_shared<rclcpp::GuardCondition>();
   }
 
-  RCLCPP_PUBLIC
-  size_t get_number_of_ready_guard_conditions() override { return 1; }
+  ~AnytimeWaitable() override = default;
 
-  void execute(std::shared_ptr<void> & data) override
+  void add_to_wait_set(rcl_wait_set_t * wait_set) override
   {
-    (void)data;
-    std::lock_guard<std::mutex> lock(execute_mutex_);
-    this->execute_callback_();
-  }
+    std::lock_guard<std::mutex> lock(guard_condition_mutex_);
 
-  std::shared_ptr<void> take_data() override { return nullptr; }
+    rcl_guard_condition_t * cond = &guard_condition_->get_rcl_guard_condition();
+    rcl_ret_t ret = rcl_wait_set_add_guard_condition(wait_set, cond, NULL);
+
+    if (RCL_RET_OK != ret) {
+      rclcpp::exceptions::throw_from_rcl_error(ret, "failed to add guard condition to wait set");
+    }
+  }
 
   bool is_ready(rcl_wait_set_t * wait_set) override
   {
@@ -49,34 +55,32 @@ public:
     return any_ready;
   }
 
-  void add_to_wait_set(rcl_wait_set_t * wait_set) override
+  void execute(std::shared_ptr<void> & data) override
   {
-    std::lock_guard<std::mutex> lock(guard_condition_mutex_);
-
-    rcl_guard_condition_t * cond = &guard_condition_->get_rcl_guard_condition();
-    rcl_ret_t ret = rcl_wait_set_add_guard_condition(wait_set, cond, NULL);
-
-    if (RCL_RET_OK != ret) {
-      rclcpp::exceptions::throw_from_rcl_error(ret, "failed to add guard condition to wait set");
-    }
+    (void)data;
+    this->execute_callback_();
+    is_triggered_ = false;  // Reset the flag atomically after execution
   }
+
+  std::shared_ptr<void> take_data() override { return nullptr; }
+
+  RCLCPP_PUBLIC
+  size_t get_number_of_ready_guard_conditions() override { return 1; }
 
   void notify()
   {
-    std::lock_guard<std::mutex> lock(notify_guard_conditions_);
-    guard_condition_->trigger();
+    std::lock_guard<std::mutex> lock(guard_condition_mutex_);
+    if (!is_triggered_.exchange(true)) {  // Atomically check and set the flag
+      guard_condition_->trigger();
+    }
   }
 
-  std::shared_ptr<rclcpp::GuardCondition> guard_condition_;
-
 private:
-  std::atomic<bool> triggered_{false};
-
+  std::shared_ptr<rclcpp::GuardCondition> guard_condition_;
   std::mutex guard_condition_mutex_;
   std::mutex notify_guard_conditions_;
-  std::mutex execute_mutex_;
-
   std::function<void(void)> execute_callback_;
+  std::atomic<bool> is_triggered_ = false;  // Use atomic for thread-safe flag
 };
 
 #endif  // ANYTIME_WAITABLE_HPP
