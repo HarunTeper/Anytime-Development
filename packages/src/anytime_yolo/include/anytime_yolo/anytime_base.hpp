@@ -12,9 +12,11 @@ public:
   virtual ~AnytimeBase() = default;
 
   virtual void reactive_function() = 0;
+  virtual void reactive_result_function() = 0;
   virtual void check_cancel_and_finish_reactive() = 0;
 
   virtual void proactive_function() = 0;
+  virtual void proactive_result_function() = 0;
   virtual void check_cancel_and_finish_proactive() = 0;
 
   virtual void start() = 0;
@@ -33,7 +35,7 @@ public:
   std::shared_ptr<GoalHandleType> get_goal_handle() { return goal_handle_; }
 
   void notify_iteration() { anytime_iteration_waitable_->notify(); }
-
+  void notify_result() { anytime_result_waitable_->notify(); }
   void notify_check_finish() { anytime_check_finish_waitable_->notify(); }
 
   void set_goal_handle_accept_time(rclcpp::Time time) { server_goal_accept_time_ = time; }
@@ -42,6 +44,7 @@ public:
 
 protected:
   std::shared_ptr<AnytimeWaitable> anytime_iteration_waitable_;
+  std::shared_ptr<AnytimeWaitable> anytime_result_waitable_;
   std::shared_ptr<AnytimeWaitable> anytime_check_finish_waitable_;
 
   std::atomic<bool> is_running_{false};

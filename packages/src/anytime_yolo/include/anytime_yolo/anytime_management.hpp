@@ -42,10 +42,14 @@ public:
     if constexpr (isReactiveProactive) {
       anytime_iteration_waitable_ =
         std::make_shared<AnytimeWaitable>([this]() { this->proactive_function(); });
+      anytime_result_waitable_ =
+        std::make_shared<AnytimeWaitable>([this]() { this->proactive_result_function(); });
       anytime_check_finish_waitable_ =
         std::make_shared<AnytimeWaitable>([this]() { this->check_cancel_and_finish_proactive(); });
       node_->get_node_waitables_interface()->add_waitable(
         anytime_iteration_waitable_, compute_callback_group_);
+      node_->get_node_waitables_interface()->add_waitable(
+        anytime_result_waitable_, compute_callback_group_);
       node_->get_node_waitables_interface()->add_waitable(
         anytime_check_finish_waitable_,
         node_->get_node_base_interface()->get_default_callback_group());
@@ -54,11 +58,15 @@ public:
     else {
       anytime_iteration_waitable_ =
         std::make_shared<AnytimeWaitable>([this]() { this->reactive_function(); });
+      anytime_result_waitable_ =
+        std::make_shared<AnytimeWaitable>([this]() { this->reactive_result_function(); });
       anytime_check_finish_waitable_ =
         std::make_shared<AnytimeWaitable>([this]() { this->check_cancel_and_finish_reactive(); });
 
       node_->get_node_waitables_interface()->add_waitable(
         anytime_iteration_waitable_, compute_callback_group_);
+      node_->get_node_waitables_interface()->add_waitable(
+        anytime_result_waitable_, compute_callback_group_);
       node_->get_node_waitables_interface()->add_waitable(
         anytime_check_finish_waitable_,
         node_->get_node_base_interface()->get_default_callback_group());
@@ -67,14 +75,20 @@ public:
 
   // ----------------- Reactive Functions -----------------
 
-  void reactive_function()
+  void reactive_function() override
   {
     RCLCPP_INFO(node_->get_logger(), "Reactive function called");
     compute();
     if constexpr (!isSyncAsync) {
-      send_feedback();
-      notify_check_finish();
+      notify_result();
     }
+  }
+
+  void reactive_result_function() override
+  {
+    RCLCPP_INFO(node_->get_logger(), "Reactive result function called");
+    send_feedback();
+    notify_check_finish();
   }
 
   void check_cancel_and_finish_reactive() override
@@ -107,15 +121,20 @@ public:
   // ----------------- Proactive Functions -----------------
 
   // proactive function to approximate Pi
-  void proactive_function()
+  void proactive_function() override
   {
     RCLCPP_INFO(node_->get_logger(), "Proactive function called");
     compute();
     if constexpr (!isSyncAsync) {
-      send_feedback();
-      calculate_result();
-      notify_check_finish();
+      notify_result();
     }
+  }
+
+  void proactive_result_function() override
+  {
+    send_feedback();
+    calculate_result();
+    notify_check_finish();
   }
 
   void check_cancel_and_finish_proactive() override
@@ -162,8 +181,9 @@ public:
 
     if (this_ptr->processed_layers_ % this_ptr->batch_size_ == 0) {
       RCLCPP_INFO(this_ptr->node_->get_logger(), "Calculating result from callback function");
-      this_ptr->send_feedback();
-      this_ptr->notify_check_finish();
+      if constexpr (isSyncAsync) {
+        this_ptr->notify_result();
+      }
     }
   }
 
