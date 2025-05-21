@@ -334,6 +334,7 @@ public:
     new_result->action_server_receive = this->server_goal_receive_time_;
     new_result->action_server_accept = this->server_goal_accept_time_;
     new_result->action_server_start = this->server_goal_start_time_;
+    new_result->action_server_cancel = this->result_->action_server_cancel;
 
     this->result_ = new_result;
   }
