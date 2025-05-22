@@ -183,5 +183,5 @@ if [[ "$mode" == "plot" || "$mode" == "both" ]]; then
     done
     
     echo "Running plotter with all configurations..."
-    python3 evaluation_plotter_yolo.py --threading $threading_args --reactive $reactive_args --sync-async $sync_args --batch-sizes $batch_args --runs $num_runs --results-dir results/yolo_score --output-dir plots/yolo_score
+    python3 evaluation_plotter_yolo_score.py --threading $threading_args --reactive $reactive_args --sync-async $sync_args --batch-sizes $batch_args --runs $num_runs --results-dir results/yolo_score --output-dir plots/yolo_score
 fi
