@@ -77,7 +77,7 @@ public:
 
   void reactive_function() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Reactive function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Reactive function called");
     compute();
     if constexpr (!isSyncAsync) {
       notify_result();
@@ -86,7 +86,7 @@ public:
 
   void reactive_result_function() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Reactive result function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Reactive result function called");
     bool should_finish = yolo_state_->isCompleted();
     bool should_cancel = this->goal_handle_->is_canceling();
 
@@ -100,7 +100,7 @@ public:
 
   void check_cancel_and_finish_reactive() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Check cancel and finish reactive function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Check cancel and finish reactive function called");
     bool should_finish = yolo_state_->isCompleted();
     bool should_cancel = this->goal_handle_->is_canceling();
 
@@ -114,11 +114,11 @@ public:
       }
 
       this->deactivate();
-      RCLCPP_INFO(
+      RCLCPP_DEBUG(
         node_->get_logger(), "Reactive function finished, should finish: %d, should cancel: %d",
         should_finish, should_cancel);
     } else if (!this->is_running()) {
-      RCLCPP_INFO(node_->get_logger(), "Reactive function finished previously");
+      RCLCPP_DEBUG(node_->get_logger(), "Reactive function finished previously");
     }
   }
 
@@ -127,7 +127,7 @@ public:
   // proactive function to approximate Pi
   void proactive_function() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Proactive function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Proactive function called");
     compute();
     if constexpr (!isSyncAsync) {
       notify_result();
@@ -142,7 +142,7 @@ public:
 
   void check_cancel_and_finish_proactive() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Check cancel and finish proactive function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Check cancel and finish proactive function called");
     bool should_finish = yolo_state_->isCompleted();
     bool should_cancel = this->goal_handle_->is_canceling();
 
@@ -155,11 +155,11 @@ public:
         this->goal_handle_->succeed(this->result_);
       }
       this->deactivate();
-      RCLCPP_INFO(
+      RCLCPP_DEBUG(
         node_->get_logger(), "Proactive function finished, should finish: %d, should cancel: %d",
         should_finish, should_cancel);
     } else if (!this->is_running()) {
-      RCLCPP_INFO(node_->get_logger(), "Proactive function finished previously");
+      RCLCPP_DEBUG(node_->get_logger(), "Proactive function finished previously");
     } else {
       notify_iteration();
     }
@@ -169,7 +169,7 @@ public:
 
   static void CUDART_CB forward_finished_callback(void * userData)
   {
-    RCLCPP_INFO(
+    RCLCPP_DEBUG(
       static_cast<AnytimeManagement *>(userData)->node_->get_logger(), "Forward finished");
 
     auto this_ptr = static_cast<AnytimeManagement *>(userData);
@@ -178,7 +178,7 @@ public:
       if (
         this_ptr->goal_handle_->is_canceling() || !this_ptr->goal_handle_->is_executing() ||
         !this_ptr->is_running()) {
-        RCLCPP_INFO(
+        RCLCPP_DEBUG(
           this_ptr->node_->get_logger(), "Goal handle is canceling, stopping computation");
         return;
       }
@@ -187,7 +187,7 @@ public:
     if constexpr (isSyncAsync) {
       // Increment processed layers counter for async mode
       this_ptr->processed_layers_++;
-      RCLCPP_INFO(
+      RCLCPP_DEBUG(
         this_ptr->node_->get_logger(), "Processed layers: %d", this_ptr->processed_layers_);
       this_ptr->send_feedback();
     } else if constexpr (!isSyncAsync) {
@@ -195,7 +195,7 @@ public:
     }
 
     if (this_ptr->processed_layers_ % this_ptr->batch_size_ == 0) {
-      RCLCPP_INFO(this_ptr->node_->get_logger(), "Calculating result from callback function");
+      RCLCPP_DEBUG(this_ptr->node_->get_logger(), "Calculating result from callback function");
       if constexpr (isSyncAsync) {
         this_ptr->notify_result();
       }
@@ -206,13 +206,13 @@ public:
 
   void start() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Start function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Start function called");
     notify_iteration();
   }
 
   void compute() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Compute function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Compute function called");
 
     // Start timing
     auto start_time = this->node_->now();
@@ -224,11 +224,11 @@ public:
       if (
         this->goal_handle_->is_canceling() || !this->goal_handle_->is_executing() ||
         !this->is_running()) {
-        RCLCPP_INFO(node_->get_logger(), "Goal handle is canceling, stopping computation");
+        RCLCPP_DEBUG(node_->get_logger(), "Goal handle is canceling, stopping computation");
         return;
       }
 
-      RCLCPP_INFO(node_->get_logger(), "Computing batch part %d", i);
+      RCLCPP_DEBUG(node_->get_logger(), "Computing batch part %d", i);
 
       void (*callback)(void *);
       if constexpr (!isSyncAsync) {
@@ -236,29 +236,29 @@ public:
       } else if constexpr (isSyncAsync) {
         callback = forward_finished_callback;
       }
-      RCLCPP_INFO(node_->get_logger(), "Callback function is null: %d", callback == nullptr);
-      RCLCPP_INFO(node_->get_logger(), "Calling inferStep");
+      RCLCPP_DEBUG(node_->get_logger(), "Callback function is null: %d", callback == nullptr);
+      RCLCPP_DEBUG(node_->get_logger(), "Calling inferStep");
 
       yolo_.inferStep(*yolo_state_, is_sync_async, callback, this);
 
-      RCLCPP_INFO(node_->get_logger(), "Finished batch part %d", i);
+      RCLCPP_DEBUG(node_->get_logger(), "Finished batch part %d", i);
 
       if constexpr (!isSyncAsync) {
         // Increment processed layers counter for sync mode
         processed_layers_++;
-        RCLCPP_INFO(node_->get_logger(), "Processed layers: %d", processed_layers_);
+        RCLCPP_DEBUG(node_->get_logger(), "Processed layers: %d", processed_layers_);
         send_feedback();
       } else if constexpr (isSyncAsync) {
         // nothing to do for async mode
       }
     }
-    RCLCPP_INFO(node_->get_logger(), "Finished computing");
+    RCLCPP_DEBUG(node_->get_logger(), "Finished computing");
 
     // End timing
     auto end_time = this->node_->now();
     // Calculate computation time for this batch
     rclcpp::Duration computation_time = end_time - start_time;
-    RCLCPP_INFO(
+    RCLCPP_DEBUG(
       node_->get_logger(), "Batch computation time: %f ms", computation_time.nanoseconds() / 1e6);
 
     // Update the average computation time
@@ -271,22 +271,25 @@ public:
         (computation_time.nanoseconds() - average_computation_time_.nanoseconds()) / batch_count_));
     }
 
-    RCLCPP_INFO(
+    RCLCPP_DEBUG(
       node_->get_logger(), "Average computation time: %f ms",
       average_computation_time_.nanoseconds() / 1e6);
   }
 
   void send_feedback() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Send feedback function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Send feedback function called");
     auto feedback = std::make_shared<Anytime::Feedback>();
     // --- CUSTOM ---
     feedback->processed_layers = processed_layers_;
+    for (const auto & detection : this->result_->detections) {
+      feedback->detections.push_back(detection);
+    }
     // --- CUSTOM ---
-    RCLCPP_INFO(node_->get_logger(), "Sending feedback, processed layers: %d", processed_layers_);
+    RCLCPP_DEBUG(node_->get_logger(), "Sending feedback, processed layers: %d", processed_layers_);
     if (this->goal_handle_) {
       this->goal_handle_->publish_feedback(feedback);
-      RCLCPP_INFO(node_->get_logger(), "Feedback sent, processed layers: %d", processed_layers_);
+      RCLCPP_DEBUG(node_->get_logger(), "Feedback sent, processed layers: %d", processed_layers_);
     } else {
       RCLCPP_WARN(node_->get_logger(), "Goal handle is null, cannot send feedback");
     }
@@ -294,17 +297,17 @@ public:
 
   void calculate_result() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Calculate result function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Calculate result function called");
     auto new_result = std::make_shared<Anytime::Result>();
 
-    RCLCPP_INFO(node_->get_logger(), "Calculating result");
+    RCLCPP_DEBUG(node_->get_logger(), "Calculating result");
     result_processed_layers_ = processed_layers_;
     std::vector<float> yolo_result;
     if constexpr (isReactiveProactive) {
-      RCLCPP_INFO(node_->get_logger(), "Calculating latest exit");
+      RCLCPP_DEBUG(node_->get_logger(), "Calculating latest exit");
       yolo_result = yolo_.calculateLatestExit(*yolo_state_);
     } else if constexpr (!isReactiveProactive) {
-      RCLCPP_INFO(node_->get_logger(), "Finishing early");
+      RCLCPP_DEBUG(node_->get_logger(), "Finishing early");
       yolo_result = yolo_.finishEarly(*yolo_state_);
     }
 
@@ -370,19 +373,19 @@ public:
   void notify_cancel() override
   {
     this->server_goal_cancel_time_ = this->node_->now();
-    RCLCPP_INFO(node_->get_logger(), "Notify cancel function");
+    RCLCPP_DEBUG(node_->get_logger(), "Notify cancel function");
     if constexpr (isReactiveProactive) {
       this->notify_check_finish();
     } else if constexpr (!isReactiveProactive) {
       this->notify_result();
     }
-    RCLCPP_INFO(node_->get_logger(), "Notify cancel function finished");
+    RCLCPP_DEBUG(node_->get_logger(), "Notify cancel function finished");
   }
 
   // Reset function
   void reset() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Reset function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Reset function called");
     this->result_ = std::make_shared<Anytime::Result>();
 
     // Process image data from the goal handle

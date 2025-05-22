@@ -8,7 +8,7 @@
 AnytimeActionServer::AnytimeActionServer(rclcpp::NodeOptions options)
 : Node("anytime_action_server", options)
 {
-  RCLCPP_INFO(this->get_logger(), "Starting Anytime action server");
+  RCLCPP_DEBUG(this->get_logger(), "Starting Anytime action server");
 
   // Create the action server
   action_server_ = rclcpp_action::create_server<Anytime>(
@@ -35,10 +35,10 @@ AnytimeActionServer::AnytimeActionServer(rclcpp::NodeOptions options)
   // Convert strings to booleans
   bool is_reactive_proactive = (reactive_proactive_str == "proactive");
 
-  RCLCPP_INFO(
+  RCLCPP_DEBUG(
     this->get_logger(), "is_reactive_proactive: %s",
     is_reactive_proactive ? "proactive" : "reactive");
-  RCLCPP_INFO(this->get_logger(), "batch_size: %d", batch_size);
+  RCLCPP_DEBUG(this->get_logger(), "batch_size: %d", batch_size);
 
   // Create the Anytime management object based on the parameters
   anytime_management_ = create_anytime_management(this, is_reactive_proactive, batch_size);
@@ -64,13 +64,13 @@ rclcpp_action::GoalResponse AnytimeActionServer::handle_goal(
   const rclcpp_action::GoalUUID & uuid, const std::shared_ptr<const Anytime::Goal> goal)
 {
   anytime_management_->set_goal_handle_receive_time(this->now());
-  RCLCPP_INFO(this->get_logger(), "Received goal request with number %d", goal->goal);
+  RCLCPP_DEBUG(this->get_logger(), "Received goal request with number %d", goal->goal);
   (void)uuid;  // Suppress unused variable warning
   if (anytime_management_->is_running()) {
     RCLCPP_ERROR(this->get_logger(), "Goal rejected: server is active");
     return rclcpp_action::GoalResponse::REJECT;
   }
-  RCLCPP_INFO(this->get_logger(), "Goal accepted: server is inactive");
+  RCLCPP_DEBUG(this->get_logger(), "Goal accepted: server is inactive");
   // set the anytime management goal handle accept time
   anytime_management_->set_goal_handle_accept_time(this->now());
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
@@ -80,7 +80,7 @@ rclcpp_action::GoalResponse AnytimeActionServer::handle_goal(
 rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
   const std::shared_ptr<AnytimeGoalHandle> goal_handle)
 {
-  RCLCPP_INFO(this->get_logger(), "Received cancel request");
+  RCLCPP_DEBUG(this->get_logger(), "Received cancel request");
   (void)goal_handle;  // Suppress unused variable warning
 
   // Cancel the Anytime management
@@ -92,15 +92,15 @@ rclcpp_action::CancelResponse AnytimeActionServer::handle_cancel(
 void AnytimeActionServer::handle_accepted(const std::shared_ptr<AnytimeGoalHandle> goal_handle)
 {
   anytime_management_->set_goal_processing_start_time(this->now());
-  RCLCPP_INFO(this->get_logger(), "Setting goal handle for AnytimeManagement");
+  RCLCPP_DEBUG(this->get_logger(), "Setting goal handle for AnytimeManagement");
   anytime_management_->set_goal_handle(goal_handle);
 
-  RCLCPP_INFO(this->get_logger(), "Resetting AnytimeManagement");
+  RCLCPP_DEBUG(this->get_logger(), "Resetting AnytimeManagement");
   anytime_management_->reset();
 
-  RCLCPP_INFO(this->get_logger(), "Activating AnytimeManagement");
+  RCLCPP_DEBUG(this->get_logger(), "Activating AnytimeManagement");
   anytime_management_->activate();
 
-  RCLCPP_INFO(this->get_logger(), "Start AnytimeManagement");
+  RCLCPP_DEBUG(this->get_logger(), "Start AnytimeManagement");
   anytime_management_->start();
 }

@@ -64,7 +64,7 @@ public:
 
   void reactive_function() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Reactive function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Reactive function called");
     compute();
     send_feedback();
     notify_result();
@@ -72,7 +72,7 @@ public:
 
   void reactive_result_function() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Reactive result function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Reactive result function called");
     bool should_finish = loop_count_ >= this->goal_handle_->get_goal()->goal;
     bool should_cancel = this->goal_handle_->is_canceling();
 
@@ -86,7 +86,7 @@ public:
 
   void check_cancel_and_finish_reactive() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Check cancel and finish reactive function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Check cancel and finish reactive function called");
     bool should_finish = loop_count_ >= this->goal_handle_->get_goal()->goal;
     bool should_cancel = this->goal_handle_->is_canceling();
 
@@ -104,7 +104,7 @@ public:
         node_->get_logger(), "Reactive function finished, should finish: %d, should cancel: %d",
         should_finish, should_cancel);
     } else if (!this->is_running()) {
-      RCLCPP_INFO(node_->get_logger(), "Reactive function finished previously");
+      RCLCPP_DEBUG(node_->get_logger(), "Reactive function finished previously");
     }
   }
 
@@ -113,7 +113,7 @@ public:
   // proactive function to approximate Pi
   void proactive_function() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Proactive function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Proactive function called");
     compute();
     notify_result();
   }
@@ -127,7 +127,7 @@ public:
 
   void check_cancel_and_finish_proactive() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Check cancel and finish proactive function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Check cancel and finish proactive function called");
     bool should_finish = loop_count_ >= this->goal_handle_->get_goal()->goal;
     bool should_cancel = this->goal_handle_->is_canceling();
 
@@ -154,13 +154,13 @@ public:
 
   void start() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Start function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Start function called");
     notify_iteration();
   }
 
   void compute() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Compute function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Compute function called");
     // Start timing
     auto start_time = this->node_->now();
 
@@ -193,7 +193,7 @@ public:
 
   void send_feedback() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Send feedback function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Send feedback function called");
     auto feedback = std::make_shared<Anytime::Feedback>();
     // --- CUSTOM ---
     feedback->feedback = count_total_;
@@ -205,7 +205,7 @@ public:
 
   void calculate_result() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Calculate result function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Calculate result function called");
     auto new_result = std::make_shared<Anytime::Result>();
 
     // Calculate the result
@@ -228,19 +228,19 @@ public:
   void notify_cancel() override
   {
     server_goal_cancel_time_ = this->node_->now();
-    RCLCPP_INFO(node_->get_logger(), "Notify cancel function");
+    RCLCPP_DEBUG(node_->get_logger(), "Notify cancel function");
     if constexpr (isReactiveProactive) {
       this->notify_check_finish();
     } else if constexpr (!isReactiveProactive) {
       this->notify_result();
     }
-    RCLCPP_INFO(node_->get_logger(), "Notify cancel function finished");
+    RCLCPP_DEBUG(node_->get_logger(), "Notify cancel function finished");
   }
 
   // Reset function
   void reset() override
   {
-    RCLCPP_INFO(node_->get_logger(), "Reset function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Reset function called");
     this->result_ = std::make_shared<Anytime::Result>();
 
     // Reset the count variables

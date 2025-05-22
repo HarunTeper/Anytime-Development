@@ -16,3 +16,4 @@ builtin_interfaces/Time action_server_cancel
 builtin_interfaces/Time action_server_send_result
 ---
 int32 processed_layers
+vision_msgs/Detection2D[] detections  # Array of detections with bounding boxes
