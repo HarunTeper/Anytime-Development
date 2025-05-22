@@ -11,6 +11,11 @@ def include_launch_description(context: LaunchContext):
     result_filename = LaunchConfiguration('result_filename')
     image_topic = LaunchConfiguration('image_topic')
     cancel_after_layers = LaunchConfiguration('cancel_after_layers')
+    debug = LaunchConfiguration('debug')
+
+    # Set logger level based on debug argument
+    logger = "debug" if context.launch_configurations.get(
+        "debug", "false").lower() == "true" else "info"
 
     anytime_cmd = Node(
         package='anytime_yolo',
@@ -21,6 +26,7 @@ def include_launch_description(context: LaunchContext):
             'image_topic': image_topic,
             'cancel_after_layers': cancel_after_layers
         }],
+        arguments=['--ros-args', '--log-level', logger],
         # output='screen',
     )
 
@@ -51,12 +57,17 @@ def generate_launch_description():
         description='Number of processed layers before triggering cancellation'
     )
 
+    debug_arg = DeclareLaunchArgument(
+        'debug', default_value='false', description='Enable debug logging'
+    )
+
     # Launch Description
     launch_description = LaunchDescription()
 
     launch_description.add_action(result_filename_arg)
     launch_description.add_action(image_topic_arg)
     launch_description.add_action(cancel_after_layers_arg)
+    launch_description.add_action(debug_arg)
 
     launch_description.add_action(OpaqueFunction(
         function=include_launch_description))

@@ -13,6 +13,7 @@ def include_launch_description(context: LaunchContext):
     batch_size = LaunchConfiguration("batch_size")
     is_passive_cooperative = LaunchConfiguration("is_passive_cooperative")
     is_sync_async = LaunchConfiguration("is_sync_async")
+    debug = LaunchConfiguration("debug")
 
     # Determine the threading mode from launch context
     if context.launch_configurations["multi_threading"].lower() == "false":
@@ -21,6 +22,10 @@ def include_launch_description(context: LaunchContext):
         is_single_multi = "multi"
     else:
         raise ValueError("Invalid threading type")
+
+    # Set logger level based on debug argument
+    logger = "debug" if context.launch_configurations.get(
+        "debug", "false").lower() == "true" else "info"
 
     anytime_cmd = Node(
         package="anytime_yolo",
@@ -34,7 +39,8 @@ def include_launch_description(context: LaunchContext):
             "is_passive_cooperative": is_passive_cooperative,
             "is_sync_async": is_sync_async
         }],
-        arguments=["--is_single_multi", is_single_multi],
+        arguments=["--is_single_multi", is_single_multi,
+                   "--ros-args", "--log-level", logger],
         # output='screen',
     )
 
@@ -83,6 +89,10 @@ def generate_launch_description():
         description="Synchronous or asynchronous mode"
     )
 
+    debug_arg = DeclareLaunchArgument(
+        "debug", default_value="false", description="Enable debug logging"
+    )
+
     # Launch Description
     launch_description = LaunchDescription()
 
@@ -92,6 +102,7 @@ def generate_launch_description():
     launch_description.add_action(weights_path_arg)
     launch_description.add_action(passive_cooperative_arg)
     launch_description.add_action(sync_async_arg)
+    launch_description.add_action(debug_arg)
 
     launch_description.add_action(OpaqueFunction(
         function=include_launch_description))

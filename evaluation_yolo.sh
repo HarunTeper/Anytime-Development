@@ -3,6 +3,7 @@
 # Default operation mode: both running and plotting
 mode="both"
 num_runs=3  # Default number of runs
+debug_flag="false"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -21,12 +22,17 @@ while [[ $# -gt 0 ]]; do
             shift
             shift
             ;;
+        --debug)
+            debug_flag="true"
+            shift
+            ;;
         --help)
             echo "Usage: $0 [OPTIONS]"
             echo "Options:"
             echo "  --run-only    Only run experiments without plotting"
             echo "  --plot-only   Only plot results without running experiments"
             echo "  --runs N      Number of runs for each configuration (default: 3)"
+            echo "  --debug       Enable debug logging in ROS2 nodes"
             echo "  --help        Display this help message"
             echo "Default behavior: Run experiments and plot results"
             exit 0
@@ -41,10 +47,10 @@ done
 
 source packages/install/setup.bash
 
-declare -a is_single_multi=("False" "True")
-declare -a is_reactive_proactive=("False" "True")
-declare -a is_sync_async=("False" "True")
-declare -a batch_sizes=(1 5 25)
+declare -a is_single_multi=("False")
+declare -a is_reactive_proactive=("True")
+declare -a is_sync_async=("False")
+declare -a batch_sizes=(1)
 
 # Create the results and plots directories
 mkdir -p results/yolo
@@ -86,12 +92,12 @@ if [[ "$mode" == "run" || "$mode" == "both" ]]; then
                         echo "Running configuration: $config_name (Run $run of $num_runs)"
 
                         # Start the action server in the background
-                        ros2 launch anytime_yolo action_server.launch.py multi_threading:=$threading is_reactive_proactive:=$reactive_param batch_size:=$batch_size is_sync_async:=$sync_param > ./results/yolo/${config_name}_server.log & server_pid=$!
+                        ros2 launch anytime_yolo action_server.launch.py multi_threading:=$threading is_reactive_proactive:=$reactive_param batch_size:=$batch_size is_sync_async:=$sync_param debug:=$debug_flag > ./results/yolo/${config_name}_server.log & server_pid=$!
 
                         sleep 5
 
                         # Start the action client in the background and pass result filename
-                        ros2 launch anytime_yolo action_client.launch.py threading_type:=single result_filename:="${result_filename}" > "./results/yolo/${config_name}_client.log" & client_pid=$!
+                        ros2 launch anytime_yolo action_client.launch.py threading_type:=single result_filename:="${result_filename}" debug:=$debug_flag > "./results/yolo/${config_name}_client.log" & client_pid=$!
 
                         # Start the detection visualizer in the background
                         ros2 launch video_publisher detection_visualizer.launch.py > ./results/yolo/${config_name}_visualizer.log & visualizer_pid=$!
