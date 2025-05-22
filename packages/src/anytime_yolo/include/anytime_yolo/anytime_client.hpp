@@ -60,6 +60,9 @@ private:
   // Number of layers to process before canceling
   int cancel_after_layers_;
 
+  // Boolean flag for cancel_layer_score
+  bool cancel_layer_score_ = false;
+
   // Function to send a goal to the action server
   void send_goal(const Anytime::Goal & goal_msg);
 

@@ -5,6 +5,10 @@ mode="both"
 num_runs=3  # Default number of runs
 debug_flag="false"
 
+# Add cancel_layer_score flag
+cancel_layer_score_flag="true"
+declare -a is_reactive_proactive=("True")
+
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     key="$1"
@@ -48,7 +52,6 @@ done
 source packages/install/setup.bash
 
 declare -a is_single_multi=("False" "True")
-declare -a is_reactive_proactive=("False" "True")
 declare -a is_sync_async=("False" "True")
 declare -a batch_sizes=(1 5 10)
 
@@ -96,8 +99,8 @@ if [[ "$mode" == "run" || "$mode" == "both" ]]; then
 
                         sleep 5
 
-                        # Start the action client in the background and pass result filename
-                        ros2 launch anytime_yolo action_client.launch.py threading_type:=single result_filename:="${result_filename}" debug:=$debug_flag > "./results/yolo/${config_name}_client.log" & client_pid=$!
+                        # Start the action client in the background and pass result filename and cancel_layer_score
+                        ros2 launch anytime_yolo action_client.launch.py threading_type:=single result_filename:="${result_filename}" debug:=$debug_flag cancel_layer_score:=$cancel_layer_score_flag > "./results/yolo/${config_name}_client.log" & client_pid=$!
 
                         # Start the detection visualizer in the background
                         ros2 launch video_publisher detection_visualizer.launch.py > ./results/yolo/${config_name}_visualizer.log & visualizer_pid=$!

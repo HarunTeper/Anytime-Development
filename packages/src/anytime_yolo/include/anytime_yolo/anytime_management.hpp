@@ -283,6 +283,9 @@ public:
     // --- CUSTOM ---
     feedback->processed_layers = processed_layers_;
     for (const auto & detection : this->result_->detections) {
+      RCLCPP_DEBUG(
+        node_->get_logger(), "Adding detection to feedback, class ID: %s, score: %f",
+        detection.results[0].hypothesis.class_id.c_str(), detection.results[0].hypothesis.score);
       feedback->detections.push_back(detection);
     }
     // --- CUSTOM ---

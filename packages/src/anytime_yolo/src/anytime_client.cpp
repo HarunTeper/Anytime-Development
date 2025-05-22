@@ -20,10 +20,12 @@ AnytimeActionClient::AnytimeActionClient(const rclcpp::NodeOptions & options)
   this->declare_parameter("result_filename", "anytime_results");
   this->declare_parameter("image_topic", "video_frames");
   this->declare_parameter("cancel_after_layers", 10);
+  this->declare_parameter("cancel_layer_score", false);
 
   result_filename_ = this->get_parameter("result_filename").as_string();
   std::string image_topic = this->get_parameter("image_topic").as_string();
   cancel_after_layers_ = this->get_parameter("cancel_after_layers").as_int();
+  cancel_layer_score_ = this->get_parameter("cancel_layer_score").as_bool();
 
   RCLCPP_DEBUG(this->get_logger(), "Result filename: %s", result_filename_.c_str());
   RCLCPP_DEBUG(this->get_logger(), "Image topic: %s", image_topic.c_str());
@@ -132,6 +134,9 @@ void AnytimeActionClient::feedback_callback(
 
   // Print information about detections with highest score
   if (!feedback->detections.empty()) {
+    // print the number of detections
+    RCLCPP_DEBUG(this->get_logger(), "Number of detections: %zu", feedback->detections.size());
+
     // Find detection with the highest score
     const auto & detections = feedback->detections;
 
@@ -149,7 +154,7 @@ void AnytimeActionClient::feedback_callback(
         [](const auto & a, const auto & b) { return a.hypothesis.score < b.hypothesis.score; });
 
       // Print the highest score and its class ID
-      RCLCPP_INFO(
+      RCLCPP_DEBUG(
         this->get_logger(), "Detection %zu: Class ID = %s, Score = %.3f", i,
         highest_score_result->hypothesis.class_id.c_str(), highest_score_result->hypothesis.score);
     }
@@ -157,10 +162,38 @@ void AnytimeActionClient::feedback_callback(
     RCLCPP_DEBUG(this->get_logger(), "No detections in feedback");
   }
 
-  // if (feedback->processed_layers >= cancel_after_layers_ && !is_cancelling_) {
-  //   RCLCPP_DEBUG(this->get_logger(), "Notifying cancel waitable");
-  //   cancel_waitable_->notify();
-  // }
+  if (cancel_layer_score_) {
+    // Cancel if high score for id 9 is detected
+    if (!feedback->detections.empty()) {
+      const auto & detections = feedback->detections;
+      for (size_t i = 0; i < detections.size(); ++i) {
+        const auto & detection = detections[i];
+        if (detection.results.empty()) {
+          continue;
+        }
+        auto highest_score_result = std::max_element(
+          detection.results.begin(), detection.results.end(),
+          [](const auto & a, const auto & b) { return a.hypothesis.score < b.hypothesis.score; });
+        if (
+          highest_score_result->hypothesis.score >= 0.8 &&
+          highest_score_result->hypothesis.class_id == "9") {
+          RCLCPP_INFO(
+            this->get_logger(), "Canceling goal due to high score for id 9 after %d layers",
+            feedback->processed_layers);
+          cancel_waitable_->notify();
+          return;
+        }
+      }
+    }
+  } else {
+    // Cancel after cancel_after_layers
+    if (feedback->processed_layers >= cancel_after_layers_ && !is_cancelling_) {
+      RCLCPP_INFO(
+        this->get_logger(), "Notifying cancel waitable after %d layers",
+        feedback->processed_layers);
+      cancel_waitable_->notify();
+    }
+  }
 }
 
 void AnytimeActionClient::cancel_callback()

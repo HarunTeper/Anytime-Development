@@ -12,6 +12,7 @@ def include_launch_description(context: LaunchContext):
     image_topic = LaunchConfiguration('image_topic')
     cancel_after_layers = LaunchConfiguration('cancel_after_layers')
     debug = LaunchConfiguration('debug')
+    cancel_layer_score = LaunchConfiguration('cancel_layer_score')
 
     # Set logger level based on debug argument
     logger = "debug" if context.launch_configurations.get(
@@ -24,7 +25,8 @@ def include_launch_description(context: LaunchContext):
         parameters=[{
             'result_filename': result_filename,
             'image_topic': image_topic,
-            'cancel_after_layers': cancel_after_layers
+            'cancel_after_layers': cancel_after_layers,
+            'cancel_layer_score': cancel_layer_score
         }],
         arguments=['--ros-args', '--log-level', logger],
         # output='screen',
@@ -61,6 +63,12 @@ def generate_launch_description():
         'debug', default_value='false', description='Enable debug logging'
     )
 
+    cancel_layer_score_arg = DeclareLaunchArgument(
+        'cancel_layer_score',
+        default_value='false',
+        description='Enable cancellation based on high score for id 9 in feedback'
+    )
+
     # Launch Description
     launch_description = LaunchDescription()
 
@@ -68,6 +76,7 @@ def generate_launch_description():
     launch_description.add_action(image_topic_arg)
     launch_description.add_action(cancel_after_layers_arg)
     launch_description.add_action(debug_arg)
+    launch_description.add_action(cancel_layer_score_arg)
 
     launch_description.add_action(OpaqueFunction(
         function=include_launch_description))
