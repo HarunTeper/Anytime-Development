@@ -56,8 +56,8 @@ declare -a is_sync_async=("False" "True")
 declare -a batch_sizes=(1 5 10)
 
 # Create the results and plots directories
-mkdir -p results/yolo
-mkdir -p plots/yolo
+mkdir -p results/yolo_score
+mkdir -p plots/yolo_score
 
 # Run experiments if mode is "run" or "both"
 if [[ "$mode" == "run" || "$mode" == "both" ]]; then
@@ -95,20 +95,20 @@ if [[ "$mode" == "run" || "$mode" == "both" ]]; then
                         echo "Running configuration: $config_name (Run $run of $num_runs)"
 
                         # Start the action server in the background
-                        ros2 launch anytime_yolo action_server.launch.py multi_threading:=$threading is_reactive_proactive:=$reactive_param batch_size:=$batch_size is_sync_async:=$sync_param debug:=$debug_flag > ./results/yolo/${config_name}_server.log & server_pid=$!
+                        ros2 launch anytime_yolo action_server.launch.py multi_threading:=$threading is_reactive_proactive:=$reactive_param batch_size:=$batch_size is_sync_async:=$sync_param debug:=$debug_flag > ./results/yolo_score/${config_name}_server.log & server_pid=$!
 
                         sleep 5
 
                         # Start the action client in the background and pass result filename and cancel_layer_score
-                        ros2 launch anytime_yolo action_client.launch.py threading_type:=single result_filename:="${result_filename}" debug:=$debug_flag cancel_layer_score:=$cancel_layer_score_flag > "./results/yolo/${config_name}_client.log" & client_pid=$!
+                        ros2 launch anytime_yolo action_client.launch.py threading_type:=single result_filename:="${result_filename}" debug:=$debug_flag cancel_layer_score:=$cancel_layer_score_flag > "./results/yolo_score/${config_name}_client.log" & client_pid=$!
 
                         # Start the detection visualizer in the background
-                        ros2 launch video_publisher detection_visualizer.launch.py > ./results/yolo/${config_name}_visualizer.log & visualizer_pid=$!
+                        ros2 launch video_publisher detection_visualizer.launch.py > ./results/yolo_score/${config_name}_visualizer.log & visualizer_pid=$!
                         
                         sleep 5
 
                         # Run the video publisher (blocking, foreground)
-                        ros2 launch video_publisher video_publisher.launch.py > ./results/yolo/${config_name}_publisher.log
+                        ros2 launch video_publisher video_publisher.launch.py > ./results/yolo_score/${config_name}_publisher.log
 
                         # Wait for video_publisher process to finish if still running
                         while ps -p $(pgrep -f "video_publisher.launch.py") > /dev/null 2>&1; do
@@ -183,5 +183,5 @@ if [[ "$mode" == "plot" || "$mode" == "both" ]]; then
     done
     
     echo "Running plotter with all configurations..."
-    python3 evaluation_plotter_yolo.py --threading $threading_args --reactive $reactive_args --sync-async $sync_args --batch-sizes $batch_args --runs $num_runs --results-dir results/yolo --output-dir plots/yolo
+    python3 evaluation_plotter_yolo.py --threading $threading_args --reactive $reactive_args --sync-async $sync_args --batch-sizes $batch_args --runs $num_runs --results-dir results/yolo_score --output-dir plots/yolo_score
 fi
