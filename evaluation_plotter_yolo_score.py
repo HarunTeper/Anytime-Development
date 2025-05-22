@@ -429,12 +429,12 @@ def plot_batch_size_comparison(threading_types, reactive_types, sync_async_types
                 # Collect data for each batch size
                 for batch_size in batch_sizes:
                     # Match all runs for this configuration
-                    pattern = f"results/yolo/yolo_raw_timestamps_batch_{batch_size}_{reactive}_{threading}_{sync_async}_run*.csv"
+                    pattern = f"results/yolo_score/yolo_raw_timestamps_batch_{batch_size}_{reactive}_{threading}_{sync_async}_run*.csv"
                     matching_files = glob.glob(pattern)
 
                     if not matching_files:
                         # Try the old timing data pattern as fallback
-                        pattern = f"results/yolo/anytime_timing_data_batch_{batch_size}_{reactive}_{threading}_{sync_async}_run*.csv"
+                        pattern = f"results/yolo_score/anytime_timing_data_batch_{batch_size}_{reactive}_{threading}_{sync_async}_run*.csv"
                         matching_files = glob.glob(pattern)
 
                     if not matching_files:
@@ -1001,9 +1001,9 @@ def main():
                         help='Batch sizes', required=True)
     parser.add_argument('--runs', type=int, default=1,
                         help='Number of runs per configuration')
-    parser.add_argument('--results-dir', type=str, default='results/yolo',
+    parser.add_argument('--results-dir', type=str, default='results/yolo_score',
                         help='Directory containing result files')
-    parser.add_argument('--output-dir', type=str, default='plots/yolo',
+    parser.add_argument('--output-dir', type=str, default='plots/yolo_score',
                         help='Directory to save output plots')
     parser.add_argument('--cut-samples', type=int, default=1,
                         help='Number of samples to cut from the beginning of each run (default: 0)')
