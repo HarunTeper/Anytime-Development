@@ -26,9 +26,9 @@ public:
   virtual void notify_cancel() = 0;
   virtual void reset() = 0;
 
-  void activate() { is_running_.store(true, std::memory_order_relaxed); }
-  void deactivate() { is_running_.store(false, std::memory_order_relaxed); }
-  bool is_running() const { return is_running_.load(std::memory_order_relaxed); }
+  void activate() { is_running_.store(true, std::memory_order_seq_cst); }
+  void deactivate() { is_running_.store(false, std::memory_order_seq_cst); }
+  bool is_running() const { return is_running_.load(std::memory_order_seq_cst); }
 
   void set_goal_handle(std::shared_ptr<GoalHandleType> goal_handle) { goal_handle_ = goal_handle; }
 
