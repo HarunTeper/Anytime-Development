@@ -147,7 +147,12 @@ public:
     bool should_cancel = this->goal_handle_->is_canceling();
 
     if ((should_finish || should_cancel) && this->is_running()) {
-      this->result_->action_server_cancel = this->server_goal_cancel_time_;
+      if(should_cancel) {
+        this->result_->action_server_cancel = this->server_goal_cancel_time_;
+      }
+      else{
+        this->result_->action_server_cancel = this->node_->now();
+      }
       this->result_->action_server_send_result = this->node_->now();
       if (should_cancel) {
         this->goal_handle_->canceled(this->result_);
