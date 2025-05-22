@@ -227,6 +227,12 @@ void AnytimeActionClient::cancel_response_callback(
 
 void AnytimeActionClient::result_callback(const AnytimeGoalHandle::WrappedResult & result)
 {
+  if(!is_cancelling_){
+    // set cancel times
+    client_send_cancel_start_time_ = this->now();
+    client_send_cancel_end_time_ = this->now();
+  }
+
   client_result_time_ = this->now();
 
   // Log the result based on the result code
