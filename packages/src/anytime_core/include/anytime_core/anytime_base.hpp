@@ -27,44 +27,39 @@ public:
 
   // Optional: callback to be invoked after each iteration (for async GPU operations)
   // Return nullptr for synchronous operations (default behavior for Monte Carlo)
-  // Requirements for get_iteration_callback, sends feedback and calls notify_result
+  // Requirements for get_iteration_callback, sends feedback and calls notify_waitable
   // when batch is complete
   virtual void * get_iteration_callback() { return nullptr; }
 
-  // Common reactive/proactive implementations
-  virtual void reactive_function()
+  // Combined unified anytime function that handles compute, result, and finish checks
+  // This replaces the previous three-function pattern with a single state machine
+  virtual void reactive_anytime_function()
   {
-    RCLCPP_DEBUG(node_->get_logger(), "Reactive function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Reactive anytime function called");
+
+    if (!is_running()) {
+      RCLCPP_DEBUG(node_->get_logger(), "Not running, skipping execution");
+      return;
+    }
+
+    // Step 1: Compute iteration
     compute();
+
+    // Step 2: Send feedback (synchronous mode only)
     if (get_iteration_callback() == nullptr) {
-      // Synchronous mode: send feedback and notify result immediately
       send_feedback();
-      notify_result();
     }
-    // Async mode: callback will handle notification
-  }
+    // Async mode: callback will handle feedback
 
-  virtual void reactive_result_function()
-  {
-    RCLCPP_DEBUG(node_->get_logger(), "Reactive result function called");
+    // Step 3: Check if we should finish
     bool should_finish_now = should_finish();
     bool should_cancel = goal_handle_->is_canceling();
 
     if ((should_finish_now || should_cancel) && is_running()) {
+      // Calculate final result
       calculate_result();
-      notify_check_finish();
-    } else if (is_running()) {
-      notify_iteration();
-    }
-  }
 
-  virtual void check_cancel_and_finish_reactive()
-  {
-    RCLCPP_DEBUG(node_->get_logger(), "Check cancel and finish reactive function called");
-    bool should_finish_now = should_finish();
-    bool should_cancel = goal_handle_->is_canceling();
-
-    if ((should_finish_now || should_cancel) && is_running()) {
+      // Finish the goal
       if (should_cancel) {
         goal_handle_->canceled(result_);
       } else {
@@ -75,57 +70,54 @@ public:
       RCLCPP_DEBUG(
         node_->get_logger(), "Reactive function finished, should finish: %d, should cancel: %d",
         should_finish_now, should_cancel);
-    } else if (!is_running()) {
-      RCLCPP_DEBUG(node_->get_logger(), "Reactive function finished previously");
+    } else if (is_running()) {
+      // Continue with next iteration
+      notify_waitable();
     }
   }
 
-  virtual void proactive_function()
+  virtual void proactive_anytime_function()
   {
-    RCLCPP_DEBUG(node_->get_logger(), "Proactive function called");
+    RCLCPP_DEBUG(node_->get_logger(), "Proactive anytime function called");
+
+    if (!is_running()) {
+      RCLCPP_DEBUG(node_->get_logger(), "Not running, skipping execution");
+      return;
+    }
+
+    // Step 1: Compute iteration
     compute();
-    if (get_iteration_callback() == nullptr) {
-      // Synchronous mode: notify result immediately
-      notify_result();
-    }
-    // Async mode: callback will handle notification
-  }
 
-  virtual void proactive_result_function()
-  {
-    RCLCPP_DEBUG(node_->get_logger(), "Proactive result function called");
+    // Step 2: Calculate and send result/feedback
     calculate_result();
     send_feedback();
-    notify_check_finish();
-  }
 
-  virtual void check_cancel_and_finish_proactive()
-  {
-    RCLCPP_DEBUG(node_->get_logger(), "Check cancel and finish proactive function called");
+    // Step 3: Check if we should finish
     bool should_finish_now = should_finish();
     bool should_cancel = goal_handle_->is_canceling();
 
     if ((should_finish_now || should_cancel) && is_running()) {
+      // Finish the goal
       if (should_cancel) {
         goal_handle_->canceled(result_);
       } else {
         goal_handle_->succeed(result_);
       }
+
       deactivate();
       RCLCPP_DEBUG(
         node_->get_logger(), "Proactive function finished, should finish: %d, should cancel: %d",
         should_finish_now, should_cancel);
-    } else if (!is_running()) {
-      RCLCPP_DEBUG(node_->get_logger(), "Proactive function finished previously");
-    } else {
-      notify_iteration();
+    } else if (is_running()) {
+      // Continue with next iteration
+      notify_waitable();
     }
   }
 
   virtual void start()
   {
     RCLCPP_DEBUG(node_->get_logger(), "Start function called");
-    notify_iteration();
+    notify_waitable();
   }
 
   virtual void compute()
@@ -204,13 +196,8 @@ public:
   virtual void notify_cancel()
   {
     RCLCPP_DEBUG(node_->get_logger(), "Notify cancel function");
-    if (is_reactive_proactive_) {
-      // Proactive: check finish immediately
-      this->notify_check_finish();
-    } else {
-      // Reactive: process result first, then check finish
-      this->notify_result();
-    }
+    // Trigger the waitable to process the cancellation
+    this->notify_waitable();
     RCLCPP_DEBUG(node_->get_logger(), "Notify cancel function finished");
   }
 
@@ -235,10 +222,8 @@ public:
   void set_goal_handle(std::shared_ptr<GoalHandleType> goal_handle) { goal_handle_ = goal_handle; }
   std::shared_ptr<GoalHandleType> get_goal_handle() { return goal_handle_; }
 
-  // Waitable notifications
-  void notify_iteration() { anytime_iteration_waitable_->notify(); }
-  void notify_result() { anytime_result_waitable_->notify(); }
-  void notify_check_finish() { anytime_check_finish_waitable_->notify(); }
+  // Waitable notification - single unified waitable
+  void notify_waitable() { anytime_waitable_->trigger(); }
 
 protected:
   // Initialize waitables and callback group
@@ -256,42 +241,26 @@ protected:
     compute_callback_group_ =
       node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
-    // Create and register waitables based on reactive/proactive mode
+    // Create single unified waitable based on reactive/proactive mode
     if constexpr (isReactiveProactive) {
       // Proactive mode
-      anytime_iteration_waitable_ =
-        std::make_shared<AnytimeWaitable>([this]() { this->proactive_function(); });
-      anytime_result_waitable_ =
-        std::make_shared<AnytimeWaitable>([this]() { this->proactive_result_function(); });
-      anytime_check_finish_waitable_ =
-        std::make_shared<AnytimeWaitable>([this]() { this->check_cancel_and_finish_proactive(); });
+      anytime_waitable_ =
+        std::make_shared<AnytimeWaitable>([this]() { this->proactive_anytime_function(); });
     } else {
       // Reactive mode
-      anytime_iteration_waitable_ =
-        std::make_shared<AnytimeWaitable>([this]() { this->reactive_function(); });
-      anytime_result_waitable_ =
-        std::make_shared<AnytimeWaitable>([this]() { this->reactive_result_function(); });
-      anytime_check_finish_waitable_ =
-        std::make_shared<AnytimeWaitable>([this]() { this->check_cancel_and_finish_reactive(); });
+      anytime_waitable_ =
+        std::make_shared<AnytimeWaitable>([this]() { this->reactive_anytime_function(); });
     }
 
-    // Add waitables to node
-    node->get_node_waitables_interface()->add_waitable(
-      anytime_iteration_waitable_, compute_callback_group_);
-    node->get_node_waitables_interface()->add_waitable(
-      anytime_result_waitable_, compute_callback_group_);
-    node->get_node_waitables_interface()->add_waitable(
-      anytime_check_finish_waitable_,
-      node->get_node_base_interface()->get_default_callback_group());
+    // Add waitable to node
+    node->get_node_waitables_interface()->add_waitable(anytime_waitable_, compute_callback_group_);
   }
 
   // Node pointer for logging (must be set by derived class)
   rclcpp::Node * node_ = nullptr;
 
-  // Waitables for synchronization
-  std::shared_ptr<AnytimeWaitable> anytime_iteration_waitable_;
-  std::shared_ptr<AnytimeWaitable> anytime_result_waitable_;
-  std::shared_ptr<AnytimeWaitable> anytime_check_finish_waitable_;
+  // Single unified waitable for all operations
+  std::shared_ptr<AnytimeWaitable> anytime_waitable_;
 
   // Running state
   std::atomic<bool> is_running_{false};

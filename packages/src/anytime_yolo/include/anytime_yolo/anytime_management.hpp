@@ -265,7 +265,7 @@ public:
       (this_ptr->processed_layers_ % this_ptr->batch_size_ == 0) ||
       (this_ptr->processed_layers_ >= 25)) {
       RCLCPP_DEBUG(this_ptr->node_->get_logger(), "Calculating result from callback function");
-      this_ptr->notify_result();
+      this_ptr->notify_waitable();
     }
   }
 

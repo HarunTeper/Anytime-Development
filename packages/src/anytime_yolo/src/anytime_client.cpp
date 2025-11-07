@@ -161,7 +161,7 @@ void AnytimeActionClient::process_feedback(
             this->get_logger(),
             "Canceling goal due to high score (%.2f) for class %s after %d layers",
             found->hypothesis.score, target_class_id_.c_str(), feedback->processed_layers);
-          cancel_waitable_->notify();
+          cancel_waitable_->trigger();
           return;
         }
       }
@@ -172,7 +172,7 @@ void AnytimeActionClient::process_feedback(
       RCLCPP_INFO(
         this->get_logger(), "Notifying cancel waitable after %d layers",
         feedback->processed_layers);
-      cancel_waitable_->notify();
+      cancel_waitable_->trigger();
     }
   }
 }
