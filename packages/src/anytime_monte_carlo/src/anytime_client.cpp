@@ -9,7 +9,6 @@
 #include <numeric>
 #include <vector>
 
-
 AnytimeActionClient::AnytimeActionClient(const rclcpp::NodeOptions & options)
 : anytime_core::AnytimeClientBase<Anytime>("anytime_action_client", options)
 {
@@ -74,7 +73,7 @@ void AnytimeActionClient::on_goal_accepted(AnytimeGoalHandle::SharedPtr goal_han
 {
   // Store the goal handle (already done in base class, but ensure it's set)
   goal_handle_ = goal_handle;
-  
+
   // Reset the cancel timeout timer to start counting down
   cancel_timeout_timer_->reset();
 }
@@ -105,10 +104,10 @@ void AnytimeActionClient::cleanup_after_result()
 {
   // Cancel the timeout timer if it's still running
   cancel_timeout_timer_->cancel();
-  
+
   // Clear the goal handle to prevent stale references
   goal_handle_.reset();
-  
+
   // Reset the timer to allow sending new goals
   timer_->reset();
 }
