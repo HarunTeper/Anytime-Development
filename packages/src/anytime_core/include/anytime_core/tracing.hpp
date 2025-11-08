@@ -143,6 +143,22 @@ namespace anytime_core
     anytime_client_cancel_response,                          \
     static_cast<const void *>(node->get_node_base_interface().get()), accepted)
 
+// Timing-specific client tracing helpers
+#define TRACE_ANYTIME_CLIENT_GOAL_SENT(node, timestamp_ns)                                      \
+  ANYTIME_TRACEPOINT(                                                                           \
+    anytime_client_goal_sent, static_cast<const void *>(node->get_node_base_interface().get()), \
+    timestamp_ns)
+
+#define TRACE_ANYTIME_CLIENT_CANCEL_SENT(node, timestamp_ns)                                      \
+  ANYTIME_TRACEPOINT(                                                                             \
+    anytime_client_cancel_sent, static_cast<const void *>(node->get_node_base_interface().get()), \
+    timestamp_ns)
+
+#define TRACE_ANYTIME_CLIENT_GOAL_FINISHED(node, timestamp_ns, result_code) \
+  ANYTIME_TRACEPOINT(                                                       \
+    anytime_client_goal_finished,                                           \
+    static_cast<const void *>(node->get_node_base_interface().get()), timestamp_ns, result_code)
+
 }  // namespace anytime_core
 
 #endif  // ANYTIME_CORE_TRACING_HPP

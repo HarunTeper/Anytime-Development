@@ -84,22 +84,37 @@ def parse_trace_directory(trace_dir):
             # Convert timestamp to nanoseconds
             timestamp = float(timestamp_str.replace(':', '')) * 1e9
 
-            # Extract event name
+            # Extract event name (format: "anytime:event_name:")
             event_start = line.find('anytime:')
             if event_start == -1:
                 continue
             event_part = line[event_start:]
-            event_end = event_part.find(':')
+            # Find the colon AFTER "anytime:"
+            event_end = event_part.find(':', len('anytime:'))
             if event_end == -1:
                 continue
             event_name = event_part[:event_end]
 
-            # Extract fields (simplified - we'll use regex for more complex parsing if needed)
+            # Extract fields (handle nested braces for context)
             fields = {}
-            fields_start = line.find('{')
-            fields_end = line.rfind('}')
-            if fields_start != -1 and fields_end != -1:
-                fields_str = line[fields_start+1:fields_end]
+            # Find all { } groups
+            brace_groups = []
+            brace_level = 0
+            current_start = -1
+            for i, char in enumerate(line):
+                if char == '{':
+                    if brace_level == 0:
+                        current_start = i
+                    brace_level += 1
+                elif char == '}':
+                    brace_level -= 1
+                    if brace_level == 0 and current_start != -1:
+                        brace_groups.append(line[current_start+1:i])
+                        current_start = -1
+
+            # Parse the last brace group (contains the actual event fields)
+            if len(brace_groups) > 0:
+                fields_str = brace_groups[-1]
                 # Simple field parsing (key = value pairs)
                 for field_pair in fields_str.split(','):
                     if '=' in field_pair:
@@ -135,6 +150,13 @@ def extract_metrics_from_events(events, config_name):
         'compute_times': [],  # Time spent in compute
         'feedback_times': [],  # Time spent sending feedback
         'result_times': [],  # Time spent calculating results
+        # New latency metrics
+        # Time from goal sent to goal finished (ms)
+        'goal_to_finish_latencies': [],
+        # Time from goal sent to cancel sent (ms)
+        'goal_to_cancel_latencies': [],
+        # Time from cancel sent to goal finished (ms)
+        'cancel_to_finish_latencies': [],
     }
 
     # Track state for computing metrics
@@ -143,6 +165,9 @@ def extract_metrics_from_events(events, config_name):
     current_feedback_start = None
     current_result_start = None
     cancel_request_time = None
+    # New: Track goal and cancel timestamps
+    goal_sent_time = None
+    cancel_sent_time = None
 
     for event in events:
         event_name = event.event_name
@@ -204,6 +229,39 @@ def extract_metrics_from_events(events, config_name):
                 metrics['cancellation_delays'].append(cancellation_delay_ms)
                 cancel_request_time = None
 
+        # New: Track goal sent timestamp
+        elif event_name == 'anytime:anytime_client_goal_sent':
+            if 'timestamp_ns' in event.fields:
+                goal_sent_time = int(event.fields['timestamp_ns'])
+
+        # New: Track cancel sent timestamp
+        elif event_name == 'anytime:anytime_client_cancel_sent':
+            if 'timestamp_ns' in event.fields:
+                cancel_sent_time = int(event.fields['timestamp_ns'])
+                # Calculate goal to cancel latency
+                if goal_sent_time is not None:
+                    latency_ms = (cancel_sent_time - goal_sent_time) / 1e6
+                    metrics['goal_to_cancel_latencies'].append(latency_ms)
+
+        # New: Track goal finished timestamp
+        elif event_name == 'anytime:anytime_client_goal_finished':
+            if 'timestamp_ns' in event.fields:
+                goal_finished_time = int(event.fields['timestamp_ns'])
+
+                # Calculate goal to finish latency
+                if goal_sent_time is not None:
+                    latency_ms = (goal_finished_time - goal_sent_time) / 1e6
+                    metrics['goal_to_finish_latencies'].append(latency_ms)
+
+                # Calculate cancel to finish latency
+                if cancel_sent_time is not None:
+                    latency_ms = (goal_finished_time - cancel_sent_time) / 1e6
+                    metrics['cancel_to_finish_latencies'].append(latency_ms)
+
+                # Reset for next goal
+                goal_sent_time = None
+                cancel_sent_time = None
+
     # Compute summary statistics
     if metrics['batch_times']:
         metrics['avg_time_per_batch'] = np.mean(metrics['batch_times'])
@@ -229,6 +287,34 @@ def extract_metrics_from_events(events, config_name):
     else:
         metrics['avg_cancellation_delay'] = 0
         metrics['std_cancellation_delay'] = 0
+
+    # New: Compute latency statistics
+    if metrics['goal_to_finish_latencies']:
+        metrics['avg_goal_to_finish_latency'] = np.mean(
+            metrics['goal_to_finish_latencies'])
+        metrics['std_goal_to_finish_latency'] = np.std(
+            metrics['goal_to_finish_latencies'])
+    else:
+        metrics['avg_goal_to_finish_latency'] = 0
+        metrics['std_goal_to_finish_latency'] = 0
+
+    if metrics['goal_to_cancel_latencies']:
+        metrics['avg_goal_to_cancel_latency'] = np.mean(
+            metrics['goal_to_cancel_latencies'])
+        metrics['std_goal_to_cancel_latency'] = np.std(
+            metrics['goal_to_cancel_latencies'])
+    else:
+        metrics['avg_goal_to_cancel_latency'] = 0
+        metrics['std_goal_to_cancel_latency'] = 0
+
+    if metrics['cancel_to_finish_latencies']:
+        metrics['avg_cancel_to_finish_latency'] = np.mean(
+            metrics['cancel_to_finish_latencies'])
+        metrics['std_cancel_to_finish_latency'] = np.std(
+            metrics['cancel_to_finish_latencies'])
+    else:
+        metrics['avg_cancel_to_finish_latency'] = 0
+        metrics['std_cancel_to_finish_latency'] = 0
 
     return metrics
 
@@ -261,6 +347,13 @@ def aggregate_runs(all_metrics):
             'std_iterations_per_batch': np.mean([r['std_iterations_per_batch'] for r in runs]),
             'avg_cancellation_delay': np.mean([r['avg_cancellation_delay'] for r in runs if r['avg_cancellation_delay'] > 0]) if any(r['avg_cancellation_delay'] > 0 for r in runs) else 0,
             'std_cancellation_delay': np.mean([r['std_cancellation_delay'] for r in runs if r['std_cancellation_delay'] > 0]) if any(r['std_cancellation_delay'] > 0 for r in runs) else 0,
+            # New latency metrics
+            'avg_goal_to_finish_latency': np.mean([r['avg_goal_to_finish_latency'] for r in runs if r['avg_goal_to_finish_latency'] > 0]) if any(r['avg_goal_to_finish_latency'] > 0 for r in runs) else 0,
+            'std_goal_to_finish_latency': np.mean([r['std_goal_to_finish_latency'] for r in runs if r['std_goal_to_finish_latency'] > 0]) if any(r['std_goal_to_finish_latency'] > 0 for r in runs) else 0,
+            'avg_goal_to_cancel_latency': np.mean([r['avg_goal_to_cancel_latency'] for r in runs if r['avg_goal_to_cancel_latency'] > 0]) if any(r['avg_goal_to_cancel_latency'] > 0 for r in runs) else 0,
+            'std_goal_to_cancel_latency': np.mean([r['std_goal_to_cancel_latency'] for r in runs if r['std_goal_to_cancel_latency'] > 0]) if any(r['std_goal_to_cancel_latency'] > 0 for r in runs) else 0,
+            'avg_cancel_to_finish_latency': np.mean([r['avg_cancel_to_finish_latency'] for r in runs if r['avg_cancel_to_finish_latency'] > 0]) if any(r['avg_cancel_to_finish_latency'] > 0 for r in runs) else 0,
+            'std_cancel_to_finish_latency': np.mean([r['std_cancel_to_finish_latency'] for r in runs if r['std_cancel_to_finish_latency'] > 0]) if any(r['std_cancel_to_finish_latency'] > 0 for r in runs) else 0,
         }
         aggregated[base_config] = agg
 
@@ -270,11 +363,16 @@ def aggregate_runs(all_metrics):
 def parse_config_name(config_name):
     """Parse configuration name into components"""
     # Format: batch_<size>_<mode>_<threading>
+    # or test_batch_<size>_<mode>_<threading> for test runs
     parts = config_name.split('_')
+
+    # Skip 'test' prefix if present
+    offset = 1 if parts[0] == 'test' else 0
+
     return {
-        'batch_size': int(parts[1]),
-        'mode': parts[2],
-        'threading': parts[3]
+        'batch_size': int(parts[1 + offset]),
+        'mode': parts[2 + offset],
+        'threading': parts[3 + offset]
     }
 
 
@@ -434,6 +532,102 @@ def generate_plots(aggregated_metrics):
     plt.tight_layout()
     plt.savefig(PLOTS_DIR / 'throughput.png', dpi=300)
     plt.close()
+
+    # Plot 6: End-to-End Latency (Goal to Finish)
+    print("  - Goal to finish latency")
+    df_latency = df[df['avg_goal_to_finish_latency'] > 0]
+
+    if not df_latency.empty:
+        fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+        for mode in ['reactive', 'proactive']:
+            ax = axes[0] if mode == 'reactive' else axes[1]
+
+            for threading in ['single', 'multi']:
+                data = df_latency[(df_latency['mode'] == mode) & (
+                    df_latency['threading'] == threading)]
+                data = data.sort_values('batch_size')
+
+                if not data.empty:
+                    ax.plot(data['batch_size'], data['avg_goal_to_finish_latency'],
+                            marker='o', label=f'{threading}-threaded', linewidth=2)
+
+            ax.set_xlabel('Batch Size')
+            ax.set_ylabel('Average Goal-to-Finish Latency (ms)')
+            ax.set_title(f'{mode.capitalize()} Mode')
+            ax.set_xscale('log')
+            ax.legend()
+            ax.grid(True)
+
+        plt.tight_layout()
+        plt.savefig(PLOTS_DIR / 'goal_to_finish_latency.png', dpi=300)
+        plt.close()
+    else:
+        print("    No goal-to-finish latency data found")
+
+    # Plot 7: Cancel Latency (Goal to Cancel)
+    print("  - Goal to cancel latency")
+    df_cancel_lat = df[df['avg_goal_to_cancel_latency'] > 0]
+
+    if not df_cancel_lat.empty:
+        fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+        for mode in ['reactive', 'proactive']:
+            ax = axes[0] if mode == 'reactive' else axes[1]
+
+            for threading in ['single', 'multi']:
+                data = df_cancel_lat[(df_cancel_lat['mode'] == mode) & (
+                    df_cancel_lat['threading'] == threading)]
+                data = data.sort_values('batch_size')
+
+                if not data.empty:
+                    ax.plot(data['batch_size'], data['avg_goal_to_cancel_latency'],
+                            marker='o', label=f'{threading}-threaded', linewidth=2)
+
+            ax.set_xlabel('Batch Size')
+            ax.set_ylabel('Average Goal-to-Cancel Latency (ms)')
+            ax.set_title(f'{mode.capitalize()} Mode')
+            ax.set_xscale('log')
+            ax.legend()
+            ax.grid(True)
+
+        plt.tight_layout()
+        plt.savefig(PLOTS_DIR / 'goal_to_cancel_latency.png', dpi=300)
+        plt.close()
+    else:
+        print("    No goal-to-cancel latency data found")
+
+    # Plot 8: Cancel to Finish Latency
+    print("  - Cancel to finish latency")
+    df_cancel_finish = df[df['avg_cancel_to_finish_latency'] > 0]
+
+    if not df_cancel_finish.empty:
+        fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+        for mode in ['reactive', 'proactive']:
+            ax = axes[0] if mode == 'reactive' else axes[1]
+
+            for threading in ['single', 'multi']:
+                data = df_cancel_finish[(df_cancel_finish['mode'] == mode) & (
+                    df_cancel_finish['threading'] == threading)]
+                data = data.sort_values('batch_size')
+
+                if not data.empty:
+                    ax.plot(data['batch_size'], data['avg_cancel_to_finish_latency'],
+                            marker='o', label=f'{threading}-threaded', linewidth=2)
+
+            ax.set_xlabel('Batch Size')
+            ax.set_ylabel('Average Cancel-to-Finish Latency (ms)')
+            ax.set_title(f'{mode.capitalize()} Mode')
+            ax.set_xscale('log')
+            ax.legend()
+            ax.grid(True)
+
+        plt.tight_layout()
+        plt.savefig(PLOTS_DIR / 'cancel_to_finish_latency.png', dpi=300)
+        plt.close()
+    else:
+        print("    No cancel-to-finish latency data found")
 
     print(f"  All plots saved to: {PLOTS_DIR}")
 

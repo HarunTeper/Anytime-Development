@@ -202,6 +202,30 @@ TRACEPOINT_EVENT(
               ctf_integer(bool, accepted, accepted_arg)
                 ctf_string(version, anytime_tracing_VERSION)))
 
+// Timing-specific client events (for latency measurements)
+TRACEPOINT_EVENT(
+  TRACEPOINT_PROVIDER, anytime_client_goal_sent,
+  TP_ARGS(const void *, node_handle_arg, const int64_t, timestamp_ns_arg),
+  TP_FIELDS(ctf_integer_hex(const void *, node_handle, node_handle_arg)
+              ctf_integer(int64_t, timestamp_ns, timestamp_ns_arg)
+                ctf_string(version, anytime_tracing_VERSION)))
+
+TRACEPOINT_EVENT(
+  TRACEPOINT_PROVIDER, anytime_client_cancel_sent,
+  TP_ARGS(const void *, node_handle_arg, const int64_t, timestamp_ns_arg),
+  TP_FIELDS(ctf_integer_hex(const void *, node_handle, node_handle_arg)
+              ctf_integer(int64_t, timestamp_ns, timestamp_ns_arg)
+                ctf_string(version, anytime_tracing_VERSION)))
+
+TRACEPOINT_EVENT(
+  TRACEPOINT_PROVIDER, anytime_client_goal_finished,
+  TP_ARGS(
+    const void *, node_handle_arg, const int64_t, timestamp_ns_arg, const int, result_code_arg),
+  TP_FIELDS(ctf_integer_hex(const void *, node_handle, node_handle_arg)
+              ctf_integer(int64_t, timestamp_ns, timestamp_ns_arg)
+                ctf_integer(int, result_code, result_code_arg)
+                  ctf_string(version, anytime_tracing_VERSION)))
+
 // ==================== Monte Carlo ====================
 
 TRACEPOINT_EVENT(

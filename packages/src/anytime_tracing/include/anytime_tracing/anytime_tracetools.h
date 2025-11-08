@@ -181,6 +181,19 @@ ANYTIME_DECLARE_TRACEPOINT(anytime_client_cancel_request, const void * node_hand
 ANYTIME_DECLARE_TRACEPOINT(
   anytime_client_cancel_response, const void * node_handle, const bool accepted)
 
+/// `anytime_client_goal_sent` - Timing-specific event
+ANYTIME_DECLARE_TRACEPOINT(
+  anytime_client_goal_sent, const void * node_handle, const int64_t timestamp_ns)
+
+/// `anytime_client_cancel_sent` - Timing-specific event
+ANYTIME_DECLARE_TRACEPOINT(
+  anytime_client_cancel_sent, const void * node_handle, const int64_t timestamp_ns)
+
+/// `anytime_client_goal_finished` - Timing-specific event
+ANYTIME_DECLARE_TRACEPOINT(
+  anytime_client_goal_finished, const void * node_handle, const int64_t timestamp_ns,
+  const int result_code)
+
 // ==================== Monte Carlo ====================
 
 /// `monte_carlo_init`

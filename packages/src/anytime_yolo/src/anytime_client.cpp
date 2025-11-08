@@ -238,6 +238,10 @@ void AnytimeActionClient::cancel_callback()
   // Set the cancellation flag to true to prevent multiple cancellations
   is_cancelling_ = true;
 
+  // Record cancel sent timestamp
+  auto cancel_sent_time = this->now().nanoseconds();
+  TRACE_ANYTIME_CLIENT_CANCEL_SENT(this, cancel_sent_time);
+
   // Send a cancel request for the current goal
   action_client_->async_cancel_goal(
     goal_handle_, [this](std::shared_ptr<action_msgs::srv::CancelGoal_Response> cancel_response) {

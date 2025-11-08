@@ -219,6 +219,31 @@ void ANYTIME_TRACEPOINT(
   CONDITIONAL_TP(anytime_client_cancel_response, node_handle, accepted);
 }
 
+void ANYTIME_TRACEPOINT(
+  anytime_client_goal_sent,
+  const void * node_handle,
+  const int64_t timestamp_ns)
+{
+  CONDITIONAL_TP(anytime_client_goal_sent, node_handle, timestamp_ns);
+}
+
+void ANYTIME_TRACEPOINT(
+  anytime_client_cancel_sent,
+  const void * node_handle,
+  const int64_t timestamp_ns)
+{
+  CONDITIONAL_TP(anytime_client_cancel_sent, node_handle, timestamp_ns);
+}
+
+void ANYTIME_TRACEPOINT(
+  anytime_client_goal_finished,
+  const void * node_handle,
+  const int64_t timestamp_ns,
+  const int result_code)
+{
+  CONDITIONAL_TP(anytime_client_goal_finished, node_handle, timestamp_ns, result_code);
+}
+
 // ==================== Monte Carlo ====================
 
 void ANYTIME_TRACEPOINT(

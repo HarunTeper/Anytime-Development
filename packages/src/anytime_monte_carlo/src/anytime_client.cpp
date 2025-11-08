@@ -139,6 +139,10 @@ void AnytimeActionClient::cancel_timeout_callback()
 
   // Send a cancel request for the current goal
   try {
+    // Record cancel sent timestamp
+    auto cancel_sent_time = this->now().nanoseconds();
+    TRACE_ANYTIME_CLIENT_CANCEL_SENT(this, cancel_sent_time);
+
     auto cancel_future = action_client_->async_cancel_goal(goal_handle_);
     RCLCPP_DEBUG(
       this->get_logger(), "[Goal ID: %s] Cancel request sent",

@@ -109,6 +109,11 @@ protected:
   void result_callback(const typename AnytimeGoalHandle::WrappedResult & result)
   {
     TRACE_ANYTIME_CLIENT_RESULT(this, static_cast<int>(result.code));
+
+    // Record goal finished timestamp
+    auto goal_finished_time = this->now().nanoseconds();
+    TRACE_ANYTIME_CLIENT_GOAL_FINISHED(this, goal_finished_time, static_cast<int>(result.code));
+
     // Log the result based on the result code
     switch (result.code) {
       case rclcpp_action::ResultCode::SUCCEEDED:
@@ -177,7 +182,9 @@ protected:
       return false;
     }
 
-    // Send the goal asynchronously
+    // Send the goal asynchronously and record timestamp
+    auto goal_sent_time = this->now().nanoseconds();
+    TRACE_ANYTIME_CLIENT_GOAL_SENT(this, goal_sent_time);
     action_client_->async_send_goal(goal_msg, send_goal_options);
     return true;
   }
