@@ -64,7 +64,9 @@ protected:
   virtual void log_result(const typename AnytimeGoalHandle::WrappedResult & result)
   {
     (void)result;
-    RCLCPP_DEBUG(this->get_logger(), "Result received");
+    RCLCPP_DEBUG(
+      this->get_logger(), "[Goal ID: %s] Result received",
+      rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str());
   }
 
   /**
@@ -81,7 +83,9 @@ protected:
   {
     (void)goal_handle;
     (void)feedback;
-    RCLCPP_DEBUG(this->get_logger(), "Feedback received");
+    RCLCPP_DEBUG(
+      this->get_logger(), "[Goal ID: %s] Feedback received",
+      rclcpp_action::to_string(goal_handle->get_goal_id()).c_str());
   }
 
   /**
@@ -115,7 +119,9 @@ protected:
         RCLCPP_ERROR(this->get_logger(), "Goal was aborted");
         break;
       case rclcpp_action::ResultCode::CANCELED:
-        RCLCPP_DEBUG(this->get_logger(), "Goal was canceled");
+        RCLCPP_DEBUG(
+          this->get_logger(), "[Goal ID: %s] Goal was canceled",
+          rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str());
         post_processing(result);
         break;
       default:
@@ -194,7 +200,9 @@ protected:
     // Store the goal handle for future reference
     goal_handle_ = goal_handle;
 
-    RCLCPP_DEBUG(this->get_logger(), "Goal accepted by server");
+    RCLCPP_DEBUG(
+      this->get_logger(), "[Goal ID: %s] Goal accepted by server",
+      rclcpp_action::to_string(goal_handle->get_goal_id()).c_str());
     TRACE_ANYTIME_CLIENT_GOAL_RESPONSE(this, true);
     on_goal_accepted(goal_handle);
   }
@@ -211,6 +219,9 @@ protected:
       RCLCPP_ERROR(this->get_logger(), "Feedback received for unknown goal handle");
       return;
     }
+    RCLCPP_DEBUG(
+      this->get_logger(), "[Goal ID: %s] Feedback callback triggered",
+      rclcpp_action::to_string(goal_handle->get_goal_id()).c_str());
     process_feedback(goal_handle, feedback);
   }
 

@@ -246,13 +246,21 @@ public:
   {
     auto this_ptr = static_cast<AnytimeManagement *>(userData);
 
-    RCLCPP_DEBUG(this_ptr->node_->get_logger(), "Forward finished callback");
+    std::string goal_id_str = this_ptr->goal_handle_
+                                ? rclcpp_action::to_string(this_ptr->goal_handle_->get_goal_id())
+                                : "null";
+
+    RCLCPP_DEBUG(
+      this_ptr->node_->get_logger(), "[Goal ID: %s] Forward finished callback",
+      goal_id_str.c_str());
 
     // Check if we should stop processing
     if (
       this_ptr->goal_handle_->is_canceling() || !this_ptr->goal_handle_->is_executing() ||
       !this_ptr->is_running()) {
-      RCLCPP_DEBUG(this_ptr->node_->get_logger(), "Goal handle is canceling, stopping computation");
+      RCLCPP_DEBUG(
+        this_ptr->node_->get_logger(),
+        "[Goal ID: %s] Goal handle is canceling, stopping computation", goal_id_str.c_str());
       return;
     }
 
@@ -260,7 +268,8 @@ public:
     this_ptr->processed_layers_++;
     TRACE_YOLO_CUDA_CALLBACK(this_ptr->node_, this_ptr->processed_layers_);
     RCLCPP_DEBUG(
-      this_ptr->node_->get_logger(), "Processed layers: %d", this_ptr->processed_layers_);
+      this_ptr->node_->get_logger(), "[Goal ID: %s] Processed layers: %d", goal_id_str.c_str(),
+      this_ptr->processed_layers_);
 
     // Trigger the waitable when batch is complete or when reaching/exceeding max layers
     // This allows the main anytime function to continue with the next iteration
@@ -268,8 +277,9 @@ public:
       (this_ptr->processed_layers_ % this_ptr->batch_size_ == 0) ||
       (this_ptr->processed_layers_ >= MAX_NETWORK_LAYERS)) {
       RCLCPP_DEBUG(
-        this_ptr->node_->get_logger(), "Batch complete (%d layers processed), triggering waitable",
-        this_ptr->processed_layers_);
+        this_ptr->node_->get_logger(),
+        "[Goal ID: %s] Batch complete (%d layers processed), triggering waitable",
+        goal_id_str.c_str(), this_ptr->processed_layers_);
       this_ptr->notify_waitable();
     }
   }

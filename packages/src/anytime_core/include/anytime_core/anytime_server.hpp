@@ -72,8 +72,9 @@ protected:
     const std::shared_ptr<GoalHandleType> goal_handle)
   {
     TRACE_ANYTIME_SERVER_HANDLE_CANCEL(this);
-    RCLCPP_DEBUG(this->get_logger(), "Received cancel request");
-    (void)goal_handle;
+    RCLCPP_DEBUG(
+      this->get_logger(), "[Goal ID: %s] Received cancel request",
+      rclcpp_action::to_string(goal_handle->get_goal_id()).c_str());
     anytime_management_->notify_cancel();
     return rclcpp_action::CancelResponse::ACCEPT;
   }
@@ -82,16 +83,21 @@ protected:
   virtual void handle_accepted(const std::shared_ptr<GoalHandleType> goal_handle)
   {
     TRACE_ANYTIME_SERVER_HANDLE_ACCEPTED(this);
-    RCLCPP_DEBUG(this->get_logger(), "Setting goal handle for AnytimeManagement");
+    std::string goal_id_str = rclcpp_action::to_string(goal_handle->get_goal_id());
+    RCLCPP_DEBUG(
+      this->get_logger(), "[Goal ID: %s] Setting goal handle for AnytimeManagement",
+      goal_id_str.c_str());
     anytime_management_->set_goal_handle(goal_handle);
 
-    RCLCPP_DEBUG(this->get_logger(), "Resetting AnytimeManagement");
+    RCLCPP_DEBUG(
+      this->get_logger(), "[Goal ID: %s] Resetting AnytimeManagement", goal_id_str.c_str());
     anytime_management_->reset();
 
-    RCLCPP_DEBUG(this->get_logger(), "Activating AnytimeManagement");
+    RCLCPP_DEBUG(
+      this->get_logger(), "[Goal ID: %s] Activating AnytimeManagement", goal_id_str.c_str());
     anytime_management_->activate();
 
-    RCLCPP_DEBUG(this->get_logger(), "Start AnytimeManagement");
+    RCLCPP_DEBUG(this->get_logger(), "[Goal ID: %s] Start AnytimeManagement", goal_id_str.c_str());
     anytime_management_->start();
   }
 };

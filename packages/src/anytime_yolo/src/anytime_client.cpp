@@ -11,7 +11,6 @@
 #include <numeric>
 #include <vector>
 
-
 AnytimeActionClient::AnytimeActionClient(const rclcpp::NodeOptions & options)
 : anytime_core::AnytimeClientBase<Anytime>("anytime_action_client", options)
 {
@@ -99,8 +98,9 @@ void AnytimeActionClient::on_goal_rejected()
 
 void AnytimeActionClient::on_goal_accepted(AnytimeGoalHandle::SharedPtr goal_handle)
 {
-  (void)goal_handle;
-  RCLCPP_DEBUG(this->get_logger(), "Goal accepted by server");
+  RCLCPP_DEBUG(
+    this->get_logger(), "[Goal ID: %s] Goal accepted by server",
+    rclcpp_action::to_string(goal_handle->get_goal_id()).c_str());
 }
 
 void AnytimeActionClient::process_feedback(
@@ -110,14 +110,20 @@ void AnytimeActionClient::process_feedback(
     RCLCPP_ERROR(this->get_logger(), "Feedback received for unknown goal handle");
     return;
   }
+
+  std::string goal_id_str = rclcpp_action::to_string(goal_handle->get_goal_id());
   // Log the feedback message
-  RCLCPP_DEBUG(this->get_logger(), "Feedback received");
-  RCLCPP_DEBUG(this->get_logger(), "Processed layers: %d", feedback->processed_layers);
+  RCLCPP_DEBUG(this->get_logger(), "[Goal ID: %s] Feedback received", goal_id_str.c_str());
+  RCLCPP_DEBUG(
+    this->get_logger(), "[Goal ID: %s] Processed layers: %d", goal_id_str.c_str(),
+    feedback->processed_layers);
 
   // Print information about detections with highest score
   if (!feedback->detections.empty()) {
     // print the number of detections
-    RCLCPP_DEBUG(this->get_logger(), "Number of detections: %zu", feedback->detections.size());
+    RCLCPP_DEBUG(
+      this->get_logger(), "[Goal ID: %s] Number of detections: %zu", goal_id_str.c_str(),
+      feedback->detections.size());
 
     // Find detection with the highest score
     const auto & detections = feedback->detections;
@@ -137,11 +143,13 @@ void AnytimeActionClient::process_feedback(
 
       // Print the highest score and its class ID
       RCLCPP_DEBUG(
-        this->get_logger(), "Detection %zu: Class ID = %s, Score = %.3f", i,
-        highest_score_result->hypothesis.class_id.c_str(), highest_score_result->hypothesis.score);
+        this->get_logger(), "[Goal ID: %s] Detection %zu: Class ID = %s, Score = %.3f",
+        goal_id_str.c_str(), i, highest_score_result->hypothesis.class_id.c_str(),
+        highest_score_result->hypothesis.score);
     }
   } else {
-    RCLCPP_DEBUG(this->get_logger(), "No detections in feedback");
+    RCLCPP_DEBUG(
+      this->get_logger(), "[Goal ID: %s] No detections in feedback", goal_id_str.c_str());
   }
 
   if (cancel_layer_score_) {
@@ -183,12 +191,15 @@ void AnytimeActionClient::process_feedback(
 void AnytimeActionClient::log_result(const AnytimeGoalHandle::WrappedResult & result)
 {
   (void)result;
-  RCLCPP_DEBUG(this->get_logger(), "Result received");
+  RCLCPP_DEBUG(
+    this->get_logger(), "[Goal ID: %s] Result received",
+    rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str());
 }
 
 void AnytimeActionClient::post_processing(const AnytimeGoalHandle::WrappedResult & result)
 {
-  RCLCPP_DEBUG(this->get_logger(), "Publishing detection image");
+  std::string goal_id_str = rclcpp_action::to_string(goal_handle_->get_goal_id());
+  RCLCPP_DEBUG(this->get_logger(), "[Goal ID: %s] Publishing detection image", goal_id_str.c_str());
   detection_image_publisher_->publish(*current_image_);
 
   // Create a Detection2DArray message for publishing
@@ -199,7 +210,9 @@ void AnytimeActionClient::post_processing(const AnytimeGoalHandle::WrappedResult
   detection_array.detections = result.result->detections;
 
   // Log number of detections
-  RCLCPP_DEBUG(this->get_logger(), "Publishing %ld detections", result.result->detections.size());
+  RCLCPP_DEBUG(
+    this->get_logger(), "[Goal ID: %s] Publishing %ld detections", goal_id_str.c_str(),
+    result.result->detections.size());
 
   // Publish detections
   detection_publisher_->publish(detection_array);
@@ -218,7 +231,10 @@ void AnytimeActionClient::cancel_callback()
     return;
   }
 
-  RCLCPP_DEBUG(this->get_logger(), "Cancel waitable triggered, cancelling goal");
+  std::string goal_id_str = rclcpp_action::to_string(goal_handle_->get_goal_id());
+  RCLCPP_DEBUG(
+    this->get_logger(), "[Goal ID: %s] Cancel waitable triggered, cancelling goal",
+    goal_id_str.c_str());
   // Set the cancellation flag to true to prevent multiple cancellations
   is_cancelling_ = true;
 
@@ -228,14 +244,18 @@ void AnytimeActionClient::cancel_callback()
       this->cancel_response_callback(cancel_response);
     });
 
-  RCLCPP_DEBUG(this->get_logger(), "Cancel request sent");
+  RCLCPP_DEBUG(this->get_logger(), "[Goal ID: %s] Cancel request sent", goal_id_str.c_str());
 }
 
 void AnytimeActionClient::cancel_response_callback(
   const std::shared_ptr<action_msgs::srv::CancelGoal_Response> & cancel_response)
 {
   (void)cancel_response;
-  RCLCPP_DEBUG(this->get_logger(), "Cancel request accepted by server");
+  if (goal_handle_) {
+    RCLCPP_DEBUG(
+      this->get_logger(), "[Goal ID: %s] Cancel request accepted by server",
+      rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str());
+  }
 }
 
 // Register the component

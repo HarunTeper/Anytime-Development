@@ -5,6 +5,7 @@
 #include "anytime_core/tracing.hpp"
 
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
 
 #include <atomic>
 #include <memory>
@@ -41,10 +42,14 @@ public:
   virtual void reactive_anytime_function()
   {
     TRACE_REACTIVE_ANYTIME_FUNCTION_ENTRY(node_);
-    RCLCPP_DEBUG(node_->get_logger(), "Reactive anytime function called");
+    std::string goal_id_str =
+      goal_handle_ ? rclcpp_action::to_string(goal_handle_->get_goal_id()) : "null";
+    RCLCPP_DEBUG(
+      node_->get_logger(), "[Goal ID: %s] Reactive anytime function called", goal_id_str.c_str());
 
     if (!is_running()) {
-      RCLCPP_DEBUG(node_->get_logger(), "Not running, skipping execution");
+      RCLCPP_DEBUG(
+        node_->get_logger(), "[Goal ID: %s] Not running, skipping execution", goal_id_str.c_str());
       return;
     }
 
@@ -68,8 +73,9 @@ public:
 
       deactivate();
       RCLCPP_DEBUG(
-        node_->get_logger(), "Reactive function finished, should finish: %d, should cancel: %d",
-        should_finish_now, should_cancel);
+        node_->get_logger(),
+        "[Goal ID: %s] Reactive function finished, should finish: %d, should cancel: %d",
+        goal_id_str.c_str(), should_finish_now, should_cancel);
     } else if (is_running()) {
       send_feedback();
       // Continue with next iteration
@@ -82,10 +88,14 @@ public:
   virtual void proactive_anytime_function()
   {
     TRACE_PROACTIVE_ANYTIME_FUNCTION_ENTRY(node_);
-    RCLCPP_DEBUG(node_->get_logger(), "Proactive anytime function called");
+    std::string goal_id_str =
+      goal_handle_ ? rclcpp_action::to_string(goal_handle_->get_goal_id()) : "null";
+    RCLCPP_DEBUG(
+      node_->get_logger(), "[Goal ID: %s] Proactive anytime function called", goal_id_str.c_str());
 
     if (!is_running()) {
-      RCLCPP_DEBUG(node_->get_logger(), "Not running, skipping execution");
+      RCLCPP_DEBUG(
+        node_->get_logger(), "[Goal ID: %s] Not running, skipping execution", goal_id_str.c_str());
       return;
     }
 
@@ -106,8 +116,9 @@ public:
 
       deactivate();
       RCLCPP_DEBUG(
-        node_->get_logger(), "Proactive function finished, should finish: %d, should cancel: %d",
-        should_finish_now, should_cancel);
+        node_->get_logger(),
+        "[Goal ID: %s] Proactive function finished, should finish: %d, should cancel: %d",
+        goal_id_str.c_str(), should_finish_now, should_cancel);
     } else if (is_running()) {
       // Step 3: Calculate and send result/feedback
       calculate_result();
@@ -127,7 +138,9 @@ public:
 
   virtual void compute()
   {
-    RCLCPP_DEBUG(node_->get_logger(), "Compute function called");
+    std::string goal_id_str =
+      goal_handle_ ? rclcpp_action::to_string(goal_handle_->get_goal_id()) : "null";
+    RCLCPP_DEBUG(node_->get_logger(), "[Goal ID: %s] Compute function called", goal_id_str.c_str());
 
     // Get the number of iterations for this batch
     int iterations = get_batch_iterations();
@@ -141,18 +154,22 @@ public:
     for (int i = 0; i < iterations; i++) {
       // Check if we should stop processing
       if (goal_handle_->is_canceling() || !goal_handle_->is_executing() || !is_running()) {
-        RCLCPP_DEBUG(node_->get_logger(), "Goal handle is canceling, stopping computation");
+        RCLCPP_DEBUG(
+          node_->get_logger(), "[Goal ID: %s] Goal handle is canceling, stopping computation",
+          goal_id_str.c_str());
         return;
       }
 
-      RCLCPP_DEBUG(node_->get_logger(), "Computing batch iteration %d", i);
+      RCLCPP_DEBUG(
+        node_->get_logger(), "[Goal ID: %s] Computing batch iteration %d", goal_id_str.c_str(), i);
 
       TRACE_ANYTIME_COMPUTE_ITERATION(node_, i);
 
       // Call domain-specific single iteration computation
       compute_single_iteration();
 
-      RCLCPP_DEBUG(node_->get_logger(), "Finished batch iteration %d", i);
+      RCLCPP_DEBUG(
+        node_->get_logger(), "[Goal ID: %s] Finished batch iteration %d", goal_id_str.c_str(), i);
     }
 
     // End timing
@@ -187,7 +204,7 @@ public:
     }
 
     RCLCPP_DEBUG(
-      node_->get_logger(), "Average computation time: %f ms",
+      node_->get_logger(), "[Goal ID: %s] Average computation time: %f ms", goal_id_str.c_str(),
       average_computation_time_.nanoseconds() / 1e6);
 
     TRACE_ANYTIME_COMPUTE_EXIT(
@@ -197,7 +214,10 @@ public:
   virtual void send_feedback()
   {
     TRACE_ANYTIME_SEND_FEEDBACK_ENTRY(node_);
-    RCLCPP_DEBUG(node_->get_logger(), "Send feedback function called");
+    std::string goal_id_str =
+      goal_handle_ ? rclcpp_action::to_string(goal_handle_->get_goal_id()) : "null";
+    RCLCPP_DEBUG(
+      node_->get_logger(), "[Goal ID: %s] Send feedback function called", goal_id_str.c_str());
     auto feedback = std::make_shared<typename InterfaceType::Feedback>();
 
     // Let derived class populate domain-specific feedback
@@ -205,7 +225,7 @@ public:
 
     if (goal_handle_) {
       goal_handle_->publish_feedback(feedback);
-      RCLCPP_DEBUG(node_->get_logger(), "Feedback sent");
+      RCLCPP_DEBUG(node_->get_logger(), "[Goal ID: %s] Feedback sent", goal_id_str.c_str());
     } else {
       RCLCPP_WARN(node_->get_logger(), "Goal handle is null, cannot send feedback");
     }
@@ -216,7 +236,10 @@ public:
   virtual void calculate_result()
   {
     TRACE_ANYTIME_CALCULATE_RESULT_ENTRY(node_);
-    RCLCPP_DEBUG(node_->get_logger(), "Calculate result function called");
+    std::string goal_id_str =
+      goal_handle_ ? rclcpp_action::to_string(goal_handle_->get_goal_id()) : "null";
+    RCLCPP_DEBUG(
+      node_->get_logger(), "[Goal ID: %s] Calculate result function called", goal_id_str.c_str());
     auto new_result = std::make_shared<typename InterfaceType::Result>();
 
     // Let derived class populate domain-specific result
@@ -229,16 +252,21 @@ public:
 
   virtual void notify_cancel()
   {
-    RCLCPP_DEBUG(node_->get_logger(), "Notify cancel function");
+    std::string goal_id_str =
+      goal_handle_ ? rclcpp_action::to_string(goal_handle_->get_goal_id()) : "null";
+    RCLCPP_DEBUG(node_->get_logger(), "[Goal ID: %s] Notify cancel function", goal_id_str.c_str());
     // Trigger the waitable to process the cancellation
     // this->notify_waitable();
-    RCLCPP_DEBUG(node_->get_logger(), "Notify cancel function finished");
+    RCLCPP_DEBUG(
+      node_->get_logger(), "[Goal ID: %s] Notify cancel function finished", goal_id_str.c_str());
   }
 
   virtual void reset()
   {
     TRACE_ANYTIME_BASE_RESET(node_);
-    RCLCPP_DEBUG(node_->get_logger(), "Reset function called");
+    std::string goal_id_str =
+      goal_handle_ ? rclcpp_action::to_string(goal_handle_->get_goal_id()) : "null";
+    RCLCPP_DEBUG(node_->get_logger(), "[Goal ID: %s] Reset function called", goal_id_str.c_str());
     result_ = std::make_shared<typename InterfaceType::Result>();
 
     // Reset domain-specific state

@@ -71,8 +71,9 @@ void AnytimeActionClient::on_goal_rejected()
 
 void AnytimeActionClient::on_goal_accepted(AnytimeGoalHandle::SharedPtr goal_handle)
 {
-  // Store the goal handle (already done in base class, but ensure it's set)
-  goal_handle_ = goal_handle;
+  RCLCPP_DEBUG(
+    this->get_logger(), "[Goal ID: %s] Goal accepted, starting cancel timeout timer",
+    rclcpp_action::to_string(goal_handle->get_goal_id()).c_str());
 
   // Reset the cancel timeout timer to start counting down
   cancel_timeout_timer_->reset();
@@ -81,16 +82,21 @@ void AnytimeActionClient::on_goal_accepted(AnytimeGoalHandle::SharedPtr goal_han
 void AnytimeActionClient::process_feedback(
   AnytimeGoalHandle::SharedPtr goal_handle, const std::shared_ptr<const Anytime::Feedback> feedback)
 {
-  (void)goal_handle;
   // Log the feedback received from the action server
-  RCLCPP_DEBUG(this->get_logger(), "Next number in the sequence: %f", feedback->feedback);
+  RCLCPP_DEBUG(
+    this->get_logger(), "[Goal ID: %s] Next number in the sequence: %f",
+    rclcpp_action::to_string(goal_handle->get_goal_id()).c_str(), feedback->feedback);
 }
 
 void AnytimeActionClient::log_result(const AnytimeGoalHandle::WrappedResult & result)
 {
   // Log domain-specific result information
-  RCLCPP_DEBUG(this->get_logger(), "Result received: %f", result.result->result);
-  RCLCPP_DEBUG(this->get_logger(), "Number of iterations: %d", result.result->iterations);
+  RCLCPP_DEBUG(
+    this->get_logger(), "[Goal ID: %s] Result received: %f",
+    rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str(), result.result->result);
+  RCLCPP_DEBUG(
+    this->get_logger(), "[Goal ID: %s] Number of iterations: %d",
+    rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str(), result.result->iterations);
 }
 
 void AnytimeActionClient::post_processing(const AnytimeGoalHandle::WrappedResult & result)
@@ -114,23 +120,33 @@ void AnytimeActionClient::cleanup_after_result()
 
 void AnytimeActionClient::cancel_timeout_callback()
 {
-  RCLCPP_DEBUG(this->get_logger(), "Timeout reached, canceling goal");
-
-  // Cancel the timeout timer to prevent multiple cancel requests
-  cancel_timeout_timer_->cancel();
-
   // Check if goal_handle_ is valid before attempting to cancel
   if (!goal_handle_) {
     RCLCPP_WARN(this->get_logger(), "No active goal to cancel");
     return;
   }
 
+  RCLCPP_DEBUG(
+    this->get_logger(), "[Goal ID: %s] Timeout reached, canceling timer",
+    rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str());
+
+  // Cancel the timeout timer to prevent multiple cancel requests
+  cancel_timeout_timer_->cancel();
+
+  RCLCPP_DEBUG(
+    this->get_logger(), "[Goal ID: %s] Sending cancel request",
+    rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str());
+
   // Send a cancel request for the current goal
   try {
     auto cancel_future = action_client_->async_cancel_goal(goal_handle_);
-    RCLCPP_DEBUG(this->get_logger(), "Cancel request sent");
+    RCLCPP_DEBUG(
+      this->get_logger(), "[Goal ID: %s] Cancel request sent",
+      rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str());
   } catch (const std::exception & e) {
-    RCLCPP_ERROR(this->get_logger(), "Failed to send cancel request: %s", e.what());
+    RCLCPP_ERROR(
+      this->get_logger(), "[Goal ID: %s] Failed to send cancel request: %s",
+      rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str(), e.what());
   }
 }
 
