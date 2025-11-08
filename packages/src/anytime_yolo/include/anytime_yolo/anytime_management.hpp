@@ -4,6 +4,7 @@
 #include "anytime_core/anytime_base.hpp"
 #include "anytime_core/anytime_waitable.hpp"
 #include "anytime_interfaces/action/yolo.hpp"
+#include "anytime_yolo/tracing.hpp"
 #include "anytime_yolo/yolo.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 
@@ -40,6 +41,8 @@ public:
   {
     // Initialize common base class functionality
     this->template initialize_anytime_base<isReactiveProactive>(node, batch_size);
+
+    TRACE_YOLO_INIT(node, batch_size, isReactiveProactive, isSyncAsync, weights_path.c_str());
   }
 
   // ----------------- Domain-Specific Implementations -----------------
@@ -47,6 +50,7 @@ public:
   void compute_single_iteration() override
   {
     RCLCPP_DEBUG(this->node_->get_logger(), "YOLO compute single iteration called");
+    TRACE_YOLO_LAYER_START(this->node_, processed_layers_);
 
     void (*callback)(void *) = nullptr;
     if constexpr (isSyncAsync) {
@@ -63,6 +67,7 @@ public:
     if constexpr (!isSyncAsync) {
       // Increment processed layers counter for sync mode
       processed_layers_++;
+      TRACE_YOLO_LAYER_END(this->node_, processed_layers_);
       RCLCPP_DEBUG(this->node_->get_logger(), "Processed layers: %d", processed_layers_);
       this->send_feedback();
     }
@@ -156,10 +161,14 @@ public:
     result->batch_size = this->batch_size_;
     result->processed_layers = processed_layers_;
     result->result_processed_layers = result_processed_layers_;
+
+    TRACE_YOLO_RESULT(
+      this->node_, processed_layers_, result_processed_layers_, result->detections.size());
   }
 
   void reset_domain_state() override
   {
+    TRACE_YOLO_RESET(this->node_);
     RCLCPP_DEBUG(this->node_->get_logger(), "YOLO reset domain state called");
 
     // Process image data from the goal handle
@@ -178,6 +187,8 @@ public:
 
       // Get the OpenCV image
       cv::Mat img = cv_ptr->image;
+
+      TRACE_YOLO_IMAGE_PROCESSED(this->node_, img.cols, img.rows);
 
       cv::Mat blob = cv::dnn::blobFromImage(
         img,                               // input image
@@ -247,6 +258,7 @@ public:
 
     // Increment processed layers counter for async mode
     this_ptr->processed_layers_++;
+    TRACE_YOLO_CUDA_CALLBACK(this_ptr->node_, this_ptr->processed_layers_);
     RCLCPP_DEBUG(
       this_ptr->node_->get_logger(), "Processed layers: %d", this_ptr->processed_layers_);
 

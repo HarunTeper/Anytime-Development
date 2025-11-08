@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(anytime_tracing REQUIRED)
 
 # Include directories
 include_directories(include)
@@ -26,6 +27,6 @@ endif()
 
 # Export dependencies
 ament_export_include_directories(include)
-ament_export_dependencies(rclcpp rclcpp_action)
+ament_export_dependencies(rclcpp rclcpp_action anytime_tracing)
 
 ament_package()

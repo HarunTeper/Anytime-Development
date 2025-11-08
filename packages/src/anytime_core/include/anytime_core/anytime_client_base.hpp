@@ -1,6 +1,8 @@
 #ifndef ANYTIME_CORE_ANYTIME_CLIENT_BASE_HPP
 #define ANYTIME_CORE_ANYTIME_CLIENT_BASE_HPP
 
+#include "anytime_core/tracing.hpp"
+
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 
@@ -31,6 +33,7 @@ public:
     const std::string & node_name, const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
   : Node(node_name, options)
   {
+    TRACE_ANYTIME_CLIENT_INIT(this, node_name.c_str());
     // Initialize the action client
     action_client_ = rclcpp_action::create_client<ActionType>(this, "anytime");
   }
@@ -101,6 +104,7 @@ protected:
    */
   void result_callback(const typename AnytimeGoalHandle::WrappedResult & result)
   {
+    TRACE_ANYTIME_CLIENT_RESULT(this, static_cast<int>(result.code));
     // Log the result based on the result code
     switch (result.code) {
       case rclcpp_action::ResultCode::SUCCEEDED:
@@ -138,6 +142,7 @@ protected:
     const typename ActionType::Goal & goal_msg,
     std::function<void()> on_server_unavailable = nullptr)
   {
+    TRACE_ANYTIME_CLIENT_SEND_GOAL(this);
     RCLCPP_DEBUG(this->get_logger(), "Sending goal to action server");
 
     // Define the goal options with callbacks
@@ -181,6 +186,7 @@ protected:
     // Check if the goal was rejected by the server
     if (!goal_handle) {
       RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
+      TRACE_ANYTIME_CLIENT_GOAL_RESPONSE(this, false);
       on_goal_rejected();
       return;
     }
@@ -189,6 +195,7 @@ protected:
     goal_handle_ = goal_handle;
 
     RCLCPP_DEBUG(this->get_logger(), "Goal accepted by server");
+    TRACE_ANYTIME_CLIENT_GOAL_RESPONSE(this, true);
     on_goal_accepted(goal_handle);
   }
 
@@ -199,6 +206,7 @@ protected:
     typename AnytimeGoalHandle::SharedPtr goal_handle,
     const std::shared_ptr<const typename ActionType::Feedback> feedback)
   {
+    TRACE_ANYTIME_CLIENT_FEEDBACK(this);
     if (!goal_handle) {
       RCLCPP_ERROR(this->get_logger(), "Feedback received for unknown goal handle");
       return;

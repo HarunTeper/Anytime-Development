@@ -22,11 +22,12 @@ find_package(rclcpp_action REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(anytime_interfaces REQUIRED)
 find_package(anytime_core REQUIRED)
+find_package(anytime_tracing REQUIRED)
 
 # Include Cpp "include" directory
 include_directories(include)
 
-set(anytime_dependencies "anytime_interfaces" "rclcpp" "rclcpp_action" "rclcpp_components" "anytime_core")
+set(anytime_dependencies "anytime_interfaces" "rclcpp" "rclcpp_action" "rclcpp_components" "anytime_core" "anytime_tracing")
 
 # Add libraries
 add_library(anytime_mc_client_lib SHARED src/anytime_client.cpp)

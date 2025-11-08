@@ -4,6 +4,7 @@
 #include "anytime_core/anytime_base.hpp"
 #include "anytime_core/anytime_waitable.hpp"
 #include "anytime_interfaces/action/monte_carlo.hpp"
+#include "anytime_monte_carlo/tracing.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 
 #include <cstdint>
@@ -24,6 +25,8 @@ public:
   {
     // Initialize common base class functionality
     this->template initialize_anytime_base<isReactiveProactive>(node, batch_size);
+
+    TRACE_MONTE_CARLO_INIT(node, batch_size, isReactiveProactive);
   }
 
   // ----------------- Domain-Specific Implementations -----------------
@@ -40,6 +43,8 @@ public:
     }
     count_total_++;
     loop_count_++;
+
+    TRACE_MONTE_CARLO_ITERATION(this->node_, loop_count_, count_inside_, count_total_, x, y);
   }
 
   void populate_feedback(std::shared_ptr<Anytime::Feedback> feedback) override
@@ -60,10 +65,14 @@ public:
     // Add additional information to result
     result->batch_time = this->average_computation_time_;
     result->batch_size = this->batch_size_;
+
+    TRACE_MONTE_CARLO_RESULT(
+      this->node_, result->result, result->iterations, count_inside_, count_total_);
   }
 
   void reset_domain_state() override
   {
+    TRACE_MONTE_CARLO_RESET(this->node_);
     RCLCPP_DEBUG(this->node_->get_logger(), "Monte Carlo reset domain state called");
 
     // Reset the count variables

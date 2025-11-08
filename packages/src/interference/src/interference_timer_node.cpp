@@ -1,7 +1,7 @@
 #include "interference/interference_timer_node.hpp"
 
-#include "rclcpp_components/register_node_macro.hpp"
 #include "anytime_tracing/anytime_tracetools.h"
+#include "rclcpp_components/register_node_macro.hpp"
 
 #include <chrono>
 
@@ -20,10 +20,8 @@ InterferenceTimerNode::InterferenceTimerNode(const rclcpp::NodeOptions & options
 
   // Add custom tracepoint for interference timer initialization
   ANYTIME_TRACEPOINT(
-    interference_timer_init,
-    static_cast<const void *>(this->get_node_base_interface().get()),
-    timer_period_ms_,
-    execution_time_ms_);
+    interference_timer_init, static_cast<const void *>(this->get_node_base_interface().get()),
+    timer_period_ms_, execution_time_ms_);
 
   RCLCPP_INFO(
     this->get_logger(),
@@ -45,6 +43,10 @@ InterferenceTimerNode::~InterferenceTimerNode()
 
 void InterferenceTimerNode::timer_callback()
 {
+  ANYTIME_TRACEPOINT(
+    interference_timer_callback_entry,
+    static_cast<const void *>(this->get_node_base_interface().get()), execution_count_);
+
   auto start_time = std::chrono::steady_clock::now();
 
   RCLCPP_DEBUG(this->get_logger(), "Timer callback started (execution #%zu)", execution_count_);
@@ -57,14 +59,19 @@ void InterferenceTimerNode::timer_callback()
   }
 
   auto end_time = std::chrono::steady_clock::now();
-  auto actual_duration =
-    std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+  auto actual_duration_ns =
+    std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
 
   execution_count_++;
 
   RCLCPP_DEBUG(
-    this->get_logger(), "Timer callback completed (execution #%zu). Duration: %ld ms",
-    execution_count_, actual_duration);
+    this->get_logger(), "Timer callback completed (execution #%zu). Duration: %ld ns",
+    execution_count_, actual_duration_ns);
+
+  ANYTIME_TRACEPOINT(
+    interference_timer_callback_exit,
+    static_cast<const void *>(this->get_node_base_interface().get()), execution_count_,
+    actual_duration_ns);
 }
 
 }  // namespace interference

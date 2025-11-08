@@ -16,6 +16,7 @@
   <depend>rclcpp_components</depend>
   <depend>anytime_interfaces</depend>
   <depend>anytime_core</depend>
+  <depend>anytime_tracing</depend>
   <depend>sensor_msgs</depend>
   <depend>opencv</depend>
   <depend>cv_bridge</depend>

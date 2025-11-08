@@ -2,6 +2,7 @@
 #define ANYTIME_CORE_ANYTIME_BASE_HPP
 
 #include "anytime_core/anytime_waitable.hpp"
+#include "anytime_core/tracing.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -39,6 +40,7 @@ public:
   // This replaces the previous three-function pattern with a single state machine
   virtual void reactive_anytime_function()
   {
+    TRACE_REACTIVE_ANYTIME_FUNCTION_ENTRY(node_);
     RCLCPP_DEBUG(node_->get_logger(), "Reactive anytime function called");
 
     if (!is_running()) {
@@ -73,10 +75,13 @@ public:
       // Continue with next iteration
       notify_waitable();
     }
+
+    TRACE_REACTIVE_ANYTIME_FUNCTION_EXIT(node_, should_finish_now, should_cancel);
   }
 
   virtual void proactive_anytime_function()
   {
+    TRACE_PROACTIVE_ANYTIME_FUNCTION_ENTRY(node_);
     RCLCPP_DEBUG(node_->get_logger(), "Proactive anytime function called");
 
     if (!is_running()) {
@@ -110,6 +115,8 @@ public:
       // Continue with next iteration
       notify_waitable();
     }
+
+    TRACE_PROACTIVE_ANYTIME_FUNCTION_EXIT(node_, should_finish_now, should_cancel);
   }
 
   virtual void start()
@@ -122,11 +129,13 @@ public:
   {
     RCLCPP_DEBUG(node_->get_logger(), "Compute function called");
 
-    // Start timing
-    auto start_time = node_->now();
-
     // Get the number of iterations for this batch
     int iterations = get_batch_iterations();
+
+    TRACE_ANYTIME_COMPUTE_ENTRY(node_, iterations);
+
+    // Start timing
+    auto start_time = node_->now();
 
     // Execute batch iterations
     for (int i = 0; i < iterations; i++) {
@@ -137,6 +146,8 @@ public:
       }
 
       RCLCPP_DEBUG(node_->get_logger(), "Computing batch iteration %d", i);
+
+      TRACE_ANYTIME_COMPUTE_ITERATION(node_, i);
 
       // Call domain-specific single iteration computation
       compute_single_iteration();
@@ -178,10 +189,14 @@ public:
     RCLCPP_DEBUG(
       node_->get_logger(), "Average computation time: %f ms",
       average_computation_time_.nanoseconds() / 1e6);
+
+    TRACE_ANYTIME_COMPUTE_EXIT(
+      node_, iterations, computation_time.nanoseconds(), average_computation_time_.nanoseconds());
   }
 
   virtual void send_feedback()
   {
+    TRACE_ANYTIME_SEND_FEEDBACK_ENTRY(node_);
     RCLCPP_DEBUG(node_->get_logger(), "Send feedback function called");
     auto feedback = std::make_shared<typename InterfaceType::Feedback>();
 
@@ -194,10 +209,13 @@ public:
     } else {
       RCLCPP_WARN(node_->get_logger(), "Goal handle is null, cannot send feedback");
     }
+
+    TRACE_ANYTIME_SEND_FEEDBACK_EXIT(node_);
   }
 
   virtual void calculate_result()
   {
+    TRACE_ANYTIME_CALCULATE_RESULT_ENTRY(node_);
     RCLCPP_DEBUG(node_->get_logger(), "Calculate result function called");
     auto new_result = std::make_shared<typename InterfaceType::Result>();
 
@@ -205,6 +223,8 @@ public:
     populate_result(new_result);
 
     result_ = new_result;
+
+    TRACE_ANYTIME_CALCULATE_RESULT_EXIT(node_);
   }
 
   virtual void notify_cancel()
@@ -217,6 +237,7 @@ public:
 
   virtual void reset()
   {
+    TRACE_ANYTIME_BASE_RESET(node_);
     RCLCPP_DEBUG(node_->get_logger(), "Reset function called");
     result_ = std::make_shared<typename InterfaceType::Result>();
 
@@ -228,8 +249,16 @@ public:
   }
 
   // Activation control
-  void activate() { is_running_.store(true, std::memory_order_seq_cst); }
-  void deactivate() { is_running_.store(false, std::memory_order_seq_cst); }
+  void activate()
+  {
+    TRACE_ANYTIME_BASE_ACTIVATE(node_);
+    is_running_.store(true, std::memory_order_seq_cst);
+  }
+  void deactivate()
+  {
+    TRACE_ANYTIME_BASE_DEACTIVATE(node_);
+    is_running_.store(false, std::memory_order_seq_cst);
+  }
   bool is_running() const { return is_running_.load(std::memory_order_seq_cst); }
 
   // Goal handle management
@@ -250,6 +279,8 @@ protected:
 
     // Store the mode
     is_reactive_proactive_ = isReactiveProactive;
+
+    TRACE_ANYTIME_BASE_INIT(node_, batch_size_, isReactiveProactive);
 
     // Create callback group
     compute_callback_group_ =

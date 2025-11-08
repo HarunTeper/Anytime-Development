@@ -16,6 +16,7 @@
   <depend>rclcpp_components</depend>
   <depend>anytime_interfaces</depend>
   <depend>anytime_core</depend>
+  <depend>anytime_tracing</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

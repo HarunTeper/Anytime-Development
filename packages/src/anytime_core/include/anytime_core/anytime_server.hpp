@@ -2,6 +2,7 @@
 #define ANYTIME_CORE_ANYTIME_SERVER_HPP
 
 #include "anytime_core/anytime_base.hpp"
+#include "anytime_core/tracing.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 
@@ -20,6 +21,8 @@ public:
     const std::string & node_name, rclcpp::NodeOptions options = rclcpp::NodeOptions())
   : Node(node_name, options)
   {
+    TRACE_ANYTIME_SERVER_INIT(this, node_name.c_str());
+
     // Create the action server - common for all derived classes
     action_server_ = rclcpp_action::create_server<ActionType>(
       this, "anytime",
@@ -51,12 +54,16 @@ protected:
     (void)uuid;  // Suppress unused variable warning
     (void)goal;  // Suppress unused variable warning
 
+    bool accepted = true;
     if (anytime_management_->is_running()) {
       RCLCPP_DEBUG(this->get_logger(), "Goal rejected: server is busy");
+      accepted = false;
+      TRACE_ANYTIME_SERVER_HANDLE_GOAL(this, accepted);
       return rclcpp_action::GoalResponse::REJECT;
     }
 
     RCLCPP_DEBUG(this->get_logger(), "Goal accepted: server is inactive");
+    TRACE_ANYTIME_SERVER_HANDLE_GOAL(this, accepted);
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
   }
 
@@ -64,6 +71,7 @@ protected:
   virtual rclcpp_action::CancelResponse handle_cancel(
     const std::shared_ptr<GoalHandleType> goal_handle)
   {
+    TRACE_ANYTIME_SERVER_HANDLE_CANCEL(this);
     RCLCPP_DEBUG(this->get_logger(), "Received cancel request");
     (void)goal_handle;
     anytime_management_->notify_cancel();
@@ -73,6 +81,7 @@ protected:
   // Common accepted handling
   virtual void handle_accepted(const std::shared_ptr<GoalHandleType> goal_handle)
   {
+    TRACE_ANYTIME_SERVER_HANDLE_ACCEPTED(this);
     RCLCPP_DEBUG(this->get_logger(), "Setting goal handle for AnytimeManagement");
     anytime_management_->set_goal_handle(goal_handle);
 
