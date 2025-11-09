@@ -1,0 +1,889 @@
+#!/usr/bin/env python3
+"""
+YOLO Phase 3 Runtime Analysis Script
+
+This script analyzes Phase 3 traces to evaluate computation times across different
+configurations (sync/async, single/multi-threaded).
+
+Metrics analyzed:
+- Total processing time per image/goal
+- Layer computation times
+- Exit calculation times
+- Complete computation time (layer + exit stacked)
+- Throughput comparison across configurations
+"""
+
+import os
+import sys
+import json
+import subprocess
+from pathlib import Path
+from collections import defaultdict
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from datetime import datetime
+
+# Configuration
+EXPERIMENT_DIR = Path("/home/vscode/workspace/experiments/yolo")
+TRACE_DIR = EXPERIMENT_DIR / "traces"
+RESULTS_DIR = EXPERIMENT_DIR / "results"
+RUNTIME_DIR = RESULTS_DIR / "runtime_analysis"
+
+# Create output directories
+RESULTS_DIR.mkdir(exist_ok=True)
+RUNTIME_DIR.mkdir(exist_ok=True)
+
+
+class TraceEvent:
+    """Represents a single trace event"""
+
+    def __init__(self, timestamp, event_name, fields):
+        self.timestamp = timestamp
+        self.event_name = event_name
+        self.fields = fields
+
+    def __repr__(self):
+        return f"TraceEvent({self.timestamp}, {self.event_name})"
+
+
+def parse_trace_directory(trace_dir):
+    """
+    Parse a single trace directory using babeltrace
+    """
+    print(f"  Parsing trace: {trace_dir.name}")
+
+    # Use babeltrace2 (without --names none to preserve all fields)
+    try:
+        result = subprocess.run(
+            ['babeltrace2', str(trace_dir)],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        try:
+            result = subprocess.run(
+                ['babeltrace', str(trace_dir)],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"    Error running babeltrace: {e}")
+            return []
+        except FileNotFoundError:
+            print("    Error: babeltrace not found. Please install lttng-tools.")
+            return []
+
+    # Pre-filter lines to only process anytime events
+    anytime_lines = [line for line in result.stdout.split(
+        '\n') if 'anytime:' in line]
+
+    events = []
+    for line in anytime_lines:
+        if not line.strip() or not 'anytime:' in line:
+            continue
+
+        try:
+            # Extract timestamp (in brackets)
+            ts_start = line.find('[')
+            ts_end = line.find(']')
+            if ts_start == -1 or ts_end == -1:
+                continue
+
+            timestamp_str = line[ts_start+1:ts_end]
+            timestamp = float(timestamp_str.replace(':', '')) * 1e9
+
+            # Extract event name
+            event_start = line.find('anytime:')
+            if event_start == -1:
+                continue
+
+            event_name_part = line[event_start:]
+            event_name_end = event_name_part.find(
+                ':', 8)  # Find colon after 'anytime:'
+            if event_name_end == -1:
+                continue
+
+            event_name = event_name_part[8:event_name_end]
+
+            # Extract fields (in braces)
+            fields_start = line.find('{', event_start)
+            fields_end = line.rfind('}')
+            if fields_start == -1 or fields_end == -1:
+                fields = {}
+            else:
+                fields_str = line[fields_start+1:fields_end]
+                fields = parse_fields(fields_str)
+
+            events.append(TraceEvent(timestamp, event_name, fields))
+
+        except Exception as e:
+            continue
+
+    print(f"    Parsed {len(events)} events")
+    return events
+
+
+def parse_fields(fields_str):
+    """Parse the fields string into a dictionary"""
+    fields = {}
+
+    parts = []
+    current = []
+    in_string = False
+
+    for char in fields_str + ',':
+        if char == '"':
+            in_string = not in_string
+        elif char == ',' and not in_string:
+            parts.append(''.join(current).strip())
+            current = []
+            continue
+        current.append(char)
+
+    for part in parts:
+        if not part or '=' not in part:
+            continue
+
+        key, value = part.split('=', 1)
+        key = key.strip()
+        value = value.strip()
+
+        if value.startswith('"') and value.endswith('"'):
+            value = value[1:-1]
+        else:
+            try:
+                if '.' in value:
+                    value = float(value)
+                else:
+                    value = int(value)
+            except ValueError:
+                pass
+
+        fields[key] = value
+
+    return fields
+
+
+def parse_config_from_trace_name(trace_name):
+    """
+    Extract configuration from trace directory name
+    Expected format: phase3_{sync/async}_{single/multi}_trial{n}
+    """
+    config = {
+        'sync_mode': None,
+        'threading': None,
+        'trial': None,
+        'description': trace_name
+    }
+
+    if 'sync' in trace_name and 'async' not in trace_name:
+        config['sync_mode'] = 'sync'
+    elif 'async' in trace_name:
+        config['sync_mode'] = 'async'
+
+    if 'single' in trace_name:
+        config['threading'] = 'single'
+    elif 'multi' in trace_name:
+        config['threading'] = 'multi'
+
+    # Extract trial number
+    if 'trial' in trace_name:
+        try:
+            trial_str = trace_name.split('trial')[1]
+            config['trial'] = int(''.join(filter(str.isdigit, trial_str)))
+        except:
+            pass
+
+    return config
+
+
+def analyze_runtime_trace(trace_dir):
+    """
+    Analyze runtime metrics from a Phase 3 trace
+    Returns detailed timing metrics per goal
+    """
+    events = parse_trace_directory(trace_dir)
+
+    if not events:
+        return None
+
+    config = parse_config_from_trace_name(trace_dir.name)
+
+    # Track per-goal metrics
+    goals = []
+    current_goal = {
+        'goal_id': 0,
+        'goal_start': None,
+        'goal_end': None,
+        'layer_computation_times': {},  # layer_num -> time (ms)
+        'exit_calculation_times': {},  # layer_num -> time (ms)
+        'layer_start_times': {},
+        'exit_calc_start_times': {},
+        'total_layers': 0,
+    }
+
+    goal_counter = 0
+
+    for event in events:
+        if event.event_name == 'anytime_base_activate':
+            # New goal started
+            if current_goal['goal_start']:
+                goals.append(current_goal)
+
+            goal_counter += 1
+            current_goal = {
+                'goal_id': goal_counter,
+                'goal_start': event.timestamp,
+                'goal_end': None,
+                'layer_computation_times': {},
+                'exit_calculation_times': {},
+                'layer_start_times': {},
+                'exit_calc_start_times': {},
+                'total_layers': 0,
+            }
+
+        elif event.event_name == 'yolo_layer_start':
+            layer_num = event.fields.get('layer_num', 0)
+            current_goal['layer_start_times'][layer_num] = event.timestamp
+
+        elif event.event_name == 'yolo_layer_end':
+            layer_num = event.fields.get('layer_num', 0)
+            # yolo_layer_start uses layer_num-1, yolo_layer_end uses layer_num
+            start_layer_num = layer_num - 1
+            if start_layer_num in current_goal['layer_start_times']:
+                start_time = current_goal['layer_start_times'][start_layer_num]
+                computation_time = (
+                    event.timestamp - start_time) / 1e6  # Convert to ms
+                current_goal['layer_computation_times'][layer_num] = computation_time
+            current_goal['total_layers'] = max(
+                current_goal['total_layers'], layer_num)
+
+        elif event.event_name == 'yolo_cuda_callback':
+            # In async mode, CUDA callbacks indicate layer completion
+            # processed_layers = N means layers 0 through N-1 are complete
+            processed_layers = event.fields.get('processed_layers', 0)
+            if processed_layers > 0:
+                layer_num = processed_layers - 1  # The layer that just completed
+                # Find the most recent yolo_layer_start for this layer
+                if layer_num in current_goal['layer_start_times']:
+                    start_time = current_goal['layer_start_times'][layer_num]
+                    computation_time = (
+                        event.timestamp - start_time) / 1e6  # Convert to ms
+                    # Store with layer_num+1 to match sync mode numbering (layer_end uses layer_num)
+                    current_goal['layer_computation_times'][processed_layers] = computation_time
+                current_goal['total_layers'] = max(
+                    current_goal['total_layers'], processed_layers)
+
+        elif event.event_name == 'yolo_exit_calculation_start':
+            layer_num = event.fields.get('layer_num', 0)
+            current_goal['exit_calc_start_times'][layer_num] = event.timestamp
+
+        elif event.event_name == 'yolo_exit_calculation_end':
+            layer_num = event.fields.get('layer_num', 0)
+            if layer_num in current_goal['exit_calc_start_times']:
+                start_time = current_goal['exit_calc_start_times'][layer_num]
+                calc_time = (event.timestamp - start_time) / \
+                    1e6  # Convert to ms
+                current_goal['exit_calculation_times'][layer_num] = calc_time
+
+        elif event.event_name == 'yolo_result':
+            # Goal completed (Phase 1 style with exit calculations)
+            current_goal['goal_end'] = event.timestamp
+
+        elif event.event_name == 'anytime_compute_exit':
+            # Goal completed (Phase 3 style - batch processing, no intermediate exits)
+            current_goal['goal_end'] = event.timestamp
+            # Optionally extract total computation time from the event
+            # computation_time_ns = event.fields.get('computation_time_ns', 0)
+            # iterations_completed = event.fields.get('iterations_completed', 0)
+
+    # Don't forget the last goal
+    if current_goal['goal_start']:
+        goals.append(current_goal)
+
+    # Calculate metrics
+    metrics = {
+        'trace_name': trace_dir.name,
+        'config': config,
+        'total_goals': len(goals),
+        'goals': goals,
+    }
+
+    return metrics
+
+
+def aggregate_metrics(all_metrics):
+    """
+    Aggregate metrics across all traces and group by configuration
+    """
+    print("\n  Aggregating metrics by configuration...")
+
+    # Group by configuration (sync_mode + threading)
+    config_groups = defaultdict(lambda: {
+        'traces': [],
+        'total_goal_times': [],  # Total time per goal (ms)
+        'layer_computation_times': defaultdict(list),  # layer -> [times]
+        'exit_calculation_times': defaultdict(list),  # layer -> [times]
+        'total_times_per_layer': defaultdict(list),  # layer -> [comp + exit]
+    })
+
+    for metrics in all_metrics:
+        if not metrics:
+            continue
+
+        config = metrics['config']
+        key = f"{config['sync_mode']}_{config['threading']}"
+        group = config_groups[key]
+
+        group['traces'].append(metrics['trace_name'])
+
+        for goal in metrics['goals']:
+            # Calculate total goal time
+            if goal['goal_start'] and goal['goal_end']:
+                total_time = (goal['goal_end'] - goal['goal_start']) / 1e6
+                group['total_goal_times'].append(total_time)
+
+            # Aggregate layer times
+            for layer_num, comp_time in goal['layer_computation_times'].items():
+                group['layer_computation_times'][layer_num].append(comp_time)
+
+            for layer_num, exit_time in goal['exit_calculation_times'].items():
+                group['exit_calculation_times'][layer_num].append(exit_time)
+
+            # Calculate total time per layer (comp + exit)
+            for layer_num in goal['layer_computation_times'].keys():
+                comp_time = goal['layer_computation_times'].get(layer_num, 0)
+                exit_time = goal['exit_calculation_times'].get(layer_num, 0)
+                total = comp_time + exit_time
+                group['total_times_per_layer'][layer_num].append(total)
+
+    # Calculate statistics for each group
+    summary = {}
+    for key, group in config_groups.items():
+        summary[key] = {
+            'config': key,
+            'traces': group['traces'],
+            'num_goals': len(group['total_goal_times']),
+            'avg_goal_time_ms': np.mean(group['total_goal_times']) if group['total_goal_times'] else 0,
+            'std_goal_time_ms': np.std(group['total_goal_times']) if group['total_goal_times'] else 0,
+            'min_goal_time_ms': np.min(group['total_goal_times']) if group['total_goal_times'] else 0,
+            'max_goal_time_ms': np.max(group['total_goal_times']) if group['total_goal_times'] else 0,
+            'throughput_imgs_per_sec': len(group['total_goal_times']) / (sum(group['total_goal_times']) / 1000) if group['total_goal_times'] else 0,
+        }
+
+        # Layer-wise statistics
+        summary[key]['layer_comp_stats'] = {}
+        for layer, times in group['layer_computation_times'].items():
+            if times:
+                summary[key]['layer_comp_stats'][layer] = {
+                    'mean': np.mean(times),
+                    'std': np.std(times),
+                    'min': np.min(times),
+                    'max': np.max(times),
+                }
+
+        summary[key]['layer_exit_stats'] = {}
+        for layer, times in group['exit_calculation_times'].items():
+            if times:
+                summary[key]['layer_exit_stats'][layer] = {
+                    'mean': np.mean(times),
+                    'std': np.std(times),
+                    'min': np.min(times),
+                    'max': np.max(times),
+                }
+
+        summary[key]['layer_total_stats'] = {}
+        for layer, times in group['total_times_per_layer'].items():
+            if times:
+                summary[key]['layer_total_stats'][layer] = {
+                    'mean': np.mean(times),
+                    'std': np.std(times),
+                    'min': np.min(times),
+                    'max': np.max(times),
+                }
+
+    return summary
+
+
+def plot_total_goal_time_comparison(summary):
+    """
+    Plot comparison of total goal processing times across configurations
+    """
+    print("\n  Creating total goal time comparison plot...")
+
+    configs = sorted(summary.keys())
+    if not configs:
+        print("    No data available")
+        return
+
+    means = [summary[c]['avg_goal_time_ms'] for c in configs]
+    stds = [summary[c]['std_goal_time_ms'] for c in configs]
+    labels = [c.replace('_', '+').replace('sync', 'Sync').replace(
+        'async', 'Async').replace('single', 'Single').replace('multi', 'Multi') for c in configs]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    x = np.arange(len(configs))
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
+    bar_colors = [colors[i % len(colors)] for i in range(len(configs))]
+    bars = ax.bar(x, means, yerr=stds, capsize=5, alpha=0.7, color=bar_colors)
+
+    ax.set_xlabel('Configuration', fontsize=12)
+    ax.set_ylabel('Average Goal Processing Time (ms)', fontsize=12)
+    ax.set_title('Total Goal Processing Time by Configuration', fontsize=14)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=45, ha='right')
+    ax.grid(True, alpha=0.3, axis='y')
+
+    # Add value labels on bars
+    for i, (bar, mean) in enumerate(zip(bars, means)):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height,
+                f'{mean:.1f}ms',
+                ha='center', va='bottom', fontsize=10)
+
+    plt.tight_layout()
+    plt.savefig(RUNTIME_DIR / 'total_goal_time_comparison.png', dpi=300)
+    plt.close()
+    print(f"    Saved: {RUNTIME_DIR / 'total_goal_time_comparison.png'}")
+
+
+def plot_throughput_comparison(summary):
+    """
+    Plot throughput comparison across configurations
+    """
+    print("\n  Creating throughput comparison plot...")
+
+    configs = sorted(summary.keys())
+    if not configs:
+        print("    No data available")
+        return
+
+    throughputs = [summary[c]['throughput_imgs_per_sec'] for c in configs]
+    labels = [c.replace('_', '+').replace('sync', 'Sync').replace(
+        'async', 'Async').replace('single', 'Single').replace('multi', 'Multi') for c in configs]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    x = np.arange(len(configs))
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
+    bar_colors = [colors[i % len(colors)] for i in range(len(configs))]
+    bars = ax.bar(x, throughputs, alpha=0.7, color=bar_colors)
+
+    ax.set_xlabel('Configuration', fontsize=12)
+    ax.set_ylabel('Throughput (images/sec)', fontsize=12)
+    ax.set_title('Processing Throughput by Configuration', fontsize=14)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=45, ha='right')
+    ax.grid(True, alpha=0.3, axis='y')
+
+    # Add value labels on bars
+    for i, (bar, throughput) in enumerate(zip(bars, throughputs)):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height,
+                f'{throughput:.2f}',
+                ha='center', va='bottom', fontsize=10)
+
+    plt.tight_layout()
+    plt.savefig(RUNTIME_DIR / 'throughput_comparison.png', dpi=300)
+    plt.close()
+    print(f"    Saved: {RUNTIME_DIR / 'throughput_comparison.png'}")
+
+
+def plot_layer_computation_times_by_config(summary):
+    """
+    Plot layer computation times for each configuration
+    """
+    print("\n  Creating layer computation times plot...")
+
+    fig, ax = plt.subplots(figsize=(14, 7))
+
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
+    markers = ['o', 's', '^', 'D', 'v', 'p']
+
+    for idx, (config, data) in enumerate(sorted(summary.items())):
+        if not data['layer_comp_stats']:
+            continue
+
+        layers = sorted(data['layer_comp_stats'].keys())
+        means = [data['layer_comp_stats'][l]['mean'] for l in layers]
+        stds = [data['layer_comp_stats'][l]['std'] for l in layers]
+
+        label = config.replace('_', '+').replace('sync', 'Sync').replace(
+            'async', 'Async').replace('single', 'Single').replace('multi', 'Multi')
+
+        ax.errorbar(layers, means, yerr=stds, marker=markers[idx % len(markers)],
+                    label=label, capsize=3, linewidth=2, markersize=6,
+                    color=colors[idx % len(colors)], alpha=0.8)
+
+    ax.set_xlabel('Layer Number', fontsize=12)
+    ax.set_ylabel('Computation Time (ms)', fontsize=12)
+    ax.set_title('Layer Computation Time by Configuration', fontsize=14)
+    ax.legend(loc='best', fontsize=10)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(RUNTIME_DIR / 'layer_computation_by_config.png', dpi=300)
+    plt.close()
+    print(f"    Saved: {RUNTIME_DIR / 'layer_computation_by_config.png'}")
+
+
+def plot_exit_calculation_times_by_config(summary):
+    """
+    Plot exit calculation times for each configuration
+    """
+    print("\n  Creating exit calculation times plot...")
+
+    fig, ax = plt.subplots(figsize=(14, 7))
+
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
+    markers = ['o', 's', '^', 'D', 'v', 'p']
+
+    for idx, (config, data) in enumerate(sorted(summary.items())):
+        if not data['layer_exit_stats']:
+            continue
+
+        layers = sorted(data['layer_exit_stats'].keys())
+        means = [data['layer_exit_stats'][l]['mean'] for l in layers]
+        stds = [data['layer_exit_stats'][l]['std'] for l in layers]
+
+        label = config.replace('_', '+').replace('sync', 'Sync').replace(
+            'async', 'Async').replace('single', 'Single').replace('multi', 'Multi')
+
+        ax.errorbar(layers, means, yerr=stds, marker=markers[idx % len(markers)],
+                    label=label, capsize=3, linewidth=2, markersize=6,
+                    color=colors[idx % len(colors)], alpha=0.8)
+
+    ax.set_xlabel('Layer Number', fontsize=12)
+    ax.set_ylabel('Exit Calculation Time (ms)', fontsize=12)
+    ax.set_title('Exit Calculation Time by Configuration', fontsize=14)
+    ax.legend(loc='best', fontsize=10)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(RUNTIME_DIR / 'exit_calculation_by_config.png', dpi=300)
+    plt.close()
+    print(f"    Saved: {RUNTIME_DIR / 'exit_calculation_by_config.png'}")
+
+
+def plot_stacked_layer_times_by_config(summary):
+    """
+    Create stacked bar plots showing layer computation + exit calculation times
+    One subplot per configuration
+    """
+    print("\n  Creating stacked layer times plot...")
+
+    configs = sorted(summary.keys())
+    if not configs:
+        print("    No data available")
+        return
+
+    # Create subplots - dynamically size grid based on number of configs
+    n_configs = len(configs)
+    n_cols = 2
+    n_rows = (n_configs + n_cols - 1) // n_cols  # Ceiling division
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(16, 6 * n_rows))
+
+    # Handle case where we have only one row
+    if n_rows == 1:
+        axes = axes.reshape(1, -1)
+    axes = axes.flatten()
+
+    for idx, config in enumerate(configs):
+        if idx >= len(axes):
+            break
+        ax = axes[idx]
+        data = summary[config]
+
+        if not data['layer_comp_stats'] or not data['layer_exit_stats']:
+            ax.text(0.5, 0.5, 'No data', ha='center', va='center',
+                    transform=ax.transAxes)
+            continue
+
+        # Get common layers
+        comp_layers = set(data['layer_comp_stats'].keys())
+        exit_layers = set(data['layer_exit_stats'].keys())
+        layers = sorted(comp_layers & exit_layers)
+
+        if not layers:
+            continue
+
+        comp_means = [data['layer_comp_stats'][l]['mean'] for l in layers]
+        exit_means = [data['layer_exit_stats'][l]['mean'] for l in layers]
+
+        # Create stacked bar chart
+        ax.bar(layers, comp_means, label='Layer Computation',
+               alpha=0.8, color='#1f77b4')
+        ax.bar(layers, exit_means, bottom=comp_means,
+               label='Exit Calculation', alpha=0.8, color='#ff7f0e')
+
+        label = config.replace('_', '+').replace('sync', 'Sync').replace(
+            'async', 'Async').replace('single', 'Single').replace('multi', 'Multi')
+
+        ax.set_xlabel('Layer Number', fontsize=11)
+        ax.set_ylabel('Time (ms)', fontsize=11)
+        ax.set_title(f'{label}', fontsize=12, fontweight='bold')
+        ax.legend(loc='upper right', fontsize=9)
+        ax.grid(True, alpha=0.3, axis='y')
+
+    # Hide any unused subplots
+    for idx in range(len(configs), len(axes)):
+        axes[idx].set_visible(False)
+
+    plt.suptitle('Layer Processing Time Breakdown (Stacked)',
+                 fontsize=14, fontweight='bold', y=0.995)
+    plt.tight_layout()
+    plt.savefig(RUNTIME_DIR / 'stacked_layer_times_by_config.png', dpi=300)
+    plt.close()
+    print(f"    Saved: {RUNTIME_DIR / 'stacked_layer_times_by_config.png'}")
+
+
+def plot_combined_stacked_comparison(summary):
+    """
+    Create a single comparison plot showing stacked times for all configurations side-by-side
+    """
+    print("\n  Creating combined stacked comparison plot...")
+
+    configs = sorted(summary.keys())
+    if not configs:
+        print("    No data available")
+        return
+
+    fig, ax = plt.subplots(figsize=(16, 8))
+
+    # Get all unique layers across all configs
+    all_layers = set()
+    for config in configs:
+        data = summary[config]
+        comp_layers = set(data['layer_comp_stats'].keys())
+        exit_layers = set(data['layer_exit_stats'].keys())
+        all_layers.update(comp_layers & exit_layers)
+
+    layers = sorted(all_layers)
+    if not layers:
+        print("    No common layer data")
+        return
+
+    x = np.arange(len(layers))
+    width = 0.2  # Width of each bar
+    colors_comp = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+    colors_exit = ['#aec7e8', '#ffbb78', '#98df8a', '#ff9896']
+
+    for idx, config in enumerate(configs):
+        data = summary[config]
+        label = config.replace('_', '+').replace('sync', 'Sync').replace(
+            'async', 'Async').replace('single', 'Single').replace('multi', 'Multi')
+
+        comp_means = []
+        exit_means = []
+
+        for layer in layers:
+            comp_mean = data['layer_comp_stats'].get(
+                layer, {}).get('mean', 0)
+            exit_mean = data['layer_exit_stats'].get(layer, {}).get('mean', 0)
+            comp_means.append(comp_mean)
+            exit_means.append(exit_mean)
+
+        offset = (idx - len(configs)/2 + 0.5) * width
+
+        # Plot stacked bars
+        ax.bar(x + offset, comp_means, width,
+               label=f'{label} (Comp)' if idx == 0 else '_nolegend_',
+               alpha=0.8, color=colors_comp[idx])
+        ax.bar(x + offset, exit_means, width, bottom=comp_means,
+               label=f'{label} (Exit)' if idx == 0 else '_nolegend_',
+               alpha=0.6, color=colors_exit[idx])
+
+    ax.set_xlabel('Layer Number', fontsize=12)
+    ax.set_ylabel('Time (ms)', fontsize=12)
+    ax.set_title(
+        'Layer Processing Time Comparison (All Configurations)', fontsize=14)
+    ax.set_xticks(x)
+    ax.set_xticklabels(layers)
+    ax.legend(loc='upper right', fontsize=9, ncol=2)
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    plt.savefig(RUNTIME_DIR / 'combined_stacked_comparison.png', dpi=300)
+    plt.close()
+    print(f"    Saved: {RUNTIME_DIR / 'combined_stacked_comparison.png'}")
+
+
+def export_runtime_results(summary):
+    """
+    Export runtime analysis results to JSON and text
+    """
+    print("\n  Exporting results...")
+
+    # Helper to convert numpy types
+    def convert_numpy(obj):
+        if isinstance(obj, dict):
+            return {k: convert_numpy(v) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [convert_numpy(item) for item in obj]
+        elif isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return obj
+
+    # Save JSON
+    json_path = RUNTIME_DIR / 'runtime_analysis.json'
+    with open(json_path, 'w') as f:
+        json.dump(convert_numpy(summary), f, indent=2)
+    print(f"    Saved: {json_path}")
+
+    # Create human-readable summary
+    summary_path = RUNTIME_DIR / 'runtime_summary.txt'
+    with open(summary_path, 'w') as f:
+        f.write("="*80 + "\n")
+        f.write("YOLO PHASE 3 RUNTIME ANALYSIS SUMMARY\n")
+        f.write("="*80 + "\n\n")
+
+        f.write(
+            f"Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+        for config in sorted(summary.keys()):
+            data = summary[config]
+            label = config.replace('_', ' ').upper()
+
+            f.write(f"\n{'='*80}\n")
+            f.write(f"Configuration: {label}\n")
+            f.write(f"{'='*80}\n")
+            f.write(f"Traces analyzed: {len(data['traces'])}\n")
+            for trace in data['traces']:
+                f.write(f"  - {trace}\n")
+            f.write(f"\nGoals processed: {data['num_goals']}\n\n")
+
+            f.write("GOAL PROCESSING TIME:\n")
+            f.write("-" * 80 + "\n")
+            f.write(f"  Average: {data['avg_goal_time_ms']:.2f} ms\n")
+            f.write(f"  Std Dev: {data['std_goal_time_ms']:.2f} ms\n")
+            f.write(f"  Min:     {data['min_goal_time_ms']:.2f} ms\n")
+            f.write(f"  Max:     {data['max_goal_time_ms']:.2f} ms\n\n")
+
+            f.write(f"THROUGHPUT:\n")
+            f.write("-" * 80 + "\n")
+            f.write(
+                f"  {data['throughput_imgs_per_sec']:.2f} images/second\n\n")
+
+            f.write("LAYER COMPUTATION TIMES (mean ± std):\n")
+            f.write("-" * 80 + "\n")
+            for layer in sorted(data['layer_comp_stats'].keys()):
+                stats = data['layer_comp_stats'][layer]
+                f.write(
+                    f"  Layer {layer:2d}: {stats['mean']:.3f} ± {stats['std']:.3f} ms\n")
+
+            f.write("\nEXIT CALCULATION TIMES (mean ± std):\n")
+            f.write("-" * 80 + "\n")
+            for layer in sorted(data['layer_exit_stats'].keys()):
+                stats = data['layer_exit_stats'][layer]
+                f.write(
+                    f"  Layer {layer:2d}: {stats['mean']:.3f} ± {stats['std']:.3f} ms\n")
+
+            f.write("\nTOTAL TIME PER LAYER (Computation + Exit):\n")
+            f.write("-" * 80 + "\n")
+            for layer in sorted(data['layer_total_stats'].keys()):
+                stats = data['layer_total_stats'][layer]
+                comp = data['layer_comp_stats'].get(layer, {}).get('mean', 0)
+                exit_time = data['layer_exit_stats'].get(
+                    layer, {}).get('mean', 0)
+                f.write(f"  Layer {layer:2d}: {stats['mean']:.3f} ms ")
+                f.write(f"(comp: {comp:.3f} ms, exit: {exit_time:.3f} ms)\n")
+
+            f.write("\n")
+
+        f.write("\n" + "="*80 + "\n")
+        f.write("COMPARISON SUMMARY\n")
+        f.write("="*80 + "\n\n")
+
+        f.write("Average Goal Processing Time:\n")
+        for config in sorted(summary.keys()):
+            label = config.replace('_', '+').replace('sync', 'Sync').replace(
+                'async', 'Async').replace('single', 'Single').replace('multi', 'Multi')
+            f.write(
+                f"  {label:20s}: {summary[config]['avg_goal_time_ms']:.2f} ms\n")
+
+        f.write("\nThroughput:\n")
+        for config in sorted(summary.keys()):
+            label = config.replace('_', '+').replace('sync', 'Sync').replace(
+                'async', 'Async').replace('single', 'Single').replace('multi', 'Multi')
+            f.write(
+                f"  {label:20s}: {summary[config]['throughput_imgs_per_sec']:.2f} imgs/sec\n")
+
+        f.write("\n" + "="*80 + "\n")
+
+    print(f"    Saved: {summary_path}")
+
+    # Print to console
+    with open(summary_path, 'r') as f:
+        print("\n" + f.read())
+
+
+def main():
+    """Main runtime analysis function"""
+    print("="*80)
+    print("YOLO PHASE 3 RUNTIME ANALYSIS")
+    print("="*80)
+    print(f"Trace directory: {TRACE_DIR}")
+    print(f"Runtime results: {RUNTIME_DIR}")
+
+    # Find Phase 3 traces
+    phase3_traces = [d for d in TRACE_DIR.iterdir()
+                     if d.is_dir() and 'phase3' in d.name]
+
+    if not phase3_traces:
+        print("\nError: No Phase 3 traces found!")
+        print(f"Please run Phase 3 experiments first: ./run_phase3_max_throughput.sh")
+        return 1
+
+    print(f"\nFound {len(phase3_traces)} Phase 3 trace directories")
+
+    # Analyze all Phase 3 traces
+    print("\nAnalyzing runtime metrics...")
+    all_metrics = []
+
+    for trace_dir in phase3_traces:
+        print(f"\n  Analyzing: {trace_dir.name}")
+        metrics = analyze_runtime_trace(trace_dir)
+        if metrics:
+            all_metrics.append(metrics)
+            print(f"    Processed {metrics['total_goals']} goals")
+
+    if not all_metrics:
+        print("\nError: No metrics extracted from traces!")
+        return 1
+
+    print(f"\nTotal traces analyzed: {len(all_metrics)}")
+
+    # Aggregate metrics by configuration
+    summary = aggregate_metrics(all_metrics)
+
+    # Generate plots
+    print("\nGenerating plots...")
+    plot_total_goal_time_comparison(summary)
+    plot_throughput_comparison(summary)
+    plot_layer_computation_times_by_config(summary)
+    plot_exit_calculation_times_by_config(summary)
+    plot_stacked_layer_times_by_config(summary)
+    plot_combined_stacked_comparison(summary)
+
+    # Export results
+    export_runtime_results(summary)
+
+    print("\n" + "="*80)
+    print("RUNTIME ANALYSIS COMPLETE")
+    print("="*80)
+    print(f"Results saved to: {RUNTIME_DIR}")
+    print(f"Plots saved to: {RUNTIME_DIR}")
+
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

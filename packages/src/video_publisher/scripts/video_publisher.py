@@ -62,7 +62,7 @@ class VideoPublisher(Node):
 
         image_path = os.path.join(
             self.image_path, self.image_files[self.current_index])
-        self.get_logger().info(f'Publishing image: {image_path}')
+        self.get_logger().debug(f'Publishing image: {image_path}')
 
         image = cv2.imread(image_path)
         if image is None:
@@ -73,11 +73,11 @@ class VideoPublisher(Node):
         msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
         msg.header.stamp = self.get_clock().now().to_msg()
         self.publisher_.publish(msg)
-        self.get_logger().info(
+        self.get_logger().debug(
             f'Published image: {self.image_files[self.current_index]}')
 
     def image_callback(self, msg):
-        self.get_logger().info('Received image, publishing next one.')
+        self.get_logger().debug('Received image, publishing next one.')
         self.current_index += 1
         self.publish_image()
 

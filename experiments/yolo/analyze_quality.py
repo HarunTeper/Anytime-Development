@@ -192,6 +192,11 @@ def analyze_quality_progression(trace_dir):
         # layer_num -> num_detections (filtered if enabled)
         'layer_detections': {},
         'layer_times': {},  # layer_num -> timestamp
+        'layer_computation_times': {},  # layer_num -> computation time (ns)
+        # layer_num -> exit calculation time (ns)
+        'exit_calculation_times': {},
+        'layer_start_times': {},  # layer_num -> start timestamp
+        'exit_calc_start_times': {},  # layer_num -> exit calc start timestamp
         'final_detections': 0,
         'max_layer': 0,
     }
@@ -209,9 +214,18 @@ def analyze_quality_progression(trace_dir):
                 'image_id': image_counter,
                 'layer_detections': {},
                 'layer_times': {},
+                'layer_computation_times': {},
+                'exit_calculation_times': {},
+                'layer_start_times': {},
+                'exit_calc_start_times': {},
                 'final_detections': 0,
                 'max_layer': 0,
             }
+
+        elif event.event_name == 'yolo_layer_start':
+            layer_num = event.fields.get('layer_num', 0)
+            # Store with the start layer number for matching later
+            current_image['layer_start_times'][layer_num] = event.timestamp
 
         elif event.event_name == 'yolo_layer_end':
             layer_num = event.fields.get('layer_num', 0)
@@ -219,10 +233,27 @@ def analyze_quality_progression(trace_dir):
             current_image['max_layer'] = max(
                 current_image['max_layer'], layer_num)
 
+            # Calculate layer computation time
+            # yolo_layer_start uses layer_num-1, yolo_layer_end uses layer_num
+            start_layer_num = layer_num - 1
+            if start_layer_num in current_image['layer_start_times']:
+                start_time = current_image['layer_start_times'][start_layer_num]
+                computation_time = event.timestamp - start_time
+                current_image['layer_computation_times'][layer_num] = computation_time
+
         elif event.event_name == 'yolo_exit_calculation_start':
             # Mark that we're starting exit calculation for this layer
             layer_num = event.fields.get('layer_num', 0)
             current_image['current_exit_layer'] = layer_num
+            current_image['exit_calc_start_times'][layer_num] = event.timestamp
+
+        elif event.event_name == 'yolo_exit_calculation_end':
+            layer_num = event.fields.get('layer_num', 0)
+            # Calculate exit calculation time
+            if layer_num in current_image['exit_calc_start_times']:
+                start_time = current_image['exit_calc_start_times'][layer_num]
+                calc_time = event.timestamp - start_time
+                current_image['exit_calculation_times'][layer_num] = calc_time
 
         elif event.event_name == 'yolo_detection':
             # Track individual detections for this specific layer
@@ -290,6 +321,10 @@ def calculate_quality_metrics(images):
         'layer_detection_progression': defaultdict(list),
         # layer -> [detection/final ratio]
         'layer_quality_ratio': defaultdict(list),
+        # layer -> [computation times in ms]
+        'layer_computation_times': defaultdict(list),
+        # layer -> [exit calculation times in ms]
+        'exit_calculation_times': defaultdict(list),
         # Dictionary of threshold -> list of layers where reached
         'threshold_layers': {
             50: [],
@@ -314,6 +349,20 @@ def calculate_quality_metrics(images):
             # Quality ratio (how close to final result)
             ratio = detections / final_count if final_count > 0 else 0
             metrics['layer_quality_ratio'][layer_num].append(ratio)
+
+    # Track timing data from all images (including those without detections)
+    for img in images:
+        # Layer computation times
+        for layer_num, comp_time in img['layer_computation_times'].items():
+            # Convert from nanoseconds to milliseconds
+            metrics['layer_computation_times'][layer_num].append(
+                comp_time / 1e6)
+
+        # Exit calculation times
+        for layer_num, calc_time in img['exit_calculation_times'].items():
+            # Convert from nanoseconds to milliseconds
+            metrics['exit_calculation_times'][layer_num].append(
+                calc_time / 1e6)
 
         # Find first layer where we reach each quality threshold
         for threshold_pct in [50, 60, 70, 80, 90, 95, 99]:
@@ -346,6 +395,31 @@ def calculate_quality_metrics(images):
             'max': np.max(ratios),
         }
         for layer, ratios in metrics['layer_quality_ratio'].items()
+    }
+
+    # Calculate timing statistics
+    metrics['layer_computation_time_stats'] = {
+        layer: {
+            'mean': np.mean(times),
+            'std': np.std(times),
+            'min': np.min(times),
+            'max': np.max(times),
+            'median': np.median(times),
+            'count': len(times),
+        }
+        for layer, times in metrics['layer_computation_times'].items() if len(times) > 0
+    }
+
+    metrics['exit_calculation_time_stats'] = {
+        layer: {
+            'mean': np.mean(times),
+            'std': np.std(times),
+            'min': np.min(times),
+            'max': np.max(times),
+            'median': np.median(times),
+            'count': len(times),
+        }
+        for layer, times in metrics['exit_calculation_times'].items() if len(times) > 0
     }
 
     return metrics
@@ -563,6 +637,128 @@ def plot_layer_wise_boxplot(metrics):
     print(f"    Saved: {QUALITY_DIR / 'quality_boxplot.png'}")
 
 
+def plot_layer_computation_times(metrics):
+    """
+    Plot layer computation times across layers
+    """
+    print("\n  Creating layer computation time plot...")
+
+    if not metrics['layer_computation_time_stats']:
+        print("    No data for layer computation times")
+        return
+
+    layers = sorted(metrics['layer_computation_time_stats'].keys())
+    means = [metrics['layer_computation_time_stats'][l]['mean']
+             for l in layers]
+    stds = [metrics['layer_computation_time_stats'][l]['std'] for l in layers]
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    ax.errorbar(layers, means, yerr=stds, marker='o',
+                capsize=5, linewidth=2, markersize=8, color='blue')
+    ax.set_xlabel('Layer Number')
+    ax.set_ylabel('Computation Time (ms)')
+    ax.set_title('Layer Computation Time Across Layers')
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(QUALITY_DIR / 'layer_computation_times.png', dpi=300)
+    plt.close()
+    print(f"    Saved: {QUALITY_DIR / 'layer_computation_times.png'}")
+
+
+def plot_exit_calculation_times(metrics):
+    """
+    Plot exit/result calculation times across layers
+    """
+    print("\n  Creating exit calculation time plot...")
+
+    if not metrics['exit_calculation_time_stats']:
+        print("    No data for exit calculation times")
+        return
+
+    layers = sorted(metrics['exit_calculation_time_stats'].keys())
+    means = [metrics['exit_calculation_time_stats'][l]['mean'] for l in layers]
+    stds = [metrics['exit_calculation_time_stats'][l]['std'] for l in layers]
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    ax.errorbar(layers, means, yerr=stds, marker='s',
+                capsize=5, linewidth=2, markersize=8, color='green')
+    ax.set_xlabel('Layer Number')
+    ax.set_ylabel('Calculation Time (ms)')
+    ax.set_title('Exit/Result Calculation Time Across Layers')
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(QUALITY_DIR / 'exit_calculation_times.png', dpi=300)
+    plt.close()
+    print(f"    Saved: {QUALITY_DIR / 'exit_calculation_times.png'}")
+
+
+def plot_combined_timing(metrics):
+    """
+    Plot combined view of layer computation and exit calculation times
+    """
+    print("\n  Creating combined timing plot...")
+
+    if not metrics['layer_computation_time_stats'] or not metrics['exit_calculation_time_stats']:
+        print("    No data for combined timing plot")
+        return
+
+    layers_comp = sorted(metrics['layer_computation_time_stats'].keys())
+    layers_exit = sorted(metrics['exit_calculation_time_stats'].keys())
+
+    # Use the intersection of layers for comparison
+    common_layers = sorted(set(layers_comp) & set(layers_exit))
+
+    if not common_layers:
+        print("    No common layers for combined plot")
+        return
+
+    comp_means = [metrics['layer_computation_time_stats'][l]['mean']
+                  for l in common_layers]
+    exit_means = [metrics['exit_calculation_time_stats'][l]['mean']
+                  for l in common_layers]
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+
+    # Plot 1: Side-by-side comparison
+    x = np.arange(len(common_layers))
+    width = 0.35
+
+    ax1.bar(x - width/2, comp_means, width,
+            label='Layer Computation', alpha=0.8, color='blue')
+    ax1.bar(x + width/2, exit_means, width,
+            label='Exit Calculation', alpha=0.8, color='green')
+    ax1.set_xlabel('Layer Number')
+    ax1.set_ylabel('Time (ms)')
+    ax1.set_title('Layer Computation vs Exit Calculation Time')
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(common_layers)
+    ax1.legend()
+    ax1.grid(True, alpha=0.3, axis='y')
+
+    # Plot 2: Stacked view showing total time per layer
+    total_means = [comp_means[i] + exit_means[i]
+                   for i in range(len(common_layers))]
+
+    ax2.bar(common_layers, comp_means,
+            label='Layer Computation', alpha=0.8, color='blue')
+    ax2.bar(common_layers, exit_means, bottom=comp_means,
+            label='Exit Calculation', alpha=0.8, color='green')
+    ax2.set_xlabel('Layer Number')
+    ax2.set_ylabel('Time (ms)')
+    ax2.set_title('Total Time per Layer (Stacked)')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    plt.savefig(QUALITY_DIR / 'combined_timing.png', dpi=300)
+    plt.close()
+    print(f"    Saved: {QUALITY_DIR / 'combined_timing.png'}")
+
+
 def export_quality_results(metrics, mean_thresholds, threshold_stats):
     """
     Export quality analysis results to JSON and text
@@ -598,6 +794,12 @@ def export_quality_results(metrics, mean_thresholds, threshold_stats):
         },
         'layer_detection_counts': {
             int(k): convert_numpy(v) for k, v in metrics['avg_detections_per_layer'].items()
+        },
+        'layer_computation_time_stats': {
+            int(k): convert_numpy(v) for k, v in metrics['layer_computation_time_stats'].items()
+        },
+        'exit_calculation_time_stats': {
+            int(k): convert_numpy(v) for k, v in metrics['exit_calculation_time_stats'].items()
         },
     }
 
@@ -665,6 +867,52 @@ def export_quality_results(metrics, mean_thresholds, threshold_stats):
                 f"  Layer {layer:2d}: {stats['mean']:.3f} ± {stats['std']:.3f} ")
             f.write(f"(min: {stats['min']:.3f}, max: {stats['max']:.3f})\n")
 
+        f.write("\n")
+        f.write("LAYER COMPUTATION TIMES:\n")
+        f.write("-" * 80 + "\n")
+        if metrics['layer_computation_time_stats']:
+            for layer in sorted(metrics['layer_computation_time_stats'].keys()):
+                stats = metrics['layer_computation_time_stats'][layer]
+                f.write(
+                    f"  Layer {layer:2d}: {stats['mean']:.3f} ± {stats['std']:.3f} ms ")
+                f.write(f"(median: {stats['median']:.3f} ms, ")
+                f.write(
+                    f"min: {stats['min']:.3f} ms, max: {stats['max']:.3f} ms, ")
+                f.write(f"n={stats['count']})\n")
+        else:
+            f.write("  No computation time data available\n")
+
+        f.write("\n")
+        f.write("EXIT/RESULT CALCULATION TIMES:\n")
+        f.write("-" * 80 + "\n")
+        if metrics['exit_calculation_time_stats']:
+            for layer in sorted(metrics['exit_calculation_time_stats'].keys()):
+                stats = metrics['exit_calculation_time_stats'][layer]
+                f.write(
+                    f"  Layer {layer:2d}: {stats['mean']:.3f} ± {stats['std']:.3f} ms ")
+                f.write(f"(median: {stats['median']:.3f} ms, ")
+                f.write(
+                    f"min: {stats['min']:.3f} ms, max: {stats['max']:.3f} ms, ")
+                f.write(f"n={stats['count']})\n")
+        else:
+            f.write("  No exit calculation time data available\n")
+
+        f.write("\n")
+        f.write("TOTAL TIME PER LAYER (Computation + Exit Calculation):\n")
+        f.write("-" * 80 + "\n")
+        if metrics['layer_computation_time_stats'] and metrics['exit_calculation_time_stats']:
+            common_layers = sorted(set(metrics['layer_computation_time_stats'].keys()) &
+                                   set(metrics['exit_calculation_time_stats'].keys()))
+            for layer in common_layers:
+                comp_mean = metrics['layer_computation_time_stats'][layer]['mean']
+                exit_mean = metrics['exit_calculation_time_stats'][layer]['mean']
+                total_mean = comp_mean + exit_mean
+                f.write(f"  Layer {layer:2d}: {total_mean:.3f} ms ")
+                f.write(
+                    f"(computation: {comp_mean:.3f} ms, exit calc: {exit_mean:.3f} ms)\n")
+        else:
+            f.write("  Insufficient timing data for total time calculation\n")
+
         f.write("\n" + "="*80 + "\n")
 
     print(f"    Saved: {summary_path}")
@@ -728,6 +976,12 @@ def main():
     plot_quality_ratio_progression(metrics)
     plot_cancellation_histogram(metrics)
     plot_layer_wise_boxplot(metrics)
+
+    # Generate timing plots
+    print("\nGenerating timing plots...")
+    plot_layer_computation_times(metrics)
+    plot_exit_calculation_times(metrics)
+    plot_combined_timing(metrics)
 
     # Export results
     export_quality_results(metrics, mean_thresholds, threshold_stats)

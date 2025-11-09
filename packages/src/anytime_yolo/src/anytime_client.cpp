@@ -186,7 +186,7 @@ void AnytimeActionClient::process_feedback(
   } else {
     // Cancel after cancel_after_layers
     if (feedback->processed_layers >= cancel_after_layers_ && !is_cancelling_) {
-      RCLCPP_INFO(
+      RCLCPP_DEBUG(
         this->get_logger(), "Notifying cancel waitable after %d layers",
         feedback->processed_layers);
       cancel_waitable_->trigger();
