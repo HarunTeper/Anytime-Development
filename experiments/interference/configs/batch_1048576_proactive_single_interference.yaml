@@ -1,0 +1,10 @@
+interference_timer:
+  ros__parameters:
+    # Timer configuration
+    timer_period_ms: 100  # Period in milliseconds for the interference timer
+    
+    # Execution time (busy-wait duration)
+    execution_time_ms: 10  # Busy-wait duration in milliseconds
+    
+    # Logging configuration
+    log_level: "info"  # Options: "debug", "info", "warn", "error", "fatal"

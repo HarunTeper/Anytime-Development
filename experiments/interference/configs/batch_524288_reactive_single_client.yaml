@@ -1,0 +1,10 @@
+anytime_client:
+  ros__parameters:
+    # Goal timer configuration
+    goal_timer_period_ms: 1000  # Period in milliseconds for the goal request timer
+    
+    # Cancel timeout configuration
+    cancel_timeout_period_ms: 250  # Period in milliseconds for the cancel timeout timer
+    
+    # Logging configuration
+    log_level: "info"  # Options: "debug", "info", "warn", "error", "fatal"
