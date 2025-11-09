@@ -66,15 +66,6 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     echo -e "${BLUE}Starting trace session...${NC}"
     lttng start
     
-    # Launch video publisher in background
-    echo -e "${BLUE}Launching video publisher...${NC}"
-    ros2 launch video_publisher video_publisher.launch.py \
-        image_path:=/home/vscode/workspace/packages/src/video_publisher/images &
-    VIDEO_PUB_PID=$!
-    
-    # Give video publisher time to start
-    sleep 2
-    
     # Launch YOLO client in background
     echo -e "${BLUE}Launching YOLO client...${NC}"
     ros2 launch anytime_yolo action_client.launch.py \
@@ -83,23 +74,35 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     CLIENT_PID=$!
     
     # Give client time to start
-    sleep 2
+    sleep 5
     
-    # Launch YOLO server with parameters
+    # Launch YOLO server in background
     echo -e "${BLUE}Launching YOLO server with baseline configuration...${NC}"
     echo "  - Batch size: 1"
     echo "  - Mode: Proactive"
     echo "  - Sync: sync"
     
-    # Run server in foreground (will complete when all images processed)
     ros2 launch anytime_yolo action_server.launch.py \
         is_reactive_proactive:=proactive \
         is_sync_async:=sync \
         batch_size:=1 \
-        weights_path:=/home/vscode/workspace/packages/src/anytime_yolo/weights_32 || true
+        weights_path:=/home/vscode/workspace/packages/src/anytime_yolo/weights_32 &
+    SERVER_PID=$!
     
-    # Server completed, now clean up
-    echo -e "${BLUE}YOLO processing complete, cleaning up...${NC}"
+    # Give server time to start
+    sleep 5
+    
+    # Launch video publisher in background (starts publishing images)
+    echo -e "${BLUE}Launching video publisher...${NC}"
+    ros2 launch video_publisher video_publisher.launch.py \
+        image_path:=/home/vscode/workspace/packages/src/video_publisher/images &
+    VIDEO_PUB_PID=$!
+    
+    # Wait for video publisher to complete (it will shutdown when done)
+    echo -e "${BLUE}Processing images... waiting for video publisher to complete${NC}"
+    wait ${VIDEO_PUB_PID}
+    
+    echo -e "${BLUE}Video publisher completed, cleaning up...${NC}"
     
     # Stop trace
     echo -e "${BLUE}Stopping trace session...${NC}"
@@ -108,13 +111,15 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     
     # Kill background processes
     echo -e "${BLUE}Stopping background processes...${NC}"
+    kill ${SERVER_PID} 2>/dev/null || true
     kill ${CLIENT_PID} 2>/dev/null || true
     kill ${VIDEO_PUB_PID} 2>/dev/null || true
     
     # Wait for processes to stop
-    sleep 2
+    sleep 5
     
     # Force kill if still running
+    kill -9 ${SERVER_PID} 2>/dev/null || true
     kill -9 ${CLIENT_PID} 2>/dev/null || true
     kill -9 ${VIDEO_PUB_PID} 2>/dev/null || true
     
@@ -124,8 +129,8 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     # Wait between trials
     if [ ${trial} -lt ${NUM_TRIALS} ]; then
         echo ""
-        echo -e "${YELLOW}Waiting 5 seconds before next trial...${NC}"
-        sleep 5
+        echo -e "${YELLOW}Waiting 10 seconds before next trial...${NC}"
+        sleep 10
     fi
 done
 

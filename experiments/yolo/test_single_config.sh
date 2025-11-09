@@ -43,15 +43,6 @@ lttng enable-event -u 'anytime:*'
 echo -e "${BLUE}Starting trace session...${NC}"
 lttng start
 
-# Launch video publisher in background
-echo -e "${BLUE}Launching video publisher...${NC}"
-ros2 launch video_publisher video_publisher.launch.py \
-    image_path:=/home/vscode/workspace/packages/src/video_publisher/images &
-VIDEO_PUB_PID=$!
-
-# Give video publisher time to start
-sleep 2
-
 # Launch YOLO client in background
 echo -e "${BLUE}Launching YOLO client...${NC}"
 ros2 launch anytime_yolo action_client.launch.py \
@@ -62,20 +53,39 @@ CLIENT_PID=$!
 # Give client time to start
 sleep 2
 
-# Launch YOLO server with test parameters
+# Launch YOLO server in background
 echo -e "${BLUE}Launching YOLO server...${NC}"
 echo "  - Batch size: 1"
 echo "  - Mode: Proactive"
-echo "  - Processing first image only (will timeout)"
 echo ""
-echo -e "${YELLOW}Press Ctrl+C to stop after seeing some processing...${NC}"
+echo -e "${YELLOW}Processing will run for 30 seconds or until video publisher completes...${NC}"
+echo -e "${YELLOW}Press Ctrl+C to stop early if needed${NC}"
 
-# Run server in foreground for 30 seconds max
-timeout 30s ros2 launch anytime_yolo action_server.launch.py \
+ros2 launch anytime_yolo action_server.launch.py \
     is_reactive_proactive:=proactive \
     is_sync_async:=sync \
     batch_size:=1 \
-    weights_path:=/home/vscode/workspace/packages/src/anytime_yolo/weights_32 || true
+    weights_path:=/home/vscode/workspace/packages/src/anytime_yolo/weights_32 &
+SERVER_PID=$!
+
+# Give server time to start
+sleep 2
+
+# Launch video publisher in background (starts publishing images)
+echo -e "${BLUE}Launching video publisher...${NC}"
+ros2 launch video_publisher video_publisher.launch.py \
+    image_path:=/home/vscode/workspace/packages/src/video_publisher/images &
+VIDEO_PUB_PID=$!
+
+# Wait for video publisher to complete or timeout after 30 seconds
+echo -e "${BLUE}Waiting for processing to complete (max 30 seconds)...${NC}"
+for i in {1..30}; do
+    if ! kill -0 ${VIDEO_PUB_PID} 2>/dev/null; then
+        echo -e "${GREEN}Video publisher completed!${NC}"
+        break
+    fi
+    sleep 1
+done
 
 # Clean up
 echo ""
@@ -88,6 +98,7 @@ lttng destroy
 
 # Kill background processes
 echo -e "${BLUE}Stopping background processes...${NC}"
+kill ${SERVER_PID} 2>/dev/null || true
 kill ${CLIENT_PID} 2>/dev/null || true
 kill ${VIDEO_PUB_PID} 2>/dev/null || true
 
@@ -95,6 +106,7 @@ kill ${VIDEO_PUB_PID} 2>/dev/null || true
 sleep 2
 
 # Force kill if still running
+kill -9 ${SERVER_PID} 2>/dev/null || true
 kill -9 ${CLIENT_PID} 2>/dev/null || true
 kill -9 ${VIDEO_PUB_PID} 2>/dev/null || true
 
