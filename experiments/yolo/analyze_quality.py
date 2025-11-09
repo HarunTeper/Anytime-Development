@@ -60,10 +60,10 @@ def parse_trace_directory(trace_dir):
     """
     print(f"  Parsing trace: {trace_dir.name}")
 
-    # Use babeltrace2 with filter if available (faster)
+    # Use babeltrace2 (without --names none to preserve all fields)
     try:
         result = subprocess.run(
-            ['babeltrace2', '--names', 'none', str(trace_dir)],
+            ['babeltrace2', str(trace_dir)],
             capture_output=True,
             text=True,
             check=True
@@ -194,9 +194,6 @@ def analyze_quality_progression(trace_dir):
         'layer_times': {},  # layer_num -> timestamp
         'final_detections': 0,
         'max_layer': 0,
-        # Temporary counter per layer
-        'current_layer_detections': defaultdict(int),
-        'current_exit_layer': -1,  # Track which layer is being calculated
     }
 
     image_counter = 0
@@ -204,11 +201,7 @@ def analyze_quality_progression(trace_dir):
     for event in events:
         if event.event_name == 'anytime_base_activate':
             # New goal/image started
-            if current_image['layer_detections'] or current_image['current_layer_detections']:
-                # Before saving, update layer_detections from current_layer_detections
-                for layer_num, count in current_image['current_layer_detections'].items():
-                    if layer_num not in current_image['layer_detections']:
-                        current_image['layer_detections'][layer_num] = count
+            if current_image['layer_detections']:
                 images.append(current_image)
 
             image_counter += 1
@@ -218,8 +211,6 @@ def analyze_quality_progression(trace_dir):
                 'layer_times': {},
                 'final_detections': 0,
                 'max_layer': 0,
-                'current_layer_detections': defaultdict(int),
-                'current_exit_layer': -1,
             }
 
         elif event.event_name == 'yolo_layer_end':
@@ -234,54 +225,43 @@ def analyze_quality_progression(trace_dir):
             current_image['current_exit_layer'] = layer_num
 
         elif event.event_name == 'yolo_detection':
-            # Track individual detections
-            # Detections come AFTER yolo_exit_calculation_end, so we use current_exit_layer
+            # Track individual detections for this specific layer
+            # Detections come AFTER yolo_exit_calculation_end and belong to layer_num in the event
             layer_num = event.fields.get('layer_num', 0)
             class_id = event.fields.get('class_id', -1)
+
+            # Check if we haven't recorded this layer yet (first detection for this layer)
+            if layer_num not in current_image['layer_detections']:
+                current_image['layer_detections'][layer_num] = 0
 
             if FILTER_BY_CLASS:
                 # Only count detections of the target class
                 if class_id == TARGET_CLASS_ID:
-                    current_image['current_layer_detections'][layer_num] += 1
+                    current_image['layer_detections'][layer_num] += 1
             else:
                 # Count all detections
-                current_image['current_layer_detections'][layer_num] += 1
+                current_image['layer_detections'][layer_num] += 1
 
         elif event.event_name == 'yolo_result':
-            # Detection events come after exit_calculation_end but before result
-            # Now update layer_detections with the actual counts
-            for layer_num, count in current_image['current_layer_detections'].items():
-                current_image['layer_detections'][layer_num] = count
+            # yolo_result is emitted after every layer, so we keep updating final_detections
+            # The last one (highest processed_layers) will be the true final result
+            processed_layers = event.fields.get('processed_layers', 0)
 
-            # Final result for this image
-            if FILTER_BY_CLASS or True:  # Use filtered count for both modes now
-                # The final detection count is from the last processed layer
-                processed_layers = event.fields.get('processed_layers', 0)
-                if processed_layers in current_image['layer_detections']:
-                    current_image['final_detections'] = current_image['layer_detections'][processed_layers]
-                elif processed_layers > 0:
-                    # If not in layer_detections yet, it means 0 detections
-                    current_image['final_detections'] = current_image['current_layer_detections'].get(
-                        processed_layers, 0)
-
-        elif event.event_name == 'yolo_result':
-            # Final result for this image
             if FILTER_BY_CLASS:
                 # The final detection count is from the last processed layer
-                processed_layers = event.fields.get('processed_layers', 0)
-                if processed_layers in current_image['layer_detections']:
-                    current_image['final_detections'] = current_image['layer_detections'][processed_layers]
+                current_image['final_detections'] = current_image['layer_detections'].get(
+                    processed_layers, 0)
+                current_image['max_layer'] = max(
+                    current_image['max_layer'], processed_layers)
             else:
                 # Use total detection count from the event
                 total_detections = event.fields.get('total_detections', 0)
                 current_image['final_detections'] = total_detections
+                current_image['max_layer'] = max(
+                    current_image['max_layer'], processed_layers)
 
     # Don't forget the last image
-    if current_image['layer_detections'] or current_image['current_layer_detections']:
-        # Update layer_detections from current_layer_detections
-        for layer_num, count in current_image['current_layer_detections'].items():
-            if layer_num not in current_image['layer_detections']:
-                current_image['layer_detections'][layer_num] = count
+    if current_image['layer_detections']:
         images.append(current_image)
 
     return images
@@ -551,7 +531,7 @@ def plot_layer_wise_boxplot(metrics):
 
     fig, ax = plt.subplots(figsize=(14, 6))
 
-    bp = ax.boxplot(data, labels=layers, patch_artist=True)
+    bp = ax.boxplot(data, tick_labels=layers, patch_artist=True)
 
     # Color boxes
     for patch in bp['boxes']:
