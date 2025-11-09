@@ -43,29 +43,28 @@ lttng enable-event -u 'anytime:*'
 echo -e "${BLUE}Starting trace...${NC}"
 lttng start
 
-# Launch components
-echo -e "${BLUE}Launching YOLO system...${NC}"
+# Launch YOLO server and client components
+echo -e "${BLUE}Launching YOLO server and client...${NC}"
+echo "  - Using default configuration"
+echo "  - Batch size: 1"
+echo "  - Mode: Proactive"
 
-ros2 launch anytime_yolo action_client.launch.py send_cancel:=false cancel_delay_ms:=0 &
-CLIENT_PID=$!
+ros2 launch experiments yolo.launch.py &
+YOLO_PID=$!
+
+# Wait for components to initialize
+echo -e "${BLUE}Waiting for components to initialize...${NC}"
 sleep 3
 
-ros2 launch anytime_yolo action_server.launch.py \
-    is_reactive_proactive:=proactive \
-    is_sync_async:=sync \
-    batch_size:=1 \
-    weights_path:=/home/vscode/workspace/packages/src/anytime_yolo/weights_32 &
-SERVER_PID=$!
-sleep 3
-
-# Process just 2 images for quick test
-ros2 launch video_publisher video_publisher.launch.py \
+# Launch video publisher
+echo -e "${BLUE}Launching video publisher...${NC}"
+ros2 launch experiments video_publisher_only.launch.py \
     image_path:=/home/vscode/workspace/packages/src/video_publisher/images &
 VIDEO_PUB_PID=$!
 
-# Wait for video publisher
+# Wait for processing to complete (video publisher will exit when done)
 echo -e "${BLUE}Processing images...${NC}"
-wait ${VIDEO_PUB_PID} 2>/dev/null || true
+sleep 10
 
 # Stop trace
 echo -e "${BLUE}Stopping trace...${NC}"
@@ -73,11 +72,11 @@ lttng stop
 lttng destroy
 
 # Clean up
-kill ${SERVER_PID} 2>/dev/null || true
-kill ${CLIENT_PID} 2>/dev/null || true
+kill ${VIDEO_PUB_PID} 2>/dev/null || true
+kill ${YOLO_PID} 2>/dev/null || true
 sleep 2
-kill -9 ${SERVER_PID} 2>/dev/null || true
-kill -9 ${CLIENT_PID} 2>/dev/null || true
+kill -9 ${VIDEO_PUB_PID} 2>/dev/null || true
+kill -9 ${YOLO_PID} 2>/dev/null || true
 
 # Kill any remaining YOLO processes
 pkill -9 -f 'anytime_yolo' 2>/dev/null || true

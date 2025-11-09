@@ -39,7 +39,7 @@ public:
   void log(Severity severity, const char * msg) noexcept override
   {
     if (severity <= Severity::kWARNING) {
-      std::cout << msg << std::endl;
+      // std::cout << msg << std::endl;
     }
   }
 } logger;
@@ -233,7 +233,7 @@ public:
   void printFirstN(size_t n, int lineBreakInterval = 0) const
   {
     if (size == 0) {
-      std::cout << "Empty buffer" << std::endl;
+      // std::cout << "Empty buffer" << std::endl;
       return;
     }
 
@@ -242,13 +242,13 @@ public:
     copyToHost(host_data.data(), elements * sizeof(float));
 
     for (size_t i = 0; i < elements; i++) {
-      std::cout << host_data[i] << " ";
+      // std::cout << host_data[i] << " ";
 
       if (lineBreakInterval > 0 && (i + 1) % lineBreakInterval == 0) {
-        std::cout << std::endl;
+        // std::cout << std::endl;
       }
     }
-    std::cout << std::endl;
+    // std::cout << std::endl;
   }
 
 private:
@@ -335,7 +335,7 @@ bool saveEngineToFile(const std::string & enginePath, const IHostMemory & serial
     return false;
   }
 
-  std::cout << "Engine successfully serialized to: " << enginePath << std::endl;
+  // std::cout << "Engine successfully serialized to: " << enginePath << std::endl;
   return true;
 }
 
@@ -344,11 +344,11 @@ bool buildOnnxEngine(
 {
   // setup the builder and network, then parse the model
 
-  std::cout << "Building engine from ONNX model: " << onnx_path << std::endl;
+  // std::cout << "Building engine from ONNX model: " << onnx_path << std::endl;
   if (halfPrecision) {
-    std::cout << "Using half precision" << std::endl;
+    // std::cout << "Using half precision" << std::endl;
   } else {
-    std::cout << "Using full precision" << std::endl;
+    // std::cout << "Using full precision" << std::endl;
   }
 
   const std::unique_ptr<IBuilder> builder(createInferBuilder(logger));
@@ -383,7 +383,7 @@ bool buildOnnxEngine(
 
   parser->parseFromFile(onnx_path.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));
   for (int32_t i = 0; i < parser->getNbErrors(); ++i) {
-    std::cout << parser->getError(i)->desc() << std::endl;
+    // std::cout << parser->getError(i)->desc() << std::endl;
   }
 
   const std::unique_ptr<IBuilderConfig> config(builder->createBuilderConfig());
@@ -445,7 +445,7 @@ bool loadEngine(
     return false;
   }
 
-  std::cout << "EngineData pointer" << engineData.get() << std::endl;
+  // std::cout << "EngineData pointer" << engineData.get() << std::endl;
 
   engine =
     std::unique_ptr<ICudaEngine>(runtime->deserializeCudaEngine(engineData.get(), engineSize));
@@ -577,29 +577,29 @@ public:
     json config;
     configFile >> config;
 
-    std::cout << "Loaded config file: " << folderPath + "/model.json" << std::endl;
-    std::cout << "Loading layers..." << std::endl;
+    // std::cout << "Loaded config file: " << folderPath + "/model.json" << std::endl;
+    // std::cout << "Loading layers..." << std::endl;
 
     for (const auto & layerConfig : config["layers"]) {
-      std::cout << "Loading layer: " << layerConfig["index"] << " - " << layerConfig["type"]
-                << std::endl;
+      // std::cout << "Loading layer: " << layerConfig["index"] << " - " << layerConfig["type"] <<
+      // std::endl;
       loadLayer(layerConfig, folderPath, false);
     }
 
-    std::cout << "Loading exits..." << std::endl;
+    // std::cout << "Loading exits..." << std::endl;
 
     for (const auto & exitConfig : config["subexits"]) {
-      std::cout << "Loading exit: " << exitConfig["index"] << std::endl;
+      // std::cout << "Loading exit: " << exitConfig["index"] << std::endl;
       loadSubexit(exitConfig, folderPath, false);
     }
 
-    std::cout << config["combine_subheads"].size() << " heads" << std::endl;
+    // std::cout << config["combine_subheads"].size() << " heads" << std::endl;
 
     for (const auto & combiner : config["combine_subheads"]) {
       loadSubexitCombiners(combiner, folderPath, false);
     }
 
-    std::cout << "Loading NMS engine..." << std::endl;
+    // std::cout << "Loading NMS engine..." << std::endl;
 
     if (!loadNMS(config["nms"], folderPath, false)) {
       std::cerr << "Failed to load NMS engine" << std::endl;
@@ -607,8 +607,8 @@ public:
     }
 
     // report lengths of layers and exits
-    std::cout << "Loaded " << chunks.size() << " layers" << std::endl;
-    std::cout << "Loaded " << subexits.size() << " exits" << std::endl;
+    // std::cout << "Loaded " << chunks.size() << " layers" << std::endl;
+    // std::cout << "Loaded " << subexits.size() << " exits" << std::endl;
   }
 
   // Helper function to get binding information from an engine
@@ -800,8 +800,8 @@ public:
         continue;
       }
 
-      std::cout << "Processing subexit " << subexit->exit << "-" << subexit->subexit << " "
-                << subexit->chunk->f[0] << std::endl;
+      // std::cout << "Processing subexit " << subexit->exit << "-" << subexit->subexit << " " <<
+      // subexit->chunk->f[0] << std::endl;
       const AnytimeYOLOChunk & subexitChunk = *subexit->chunk;
 
       // check if all inputs are ready
@@ -876,7 +876,7 @@ public:
 
     // Fixed size for NMS output (as in original code)
     size_t nmsOutputSize = 6 * 1000 * sizeof(float);  // Assuming 1000 detections
-    // std::cout << "NMS output size: " << nmsOutputSize << std::endl;
+    // // std::cout << "NMS output size: " << nmsOutputSize << std::endl;
 
     // Allocate NMS output buffer
     if (!nmsOutputBuffer.allocate(nmsOutputSize)) {
@@ -898,7 +898,7 @@ public:
       std::cerr << "NMS execution failed" << std::endl;
       cudaError_t status = cudaGetLastError();
       if (status != cudaSuccess) {
-        std::cout << "CUDA Error: " << cudaGetErrorString(status) << std::endl;
+        // std::cout << "CUDA Error: " << cudaGetErrorString(status) << std::endl;
         return false;
       }
     }
@@ -948,7 +948,7 @@ public:
     if (file.is_open()) {
       file << j.dump(4);  // Pretty print with 4-space indentation
       file.close();
-      // std::cout << "Successfully wrote tensor data to " << path
+      // // std::cout << "Successfully wrote tensor data to " << path
       //           << std::endl;
     } else {
       std::cerr << "Error opening file for writing: " << path << std::endl;
@@ -957,7 +957,7 @@ public:
 
   std::vector<float> processNMSAndGetResults(const CudaBuffer & input)
   {
-    std::cout << "Processing NMS" << std::endl;
+    // std::cout << "Processing NMS" << std::endl;
 
     CudaBuffer nmsOutputBuffer;
     std::vector<float> finalOutput;
@@ -997,7 +997,7 @@ public:
         if (state.currentIndex < chunks.size()) {
           const auto & chunk = chunks[state.currentIndex];
 
-          std::cout << "Processing layer " << state.currentIndex << std::endl;
+          // std::cout << "Processing layer " << state.currentIndex << std::endl;
           // Process this layer
           if (!processChunk(
                 chunk, state.inputBuffer, state.layerOutputBuffers,
@@ -1020,14 +1020,14 @@ public:
 
       case InferenceState::EXIT_PROCESSING: {
         std::lock_guard<std::mutex> lock(exitMutex);
-        std::cout << "Reached exit" << std::endl;
+        // std::cout << "Reached exit" << std::endl;
 
         // Process exit using layers output
         const std::vector<Subexit *> exitPtrs = {
           subexits[0].get(), subexits[1].get(), subexits[2].get()};
         const SubexitCombiner & head = heads[0];
 
-        std::cout << "Processing exit " << 0 << std::endl;
+        // std::cout << "Processing exit " << 0 << std::endl;
 
         if (!processExit(
               state, exitPtrs, state.layerOutputBuffers, head, state.inputBuffer,
@@ -1085,7 +1085,7 @@ public:
   std::optional<std::vector<Subexit *>> findBestExit(
     const std::vector<std::vector<int>> & possibleCombinations, int currentIndex)
   {
-    std::cout << "Looking for best exit for index " << currentIndex << std::endl;
+    // std::cout << "Looking for best exit for index " << currentIndex << std::endl;
 
     // Create a map for quick lookup of Subexit by f
     std::map<int, Subexit *> exitMap;
@@ -1152,18 +1152,19 @@ public:
     // check the farthest exits for which all inputs are ready
     auto exitPtrs = findBestExit(state.possibleExits, state.currentIndex);
     if (!exitPtrs.has_value()) {
-      std::cout << "No valid exit found" << std::endl;
+      // std::cout << "No valid exit found" << std::endl;
       return {};
     }
-    std::cout << "Found exit :";
+    // std::cout << "Found exit :";
 
     for (auto & subexit : exitPtrs.value()) {
       if (subexit == nullptr) {
-        std::cout << "-1 ";
-      } else
-        std::cout << subexit->chunk->f[0] << " ";
+        // std::cout << "-1 ";
+      } else {
+        // std::cout << subexit->chunk->f[0] << " ";
+      }
     }
-    std::cout << std::endl;
+    // std::cout << std::endl;
 
     int exit = heads.size() - 1;  // last exit
     if (exitPtrs.value()[0] != nullptr) exit = exitPtrs.value()[0]->exit;
@@ -1222,15 +1223,15 @@ private:
     const std::string weightsPath = folderPath + "/" + nmsConfig["weights"].get<std::string>();
     const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) +
                                    (halfPrecision ? "_fp16.engine" : ".engine");
-    std::cout << "Engine path: " << enginePath << std::endl;
+    // std::cout << "Engine path: " << enginePath << std::endl;
 
     if (loadEngine(enginePath, runtime, nmsEngine)) {
-      std::cout << "Successfully loaded cached NMS engine from: " << enginePath << std::endl;
+      // std::cout << "Successfully loaded cached NMS engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached NMS engine, falling back to build" << std::endl;
       buildOnnxEngine(weightsPath, enginePath, halfPrecision);
 
-      std::cout << "Successfully built NMS engine" << std::endl;
+      // std::cout << "Successfully built NMS engine" << std::endl;
       if (!loadEngine(enginePath, runtime, nmsEngine)) {
         throw std::runtime_error("Failed to load NMS engine");
       }
@@ -1259,16 +1260,16 @@ private:
     // engine path is the same as weights path but with .engine extension
     const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) +
                                    (halfPrecision ? "_fp16.engine" : ".engine");
-    std::cout << "Engine path: " << enginePath << std::endl;
+    // std::cout << "Engine path: " << enginePath << std::endl;
 
     std::unique_ptr<ICudaEngine> engine;
     if (loadEngine(enginePath, runtime, engine)) {
-      std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
+      // std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
       buildOnnxEngine(weightsPath, enginePath, halfPrecision);
 
-      std::cout << "Successfully built layer" << std::endl;
+      // std::cout << "Successfully built layer" << std::endl;
 
       if (!loadEngine(enginePath, runtime, engine)) {
         throw std::runtime_error("Failed to load engine");
@@ -1277,7 +1278,7 @@ private:
 
     auto context = std::unique_ptr<nvinfer1::IExecutionContext>(engine->createExecutionContext());
 
-    std::cout << "Loaded engine for layer: " << index << std::endl;
+    // std::cout << "Loaded engine for layer: " << index << std::endl;
 
     chunks.push_back({type, index, f, std::move(engine), std::move(context)});
     return true;
@@ -1302,12 +1303,12 @@ private:
 
     std::unique_ptr<ICudaEngine> engine;
     if (loadEngine(enginePath, runtime, engine)) {
-      std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
+      // std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
       buildOnnxEngine(weightsPath, enginePath, halfPrecision);
 
-      std::cout << "Successfully built exit" << std::endl;
+      // std::cout << "Successfully built exit" << std::endl;
 
       if (!loadEngine(enginePath, runtime, engine)) {
         throw std::runtime_error("Failed to load engine");
@@ -1330,23 +1331,23 @@ public:
   bool loadSubexitCombiners(
     const json & layerConfig, const std::string & folderPath, bool halfPrecision = false)
   {
-    std::cout << "Loading subexit combiner" << std::endl;
+    // std::cout << "Loading subexit combiner" << std::endl;
 
     const std::string weightsPath = folderPath + "/" + layerConfig["weights"].get<std::string>();
 
     const std::string enginePath = weightsPath.substr(0, weightsPath.find_last_of('.')) +
                                    (halfPrecision ? "_fp16.engine" : ".engine");
 
-    std::cout << "Engine path: " << enginePath << std::endl;
+    // std::cout << "Engine path: " << enginePath << std::endl;
 
     std::unique_ptr<ICudaEngine> engine;
     if (loadEngine(enginePath, runtime, engine)) {
-      std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
+      // std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
       buildOnnxEngine(weightsPath, enginePath, halfPrecision);
 
-      std::cout << "Successfully built subexit combiner" << std::endl;
+      // std::cout << "Successfully built subexit combiner" << std::endl;
 
       if (!loadEngine(enginePath, runtime, engine)) {
         throw std::runtime_error("Failed to load engine");

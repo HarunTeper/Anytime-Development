@@ -1,0 +1,23 @@
+# Phase 1: Baseline Configuration
+# Purpose: Collect layer-wise results to analyze quality progression
+# Server configuration for baseline experiment
+
+anytime_server:
+  ros__parameters:
+    # Anytime algorithm mode
+    is_reactive_proactive: "proactive"
+    
+    # Threading configuration
+    multi_threading: false  # Disable for baseline measurements
+    
+    # Batch processing configuration
+    batch_size: 1  # Process one layer at a time
+    
+    # Synchronization mode
+    is_sync_async: "sync"
+    
+    # YOLO weights path
+    weights_path: "/home/vscode/workspace/packages/src/anytime_yolo/weights_32"
+    
+    # Logging configuration
+    log_level: "info"

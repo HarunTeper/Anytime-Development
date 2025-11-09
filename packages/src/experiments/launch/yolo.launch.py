@@ -1,8 +1,8 @@
-"""Launch file for YOLO experiment with server, client components, and video publisher."""
+"""Launch file for YOLO experiment with server and client components (without video publisher)."""
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch_ros.actions import ComposableNodeContainer, Node
+from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 from launch.substitutions import LaunchConfiguration
 import os
@@ -10,7 +10,7 @@ from ament_index_python.packages import get_package_share_directory
 
 
 def launch_setup(context, *args, **kwargs):
-    """Setup function to print executor type and return container(s) and video publisher."""
+    """Setup function to print executor type and return container(s)."""
 
     use_multi_threaded = context.launch_configurations.get(
         'use_multi_threaded', 'true')
@@ -46,23 +46,6 @@ def launch_setup(context, *args, **kwargs):
     server_config = context.launch_configurations.get(
         'server_config', default_server_config)
     log_level = context.launch_configurations.get('log_level', 'info')
-
-    # Get image path for video publisher
-    video_publisher_pkg = get_package_share_directory('video_publisher')
-    default_image_path = os.path.join(video_publisher_pkg, 'images')
-    image_path = context.launch_configurations.get(
-        'image_path', default_image_path)
-
-    # Video publisher node (separate from component container)
-    video_publisher = Node(
-        package='video_publisher',
-        executable='video_publisher.py',
-        name='video_publisher',
-        parameters=[{
-            'image_path': image_path
-        }],
-        output='screen'
-    )
 
     nodes_to_launch = []
 
@@ -133,12 +116,11 @@ def launch_setup(context, *args, **kwargs):
 
         nodes_to_launch.extend([server_container, client_container])
 
-    nodes_to_launch.append(video_publisher)
     return nodes_to_launch
 
 
 def generate_launch_description():
-    """Return launch description with component container and video publisher."""
+    """Return launch description with component container only."""
 
     # Get the experiments package directory
     experiments_dir = get_package_share_directory('experiments')
@@ -148,10 +130,6 @@ def generate_launch_description():
         experiments_dir, 'config', 'yolo', 'default_client.yaml')
     default_server_config = os.path.join(
         experiments_dir, 'config', 'yolo', 'default_server.yaml')
-
-    # Get default image path
-    video_publisher_pkg = get_package_share_directory('video_publisher')
-    default_image_path = os.path.join(video_publisher_pkg, 'images')
 
     # Declare launch arguments
     client_config_arg = DeclareLaunchArgument(
@@ -184,18 +162,11 @@ def generate_launch_description():
         description='Use multi-threaded executor (true) or single-threaded (false)'
     )
 
-    image_path_arg = DeclareLaunchArgument(
-        'image_path',
-        default_value=default_image_path,
-        description='Path to the image directory for video publisher'
-    )
-
     return LaunchDescription([
         client_config_arg,
         server_config_arg,
         container_name_arg,
         log_level_arg,
         use_multi_threaded_arg,
-        image_path_arg,
         OpaqueFunction(function=launch_setup)
     ])

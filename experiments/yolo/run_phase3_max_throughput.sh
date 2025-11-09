@@ -66,43 +66,31 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     echo -e "${BLUE}Starting trace session...${NC}"
     lttng start
     
-    # Launch YOLO client in background
-    echo -e "${BLUE}Launching YOLO client...${NC}"
-    ros2 launch anytime_yolo action_client.launch.py \
-        send_cancel:=false \
-        cancel_delay_ms:=0 &
-    CLIENT_PID=$!
-    
-    # Give client time to start
-    sleep 2
-    
-    # Launch YOLO server in background
-    echo -e "${BLUE}Launching YOLO server with maximum throughput configuration...${NC}"
+    # Launch YOLO server and client components with Phase 3 config
+    echo -e "${BLUE}Launching YOLO server and client with maximum throughput configuration...${NC}"
     echo "  - Batch size: 25"
     echo "  - Mode: Proactive"
     echo "  - Sync: sync"
     
-    ros2 launch anytime_yolo action_server.launch.py \
-        is_reactive_proactive:=proactive \
-        is_sync_async:=sync \
-        batch_size:=25 \
-        weights_path:=/home/vscode/workspace/packages/src/anytime_yolo/weights_32 &
-    SERVER_PID=$!
+    ros2 launch experiments yolo.launch.py \
+        server_config:=${EXPERIMENT_DIR}/configs/phase3_server.yaml &
+    YOLO_PID=$!
     
-    # Give server time to start
-    sleep 2
+    # Wait for components to initialize
+    echo -e "${BLUE}Waiting for components to initialize (3 seconds)...${NC}"
+    sleep 3
     
-    # Launch video publisher in background (starts publishing images)
+    # Launch video publisher
     echo -e "${BLUE}Launching video publisher...${NC}"
-    ros2 launch video_publisher video_publisher.launch.py \
+    ros2 launch experiments video_publisher_only.launch.py \
         image_path:=/home/vscode/workspace/packages/src/video_publisher/images &
     VIDEO_PUB_PID=$!
     
-    # Wait for video publisher to complete (it will shutdown when done)
-    echo -e "${BLUE}Processing images... waiting for video publisher to complete${NC}"
+    # Wait for processing to complete (it will shutdown when done)
+    echo -e "${BLUE}Processing images... waiting for completion${NC}"
     wait ${VIDEO_PUB_PID}
     
-    echo -e "${BLUE}Video publisher completed, cleaning up...${NC}"
+    echo -e "${BLUE}Processing completed, cleaning up...${NC}"
     
     # Stop trace
     echo -e "${BLUE}Stopping trace session...${NC}"
@@ -111,17 +99,15 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     
     # Kill background processes
     echo -e "${BLUE}Stopping background processes...${NC}"
-    kill ${SERVER_PID} 2>/dev/null || true
-    kill ${CLIENT_PID} 2>/dev/null || true
     kill ${VIDEO_PUB_PID} 2>/dev/null || true
+    kill ${YOLO_PID} 2>/dev/null || true
     
     # Wait for processes to stop
     sleep 2
     
     # Force kill if still running
-    kill -9 ${SERVER_PID} 2>/dev/null || true
-    kill -9 ${CLIENT_PID} 2>/dev/null || true
     kill -9 ${VIDEO_PUB_PID} 2>/dev/null || true
+    kill -9 ${YOLO_PID} 2>/dev/null || true
     
     # Kill any remaining YOLO processes
     pkill -9 -f 'anytime_yolo' 2>/dev/null || true

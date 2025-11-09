@@ -6,14 +6,14 @@ anytime_server:
     # Threading configuration
     multi_threading: true  # Enable/disable multi-threading
     
-    # Batch processing configuration
-    batch_size: 1  # Number of iterations to compute per batch
+    # Batch processing configuration - Phase 3: Maximum throughput
+    batch_size: 25  # Process all 25 layers at once for maximum throughput
     
     # Synchronization mode
     is_sync_async: "sync"  # Options: "sync", "async"
     
     # YOLO weights path
-    weights_path: "/home/vscode/workspace/packages/src/anytime_yolo/weights_32"  # Path to the anytimeyolo weights directory
+    weights_path: "/home/vscode/workspace/packages/src/anytime_yolo/weights_32"
     
     # Logging configuration
     log_level: "info"  # Options: "debug", "info", "warn", "error", "fatal"
