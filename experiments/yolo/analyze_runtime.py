@@ -754,6 +754,105 @@ def plot_combined_stacked_comparison(summary):
     print(f"    Saved: {RUNTIME_DIR / 'combined_stacked_comparison.png'}")
 
 
+def plot_cumulative_runtime_by_config(summary):
+    """
+    Plot cumulative runtime showing total processing time up to each layer
+    for each configuration. This shows the total cost if we cancel at each specific layer.
+    """
+    print("\n  Creating cumulative runtime plot...")
+
+    configs = sorted(summary.keys())
+    if not configs:
+        print("    No data available")
+        return
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
+    markers = ['o', 's', '^', 'D', 'v', 'p']
+    linestyles = ['-', '--', '-.', ':', '-', '--']
+
+    # Plot 1: Cumulative total time (computation + exit) for each config
+    for idx, config in enumerate(configs):
+        data = summary[config]
+
+        if not data['layer_total_stats']:
+            continue
+
+        layers = sorted(data['layer_total_stats'].keys())
+        total_means = [data['layer_total_stats'][l]['mean'] for l in layers]
+
+        # Calculate cumulative sum
+        cumulative_total = np.cumsum(total_means)
+
+        label = config.replace('_', '+').replace('sync', 'Sync').replace(
+            'async', 'Async').replace('single', 'Single').replace('multi', 'Multi')
+
+        ax1.plot(layers, cumulative_total, marker=markers[idx % len(markers)],
+                 linewidth=2, markersize=6, label=label,
+                 color=colors[idx % len(
+                     colors)], linestyle=linestyles[idx % len(linestyles)],
+                 alpha=0.8)
+
+    ax1.set_xlabel('Layer Number', fontsize=12)
+    ax1.set_ylabel('Cumulative Time (ms)', fontsize=12)
+    ax1.set_title(
+        'Total Cumulative Runtime Up To Each Layer (By Configuration)', fontsize=13)
+    ax1.legend(loc='best', fontsize=10)
+    ax1.grid(True, alpha=0.3)
+
+    # Plot 2: Stacked area showing cumulative contribution for one config (or best config)
+    # Choose the config with best throughput or first one
+    if configs:
+        # Use first config for detailed breakdown
+        config = configs[0]
+        data = summary[config]
+
+        if data['layer_comp_stats'] and data['layer_exit_stats']:
+            # Get common layers
+            comp_layers = set(data['layer_comp_stats'].keys())
+            exit_layers = set(data['layer_exit_stats'].keys())
+            common_layers = sorted(comp_layers & exit_layers)
+
+            if common_layers:
+                comp_means = [data['layer_comp_stats'][l]['mean']
+                              for l in common_layers]
+                exit_means = [data['layer_exit_stats'][l]['mean']
+                              for l in common_layers]
+
+                cumulative_comp = np.cumsum(comp_means)
+                cumulative_exit = np.cumsum(exit_means)
+                cumulative_total = cumulative_comp + cumulative_exit
+
+                label = config.replace('_', '+').replace('sync', 'Sync').replace(
+                    'async', 'Async').replace('single', 'Single').replace('multi', 'Multi')
+
+                ax2.fill_between(common_layers, 0, cumulative_comp,
+                                 alpha=0.7, label='Layer Computation', color='#1f77b4')
+                ax2.fill_between(common_layers, cumulative_comp, cumulative_total,
+                                 alpha=0.7, label='Exit Calculation', color='#ff7f0e')
+                ax2.plot(common_layers, cumulative_total, marker='o',
+                         linewidth=2, markersize=6, color='red', label='Total Runtime')
+
+                ax2.set_xlabel('Layer Number', fontsize=12)
+                ax2.set_ylabel('Cumulative Time (ms)', fontsize=12)
+                ax2.set_title(
+                    f'Cumulative Runtime Breakdown: {label}', fontsize=13)
+                ax2.legend(loc='best', fontsize=10)
+                ax2.grid(True, alpha=0.3)
+            else:
+                ax2.text(0.5, 0.5, 'Insufficient data for breakdown',
+                         ha='center', va='center', transform=ax2.transAxes)
+        else:
+            ax2.text(0.5, 0.5, 'No exit calculation data for breakdown',
+                     ha='center', va='center', transform=ax2.transAxes)
+
+    plt.tight_layout()
+    plt.savefig(RUNTIME_DIR / 'cumulative_runtime.png', dpi=300)
+    plt.close()
+    print(f"    Saved: {RUNTIME_DIR / 'cumulative_runtime.png'}")
+
+
 def export_runtime_results(summary):
     """
     Export runtime analysis results to JSON and text
@@ -914,6 +1013,7 @@ def main():
     plot_exit_calculation_times_by_config(summary)
     plot_stacked_layer_times_by_config(summary)
     plot_combined_stacked_comparison(summary)
+    plot_cumulative_runtime_by_config(summary)
 
     # Export results
     export_runtime_results(summary)
