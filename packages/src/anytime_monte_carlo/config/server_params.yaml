@@ -4,10 +4,10 @@ anytime_server:
     is_reactive_proactive: "reactive"  # Options: "reactive", "proactive"
     
     # Threading configuration
-    multi_threading: true  # Enable/disable multi-threading
+    multi_threading: false  # Enable/disable multi-threading
     
     # Batch processing configuration
-    batch_size: 1000000  # Number of iterations to compute per batch
+    batch_size: 1024  # Number of iterations to compute per batch
     
     # Logging configuration
     log_level: "debug"  # Options: "debug", "info", "warn", "error", "fatal"

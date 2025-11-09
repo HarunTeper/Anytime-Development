@@ -294,7 +294,11 @@ public:
   std::shared_ptr<GoalHandleType> get_goal_handle() { return goal_handle_; }
 
   // Waitable notification - single unified waitable
-  void notify_waitable() { anytime_waitable_->trigger(); }
+  void notify_waitable()
+  {
+    RCLCPP_DEBUG(node_->get_logger(), "Notifying waitable");
+    anytime_waitable_->trigger();
+  }
 
 protected:
   // Initialize waitables and callback group

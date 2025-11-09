@@ -9,7 +9,7 @@ from ament_index_python.packages import get_package_share_directory
 
 
 def launch_setup(context, *args, **kwargs):
-    """Setup function to print executor type and return container."""
+    """Setup function to print executor type and return container(s)."""
 
     use_multi_threaded = context.launch_configurations.get(
         'use_multi_threaded', 'true')
@@ -52,40 +52,92 @@ def launch_setup(context, *args, **kwargs):
     execution_time_ms = context.launch_configurations.get(
         'execution_time_ms', '10')
 
-    # Create component container with Monte Carlo server, client, and interference timer
-    container = ComposableNodeContainer(
-        name=container_name,
-        namespace='',
-        package='rclcpp_components',
-        executable=executable_name,
-        composable_node_descriptions=[
-            ComposableNode(
-                package='anytime_monte_carlo',
-                plugin='AnytimeActionServer',
-                name='anytime_server',
-                parameters=[server_config],
-            ),
-            ComposableNode(
-                package='anytime_monte_carlo',
-                plugin='AnytimeActionClient',
-                name='anytime_client',
-                parameters=[client_config],
-            ),
-            ComposableNode(
-                package='interference',
-                plugin='interference::InterferenceTimerNode',
-                name='interference_timer',
-                parameters=[{
-                    'timer_period_ms': int(timer_period_ms),
-                    'execution_time_ms': int(execution_time_ms),
-                }]
-            ),
-        ],
-        output='screen',
-        arguments=['--ros-args', '--log-level', log_level],
-    )
+    if use_multi_threaded == 'true':
+        # Multi-threaded: Client and Server (with interference) in the same container
+        print("Configuration: Client and Server (with Interference) in SAME container (multi-threaded)")
+        print("="*80 + "\n")
 
-    return [container]
+        container = ComposableNodeContainer(
+            name=container_name,
+            namespace='',
+            package='rclcpp_components',
+            executable=executable_name,
+            composable_node_descriptions=[
+                ComposableNode(
+                    package='anytime_monte_carlo',
+                    plugin='AnytimeActionServer',
+                    name='anytime_server',
+                    parameters=[server_config],
+                ),
+                ComposableNode(
+                    package='interference',
+                    plugin='interference::InterferenceTimerNode',
+                    name='interference_timer',
+                    parameters=[{
+                        'timer_period_ms': int(timer_period_ms),
+                        'execution_time_ms': int(execution_time_ms),
+                    }]
+                ),
+                ComposableNode(
+                    package='anytime_monte_carlo',
+                    plugin='AnytimeActionClient',
+                    name='anytime_client',
+                    parameters=[client_config],
+                ),
+            ],
+            output='screen',
+            arguments=['--ros-args', '--log-level', log_level],
+        )
+        return [container]
+    else:
+        # Single-threaded: Separate containers - server with interference, and client
+        print("Configuration: Server (with Interference) and Client in SEPARATE containers (single-threaded)")
+        print("="*80 + "\n")
+
+        server_container = ComposableNodeContainer(
+            name=f'{container_name}_server',
+            namespace='',
+            package='rclcpp_components',
+            executable=executable_name,
+            composable_node_descriptions=[
+                ComposableNode(
+                    package='anytime_monte_carlo',
+                    plugin='AnytimeActionServer',
+                    name='anytime_server',
+                    parameters=[server_config],
+                ),
+                ComposableNode(
+                    package='interference',
+                    plugin='interference::InterferenceTimerNode',
+                    name='interference_timer',
+                    parameters=[{
+                        'timer_period_ms': int(timer_period_ms),
+                        'execution_time_ms': int(execution_time_ms),
+                    }]
+                ),
+            ],
+            output='screen',
+            arguments=['--ros-args', '--log-level', log_level],
+        )
+
+        client_container = ComposableNodeContainer(
+            name=f'{container_name}_client',
+            namespace='',
+            package='rclcpp_components',
+            executable=executable_name,
+            composable_node_descriptions=[
+                ComposableNode(
+                    package='anytime_monte_carlo',
+                    plugin='AnytimeActionClient',
+                    name='anytime_client',
+                    parameters=[client_config],
+                ),
+            ],
+            output='screen',
+            arguments=['--ros-args', '--log-level', log_level],
+        )
+
+        return [server_container, client_container]
 
 
 def generate_launch_description():

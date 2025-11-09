@@ -9,7 +9,7 @@ from ament_index_python.packages import get_package_share_directory
 
 
 def launch_setup(context, *args, **kwargs):
-    """Setup function to print executor type and return container."""
+    """Setup function to print executor type and return container(s)."""
 
     use_multi_threaded = context.launch_configurations.get(
         'use_multi_threaded', 'true')
@@ -42,31 +42,74 @@ def launch_setup(context, *args, **kwargs):
         'server_config', default_server_config)
     log_level = context.launch_configurations.get('log_level', 'info')
 
-    # Create component container with both client and server
-    container = ComposableNodeContainer(
-        name=container_name,
-        namespace='',
-        package='rclcpp_components',
-        executable=executable_name,
-        composable_node_descriptions=[
-            ComposableNode(
-                package='anytime_monte_carlo',
-                plugin='AnytimeActionServer',
-                name='anytime_server',
-                parameters=[server_config],
-            ),
-            ComposableNode(
-                package='anytime_monte_carlo',
-                plugin='AnytimeActionClient',
-                name='anytime_client',
-                parameters=[client_config],
-            ),
-        ],
-        output='screen',
-        arguments=['--ros-args', '--log-level', log_level],
-    )
-
-    return [container]
+    if use_multi_threaded == 'true':
+        # Multi-threaded: Both client and server in the same container
+        print("Configuration: Client and Server in SAME container (multi-threaded)")
+        print("="*80 + "\n")
+        
+        container = ComposableNodeContainer(
+            name=container_name,
+            namespace='',
+            package='rclcpp_components',
+            executable=executable_name,
+            composable_node_descriptions=[
+                ComposableNode(
+                    package='anytime_monte_carlo',
+                    plugin='AnytimeActionServer',
+                    name='anytime_server',
+                    parameters=[server_config],
+                ),
+                ComposableNode(
+                    package='anytime_monte_carlo',
+                    plugin='AnytimeActionClient',
+                    name='anytime_client',
+                    parameters=[client_config],
+                ),
+            ],
+            output='screen',
+            arguments=['--ros-args', '--log-level', log_level],
+        )
+        return [container]
+    else:
+        # Single-threaded: Separate containers for client and server
+        print("Configuration: Client and Server in SEPARATE containers (single-threaded)")
+        print("="*80 + "\n")
+        
+        server_container = ComposableNodeContainer(
+            name=f'{container_name}_server',
+            namespace='',
+            package='rclcpp_components',
+            executable=executable_name,
+            composable_node_descriptions=[
+                ComposableNode(
+                    package='anytime_monte_carlo',
+                    plugin='AnytimeActionServer',
+                    name='anytime_server',
+                    parameters=[server_config],
+                ),
+            ],
+            output='screen',
+            arguments=['--ros-args', '--log-level', log_level],
+        )
+        
+        client_container = ComposableNodeContainer(
+            name=f'{container_name}_client',
+            namespace='',
+            package='rclcpp_components',
+            executable=executable_name,
+            composable_node_descriptions=[
+                ComposableNode(
+                    package='anytime_monte_carlo',
+                    plugin='AnytimeActionClient',
+                    name='anytime_client',
+                    parameters=[client_config],
+                ),
+            ],
+            output='screen',
+            arguments=['--ros-args', '--log-level', log_level],
+        )
+        
+        return [server_container, client_container]
 
 
 def generate_launch_description():

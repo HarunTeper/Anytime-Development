@@ -35,9 +35,7 @@ public:
       },
       [this](const std::shared_ptr<GoalHandleType> goal_handle) {
         return this->handle_accepted(goal_handle);
-      },
-      rcl_action_server_get_default_options(),
-      this->get_node_base_interface()->get_default_callback_group());
+      });
   }
 
   virtual ~AnytimeActionServerBase() = default;
