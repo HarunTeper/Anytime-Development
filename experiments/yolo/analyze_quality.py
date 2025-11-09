@@ -31,8 +31,10 @@ PLOTS_DIR = RESULTS_DIR / "plots"
 QUALITY_DIR = RESULTS_DIR / "quality_analysis"
 
 # Filter settings
-FILTER_BY_CLASS = True  # Set to True to filter by specific class, False for all detections
-TARGET_CLASS_ID = 9  # Target class ID to filter for (9 = traffic light in COCO dataset)
+# Set to True to filter by specific class, False for all detections
+FILTER_BY_CLASS = True
+# Target class ID to filter for (9 = traffic light in COCO dataset)
+TARGET_CLASS_ID = 9
 
 # Create output directories
 RESULTS_DIR.mkdir(exist_ok=True)
@@ -187,11 +189,13 @@ def analyze_quality_progression(trace_dir):
     images = []
     current_image = {
         'image_id': 0,
-        'layer_detections': {},  # layer_num -> num_detections (filtered if enabled)
+        # layer_num -> num_detections (filtered if enabled)
+        'layer_detections': {},
         'layer_times': {},  # layer_num -> timestamp
         'final_detections': 0,
         'max_layer': 0,
-        'current_layer_detections': defaultdict(int),  # Temporary counter per layer
+        # Temporary counter per layer
+        'current_layer_detections': defaultdict(int),
         'current_exit_layer': -1,  # Track which layer is being calculated
     }
 
@@ -228,13 +232,13 @@ def analyze_quality_progression(trace_dir):
             # Mark that we're starting exit calculation for this layer
             layer_num = event.fields.get('layer_num', 0)
             current_image['current_exit_layer'] = layer_num
-            
+
         elif event.event_name == 'yolo_detection':
             # Track individual detections
             # Detections come AFTER yolo_exit_calculation_end, so we use current_exit_layer
             layer_num = event.fields.get('layer_num', 0)
             class_id = event.fields.get('class_id', -1)
-            
+
             if FILTER_BY_CLASS:
                 # Only count detections of the target class
                 if class_id == TARGET_CLASS_ID:
@@ -248,8 +252,8 @@ def analyze_quality_progression(trace_dir):
             # Now update layer_detections with the actual counts
             for layer_num, count in current_image['current_layer_detections'].items():
                 current_image['layer_detections'][layer_num] = count
-            
-            # Final result for this image  
+
+            # Final result for this image
             if FILTER_BY_CLASS or True:  # Use filtered count for both modes now
                 # The final detection count is from the last processed layer
                 processed_layers = event.fields.get('processed_layers', 0)
@@ -257,7 +261,8 @@ def analyze_quality_progression(trace_dir):
                     current_image['final_detections'] = current_image['layer_detections'][processed_layers]
                 elif processed_layers > 0:
                     # If not in layer_detections yet, it means 0 detections
-                    current_image['final_detections'] = current_image['current_layer_detections'].get(processed_layers, 0)
+                    current_image['final_detections'] = current_image['current_layer_detections'].get(
+                        processed_layers, 0)
 
         elif event.event_name == 'yolo_result':
             # Final result for this image
@@ -290,9 +295,10 @@ def calculate_quality_metrics(images):
     print("\n  Calculating quality metrics...")
 
     # Filter to only images with detections
-    images_with_detections = [img for img in images if img['final_detections'] > 0]
+    images_with_detections = [
+        img for img in images if img['final_detections'] > 0]
     images_without_detections = len(images) - len(images_with_detections)
-    
+
     print(f"  Images with detections: {len(images_with_detections)}")
     print(f"  Images without detections: {images_without_detections}")
 
@@ -337,7 +343,8 @@ def calculate_quality_metrics(images):
                 ratio = detections / final_count if final_count > 0 else 0
 
                 if ratio >= threshold:
-                    metrics['threshold_layers'][threshold_pct].append(layer_num)
+                    metrics['threshold_layers'][threshold_pct].append(
+                        layer_num)
                     break
 
     # Calculate statistics
@@ -375,10 +382,10 @@ def determine_cancellation_thresholds(metrics):
     for threshold_pct in [50, 60, 70, 80, 90, 95, 99]:
         mean_thresholds[f'{threshold_pct}%'] = None
         threshold = threshold_pct / 100.0
-        
+
         for layer_num in sorted(metrics['avg_quality_ratio_per_layer'].keys()):
             mean_ratio = metrics['avg_quality_ratio_per_layer'][layer_num]['mean']
-            
+
             if mean_ratio >= threshold:
                 mean_thresholds[f'{threshold_pct}%'] = layer_num
                 break
@@ -419,7 +426,7 @@ def plot_detection_progression(metrics):
                 capsize=5, linewidth=2, markersize=8)
     ax.set_xlabel('Layer Number')
     ax.set_ylabel('Average Detection Count')
-    
+
     if FILTER_BY_CLASS:
         title = f'YOLO Detection Count Progression Across Layers (Class {TARGET_CLASS_ID})'
     else:
@@ -443,7 +450,7 @@ def plot_quality_ratio_progression(metrics):
     if not layers:
         print("    No data for quality ratio progression plot")
         return
-        
+
     means = [np.mean(metrics['layer_quality_ratio'][l]) for l in layers]
     stds = [np.std(metrics['layer_quality_ratio'][l]) for l in layers]
 
@@ -457,7 +464,7 @@ def plot_quality_ratio_progression(metrics):
 
     ax.set_xlabel('Layer Number')
     ax.set_ylabel('Quality Ratio (Detections / Final)')
-    
+
     if FILTER_BY_CLASS:
         title = f'YOLO Detection Quality Progression Across Layers (Class {TARGET_CLASS_ID})'
     else:
@@ -483,49 +490,49 @@ def plot_cancellation_histogram(metrics):
     thresholds_to_plot = [70, 80, 90, 95, 99]
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
     axes = axes.flatten()
-    
+
     plotted = False
     for idx, threshold_pct in enumerate(thresholds_to_plot):
         ax = axes[idx]
         layers = metrics['threshold_layers'][threshold_pct]
-        
+
         if not layers:
-            ax.text(0.5, 0.5, f'No data for {threshold_pct}%', 
-                   ha='center', va='center', transform=ax.transAxes)
+            ax.text(0.5, 0.5, f'No data for {threshold_pct}%',
+                    ha='center', va='center', transform=ax.transAxes)
             ax.set_title(f'{threshold_pct}% Quality Threshold')
             continue
-        
+
         plotted = True
         ax.hist(layers, bins=20, edgecolor='black', alpha=0.7)
-        ax.axvline(np.mean(layers), color='r', linestyle='--', 
-                  linewidth=2, label=f"Mean: {np.mean(layers):.1f}")
-        ax.axvline(np.median(layers), color='g', linestyle='--', 
-                  linewidth=2, label=f"Median: {np.median(layers):.1f}")
-        
+        ax.axvline(np.mean(layers), color='r', linestyle='--',
+                   linewidth=2, label=f"Mean: {np.mean(layers):.1f}")
+        ax.axvline(np.median(layers), color='g', linestyle='--',
+                   linewidth=2, label=f"Median: {np.median(layers):.1f}")
+
         ax.set_xlabel('Layer Number')
         ax.set_ylabel('Number of Images')
         ax.set_title(f'{threshold_pct}% Quality Threshold')
         ax.legend(fontsize=8)
         ax.grid(True, alpha=0.3, axis='y')
-    
+
     # Remove extra subplot
     fig.delaxes(axes[5])
-    
+
     if FILTER_BY_CLASS:
-        fig.suptitle(f'Distribution: After How Many Layers Can We Cancel? (Class {TARGET_CLASS_ID})', 
-                    fontsize=14, y=0.995)
+        fig.suptitle(f'Distribution: After How Many Layers Can We Cancel? (Class {TARGET_CLASS_ID})',
+                     fontsize=14, y=0.995)
     else:
-        fig.suptitle('Distribution: After How Many Layers Can We Cancel? (All Classes)', 
-                    fontsize=14, y=0.995)
-    
+        fig.suptitle('Distribution: After How Many Layers Can We Cancel? (All Classes)',
+                     fontsize=14, y=0.995)
+
     plt.tight_layout()
-    
+
     if plotted:
         plt.savefig(QUALITY_DIR / 'cancellation_histograms.png', dpi=300)
         print(f"    Saved: {QUALITY_DIR / 'cancellation_histograms.png'}")
     else:
         print("    No data for histograms")
-    
+
     plt.close()
 
 
@@ -537,7 +544,7 @@ def plot_layer_wise_boxplot(metrics):
 
     layers = sorted(metrics['layer_quality_ratio'].keys())
     data = [metrics['layer_quality_ratio'][l] for l in layers]
-    
+
     if not layers or not data or all(len(d) == 0 for d in data):
         print("    No data for boxplot")
         return
@@ -560,7 +567,7 @@ def plot_layer_wise_boxplot(metrics):
 
     ax.set_xlabel('Layer Number')
     ax.set_ylabel('Quality Ratio')
-    
+
     if FILTER_BY_CLASS:
         title = f'Quality Distribution at Each Layer (Class {TARGET_CLASS_ID})'
     else:
@@ -629,15 +636,17 @@ def export_quality_results(metrics, mean_thresholds, threshold_stats):
 
         f.write(
             f"Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        
+
         if FILTER_BY_CLASS:
             f.write(f"Filter Mode: Class ID {TARGET_CLASS_ID}\n")
         else:
             f.write(f"Filter Mode: All Classes\n")
-        
+
         f.write(f"Total Images Analyzed: {metrics['total_images']}\n")
-        f.write(f"Images with Detections: {metrics['images_with_detections']}\n")
-        f.write(f"Images without Detections: {metrics['images_without_detections']}\n\n")
+        f.write(
+            f"Images with Detections: {metrics['images_with_detections']}\n")
+        f.write(
+            f"Images without Detections: {metrics['images_without_detections']}\n\n")
 
         f.write("MEAN-BASED CANCELLATION THRESHOLDS:\n")
         f.write("(First layer where average quality reaches threshold)\n")
@@ -656,14 +665,16 @@ def export_quality_results(metrics, mean_thresholds, threshold_stats):
             threshold_key = f'{threshold_pct}%'
             stats = threshold_stats.get(threshold_key)
             if stats:
-                f.write(f"\n  {threshold_key} Quality ({stats['count']} images):\n")
+                f.write(
+                    f"\n  {threshold_key} Quality ({stats['count']} images):\n")
                 f.write(f"    Mean:   {stats['mean']:.2f} layers\n")
                 f.write(f"    Median: {stats['median']:.2f} layers\n")
                 f.write(f"    Std:    {stats['std']:.2f} layers\n")
                 f.write(f"    Min:    {stats['min']} layers\n")
                 f.write(f"    Max:    {stats['max']} layers\n")
             else:
-                f.write(f"\n  {threshold_key} Quality: No images reached this threshold\n")
+                f.write(
+                    f"\n  {threshold_key} Quality: No images reached this threshold\n")
         f.write("\n")
 
         f.write("QUALITY PROGRESSION BY LAYER:\n")
@@ -690,7 +701,7 @@ def main():
     print("="*80)
     print(f"Trace directory: {TRACE_DIR}")
     print(f"Quality results: {QUALITY_DIR}")
-    
+
     if FILTER_BY_CLASS:
         print(f"Mode: Filtering by class ID {TARGET_CLASS_ID}")
     else:
@@ -728,7 +739,8 @@ def main():
     metrics = calculate_quality_metrics(all_images)
 
     # Determine cancellation thresholds
-    mean_thresholds, threshold_stats = determine_cancellation_thresholds(metrics)
+    mean_thresholds, threshold_stats = determine_cancellation_thresholds(
+        metrics)
 
     # Generate plots
     print("\nGenerating plots...")
