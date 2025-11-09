@@ -130,6 +130,16 @@ for batch_size in "${BATCH_SIZES[@]}"; do
                 # Wait for the process to complete or timeout
                 wait ${LAUNCH_PID} 2>/dev/null || true
                 
+                # Kill any remaining processes
+                kill ${LAUNCH_PID} 2>/dev/null || true
+                sleep 1
+                kill -9 ${LAUNCH_PID} 2>/dev/null || true
+                
+                # Kill any remaining interference processes
+                pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
+                pkill -9 -f 'interference' 2>/dev/null || true
+                pkill -9 -f 'ros2' 2>/dev/null || true
+                
                 # Give it a moment to flush
                 sleep 2
                 

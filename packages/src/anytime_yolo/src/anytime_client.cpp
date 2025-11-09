@@ -87,13 +87,19 @@ void AnytimeActionClient::send_goal(const Anytime::Goal & goal_msg)
 {
   RCLCPP_DEBUG(this->get_logger(), "Sending goal info");
 
+  // Store the goal for potential retry
+  last_goal_ = goal_msg;
+
   // Use the base class helper to send the goal
   send_goal_to_server(goal_msg);
 }
 
 void AnytimeActionClient::on_goal_rejected()
 {
-  // YOLO doesn't need to do anything special on goal rejection
+  RCLCPP_WARN(this->get_logger(), "Goal rejected by server, retrying...");
+
+  // Resend the goal
+  send_goal_to_server(last_goal_);
 }
 
 void AnytimeActionClient::on_goal_accepted(AnytimeGoalHandle::SharedPtr goal_handle)

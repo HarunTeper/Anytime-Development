@@ -90,9 +90,13 @@ if [[ "$mode" == "run" || "$mode" == "both" ]]; then
                     # Terminate both processes after 60 seconds
                     kill $server_pid 2>/dev/null
                     kill $client_pid 2>/dev/null
+                    sleep 2
+                    
                     # Force kill any remaining processes
+                    kill -9 $server_pid 2>/dev/null
+                    kill -9 $client_pid 2>/dev/null
                     pkill -9 -f 'anytime_monte_carlo' 2>/dev/null
-                    pkill -9 -f '/opt/ros/humble' 2>/dev/null
+                    pkill -9 -f 'ros2' 2>/dev/null
                     sleep 5
                 done
             done

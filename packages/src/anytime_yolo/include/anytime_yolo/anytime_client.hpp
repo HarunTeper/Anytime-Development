@@ -40,6 +40,9 @@ private:
   // Current image buffer
   sensor_msgs::msg::Image::SharedPtr current_image_;
 
+  // Store the last goal message for retry on rejection
+  Anytime::Goal last_goal_;
+
   // Flag to track if a cancel request is in progress
   bool is_cancelling_ = false;
 

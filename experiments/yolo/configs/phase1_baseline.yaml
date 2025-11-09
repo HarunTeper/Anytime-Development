@@ -11,6 +11,7 @@ server_params:
   is_reactive_proactive: "proactive"  # proactive mode
   is_sync_async: "sync"               # sync mode for simplicity
   batch_size: 1                       # Process one layer at a time
+  multi_threading: false              # Disable multi-threading for baseline
   weights_path: "/home/vscode/workspace/packages/src/anytime_yolo/weights_32"
 
 client_params:

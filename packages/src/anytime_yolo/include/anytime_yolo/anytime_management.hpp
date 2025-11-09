@@ -104,6 +104,9 @@ public:
     result_processed_layers_ = processed_layers_;
     std::vector<float> yolo_result;
 
+    // Trace exit calculation start
+    TRACE_YOLO_EXIT_CALCULATION_START(this->node_, processed_layers_);
+
     if constexpr (isReactiveProactive) {
       RCLCPP_DEBUG(this->node_->get_logger(), "Calculating latest exit");
       yolo_result = yolo_.calculateLatestExit(*yolo_state_);
@@ -111,6 +114,17 @@ public:
       RCLCPP_DEBUG(this->node_->get_logger(), "Finishing early");
       yolo_result = yolo_.finishEarly(*yolo_state_);
     }
+
+    // Count valid detections (confidence > 0)
+    int detection_count = 0;
+    for (size_t i = 0; i < yolo_result.size(); i += 6) {
+      if (i + 4 < yolo_result.size() && yolo_result[i + 4] > 0.0) {
+        detection_count++;
+      }
+    }
+
+    // Trace exit calculation end with detection count
+    TRACE_YOLO_EXIT_CALCULATION_END(this->node_, processed_layers_, detection_count);
 
     for (size_t i = 0; i < yolo_result.size(); i += 6) {
       // skip if confidence is 0.0
@@ -154,6 +168,12 @@ public:
 
       // Add the detection to the result
       result->detections.push_back(detection);
+
+      // Trace individual detection with original (pre-scaled) bounding box coordinates
+      TRACE_YOLO_DETECTION(
+        this->node_, processed_layers_, static_cast<int>(i / 6), yolo_result[i + 4],
+        static_cast<int>(yolo_result[i + 5]), yolo_result[i], yolo_result[i + 1],
+        yolo_result[i + 2] - yolo_result[i], yolo_result[i + 3] - yolo_result[i + 1]);
     }
 
     // Add additional information to result

@@ -110,6 +110,11 @@ kill -9 ${SERVER_PID} 2>/dev/null || true
 kill -9 ${CLIENT_PID} 2>/dev/null || true
 kill -9 ${VIDEO_PUB_PID} 2>/dev/null || true
 
+# Kill any remaining YOLO processes
+pkill -9 -f 'anytime_yolo' 2>/dev/null || true
+pkill -9 -f 'video_publisher' 2>/dev/null || true
+pkill -9 -f 'ros2' 2>/dev/null || true
+
 echo ""
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}Test Complete!${NC}"

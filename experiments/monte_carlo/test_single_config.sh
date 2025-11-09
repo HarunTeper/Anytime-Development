@@ -66,6 +66,15 @@ LAUNCH_PID=$!
 # Wait for completion
 wait ${LAUNCH_PID} 2>/dev/null || true
 
+# Kill any remaining processes
+kill ${LAUNCH_PID} 2>/dev/null || true
+sleep 1
+kill -9 ${LAUNCH_PID} 2>/dev/null || true
+
+# Kill any remaining Monte Carlo processes
+pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
+pkill -9 -f 'ros2' 2>/dev/null || true
+
 sleep 2
 
 echo "[5/5] Stopping trace..."

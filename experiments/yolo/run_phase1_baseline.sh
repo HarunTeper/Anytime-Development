@@ -74,7 +74,7 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     CLIENT_PID=$!
     
     # Give client time to start
-    sleep 5
+    sleep 2
     
     # Launch YOLO server in background
     echo -e "${BLUE}Launching YOLO server with baseline configuration...${NC}"
@@ -90,7 +90,7 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     SERVER_PID=$!
     
     # Give server time to start
-    sleep 5
+    sleep 2
     
     # Launch video publisher in background (starts publishing images)
     echo -e "${BLUE}Launching video publisher...${NC}"
@@ -116,12 +116,17 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     kill ${VIDEO_PUB_PID} 2>/dev/null || true
     
     # Wait for processes to stop
-    sleep 5
+    sleep 2
     
     # Force kill if still running
     kill -9 ${SERVER_PID} 2>/dev/null || true
     kill -9 ${CLIENT_PID} 2>/dev/null || true
     kill -9 ${VIDEO_PUB_PID} 2>/dev/null || true
+    
+    # Kill any remaining YOLO processes
+    pkill -9 -f 'anytime_yolo' 2>/dev/null || true
+    pkill -9 -f 'video_publisher' 2>/dev/null || true
+    pkill -9 -f 'ros2' 2>/dev/null || true
     
     echo -e "${GREEN}Trial ${trial} complete!${NC}"
     echo -e "Trace saved to: ${TRIAL_TRACE_DIR}"
@@ -130,7 +135,7 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     if [ ${trial} -lt ${NUM_TRIALS} ]; then
         echo ""
         echo -e "${YELLOW}Waiting 10 seconds before next trial...${NC}"
-        sleep 10
+        sleep 5
     fi
 done
 
