@@ -1,57 +1,73 @@
-# Anytime-Development
+# Anytime ROS2 - Experimental Evaluation
 
-## Setup
+ROS2 implementation of anytime algorithms with comprehensive tracing and experimental evaluation.
 
-Install [Docker Engine](https://docs.docker.com/engine/install/)
+## Quick Start
 
-Install [Visual Studio Code](https://code.visualstudio.com/)
+### Setup
+1. Install [Docker Engine](https://docs.docker.com/engine/install/) and [VS Code](https://code.visualstudio.com/)
+2. Install Docker and Dev Containers extensions in VS Code
+3. For GPU support: Install [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+4. Open this folder in VS Code and rebuild the dev container
 
-## GPU Setup
+### Build Workspace
+```bash
+cd /home/vscode/workspace/packages
+colcon build --symlink-install
+source install/setup.bash
+```
 
-Follow the instructions for the [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+## Experiments
 
-## Start the Container with Visual Studio Code
+Three experimental evaluations are implemented:
 
-In Visual Studio Code, install the **Docker** and **Dev Containers** extensions.
+### 1. Monte Carlo (`experiments/monte_carlo/`)
+**Purpose:** Evaluate batch size scaling and threading impact  
+**Run:** `./run_monte_carlo_experiments.sh`  
+**Duration:** ~40 minutes (24 configs × 3 trials)
 
-Build and open the container.
+### 2. Interference (`experiments/interference/`)
+**Purpose:** Measure timing interference between batch processing and periodic tasks  
+**Run:** `./run_interference_experiments.sh`  
+**Duration:** ~40 minutes (24 configs × 3 trials)
 
-## Start the Container with Docker
+### 3. YOLO (`experiments/yolo/`)
+**Purpose:** Evaluate anytime YOLO with cancellation strategies  
+**Phases:**
+- Phase 1: `./run_phase1_baseline.sh` - Baseline quality data
+- Phase 3: `./run_phase3_max_throughput.sh` - Max throughput across configs
+- Phase 4: `./run_phase4_experiments.sh` - Cancellation performance
 
-Run the following command in a terminal that is in the current folder's directory:
+See individual experiment directories for detailed documentation.
 
-> docker build -t ros2-anytime .devcontainer/
+## Tracing
 
-Start the container using the following command:
+All experiments use LTTng for low-overhead tracing. Custom tracepoints are defined in `packages/src/anytime_tracing/`.
 
-> docker run --gpus all --network host -it -v .:/home/vscode/workspace ros2-anytime
+**Key tracepoints:**
+- `anytime:anytime_compute_entry/exit` - Batch computation timing
+- `anytime:client_send_goal` - Client request tracking
+- `anytime:yolo_layer_start/end` - YOLO layer processing
+- `anytime:interference_timer_callback` - Timer interference
 
-## Running experiments
+**View traces:**
+```bash
+babeltrace ~/.lttng-traces/session_name/
+```
 
-> tmux new-session -s evaluation-session
+## Project Structure
 
-> docker build \
-  -t ros2-anytime-jetson:latest \
-  -f .devcontainer/jetson/Dockerfile \
-  --build-arg ROS_DOMAIN_ID=12 \
-  --build-arg ROS_LOCALHOST_ONLY=1 \
-  --build-arg DISPLAY=$DISPLAY \
-  .devcontainer
+```
+packages/src/
+├── anytime_core/          # Base anytime functionality
+├── anytime_tracing/       # LTTng tracing infrastructure
+├── anytime_monte_carlo/   # Monte Carlo implementation
+├── anytime_yolo/          # Anytime YOLO implementation
+├── interference/          # Timer interference test node
+└── experiments/           # Unified launch files and configs
 
->docker run \
-  --name ros2-anytime-jetson \
-  --network=host \
-  --privileged \
-  --gpus=all \
-  --runtime=nvidia \
-  --env=NVIDIA_VISIBLE_DEVICES=all \
-  --env=ROS_DOMAIN_ID=12 \
-  --env=ROS_LOCALHOST_ONLY=1 \
-  --env=DISPLAY=$DISPLAY \
-  --env=SHELL=/bin/bash \
-  -v ${PWD}:/home/vscode/workspace \
-  -v /tmp/.X11-unix:/tmp/.X11-unix \
-  -u vscode \
-  -w /home/vscode/workspace \
-  ros2-anytime-jetson:latest \
-  /bin/bash -c "chmod +x /home/vscode/workspace/evaluation_monte_carlo.sh && /home/vscode/workspace/evaluation_monte_carlo.sh"
+experiments/
+├── monte_carlo/           # Monte Carlo experiments
+├── interference/          # Interference experiments
+└── yolo/                  # YOLO experiments
+```

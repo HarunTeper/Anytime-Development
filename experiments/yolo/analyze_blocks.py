@@ -93,7 +93,19 @@ def parse_trace_directory(trace_dir):
                 continue
 
             timestamp_str = line[ts_start+1:ts_end]
-            timestamp = float(timestamp_str.replace(':', '')) * 1e9
+            # Convert HH:MM:SS.nanoseconds to nanoseconds
+            parts = timestamp_str.split(':')
+            try:
+                if len(parts) == 3:
+                    hh = int(parts[0])
+                    mm = int(parts[1])
+                    ss = float(parts[2])
+                    seconds_total = hh * 3600 + mm * 60 + ss
+                    timestamp = seconds_total * 1e9
+                else:
+                    timestamp = float(timestamp_str) * 1e9
+            except ValueError:
+                continue
 
             # Extract event name
             event_start = line.find('anytime:')
@@ -425,7 +437,7 @@ def plot_num_blocks_vs_block_size(block_size_stats):
     print(f"    Saved: {BLOCK_DIR / 'num_blocks_vs_block_size.png'}")
 
 
-def plot_per_block_delay_distribution(block_size_stats, selected_block_sizes=[1, 3, 5, 10, 15, 25]):
+def plot_per_block_delay_distribution(block_size_stats, selected_block_sizes=[1, 3, 5, 8, 16, 25]):
     """
     Plot distribution of per-block delays for selected block sizes
     """
@@ -474,7 +486,7 @@ def plot_per_block_delay_distribution(block_size_stats, selected_block_sizes=[1,
     print(f"    Saved: {BLOCK_DIR / 'per_block_delay_distribution.png'}")
 
 
-def plot_detailed_block_breakdown(block_size_stats, selected_block_sizes=[1, 5, 10, 25]):
+def plot_detailed_block_breakdown(block_size_stats, selected_block_sizes=[1, 4, 8, 16]):
     """
     Create detailed breakdown showing cumulative delay across blocks for selected block sizes
     """

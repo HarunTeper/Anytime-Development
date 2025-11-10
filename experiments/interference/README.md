@@ -1,55 +1,43 @@
-# Interference Experimental Evaluation
+# Interference Experiments
 
-This directory contains the complete experimental setup for evaluating timing interference between Monte Carlo batch processing and a periodic timer task.
+Measure timing interference between Monte Carlo batch processing and a periodic timer task.
 
-## Overview
+## Quick Start
 
-The experiments measure how Monte Carlo batch processing interferes with a periodic timer task by analyzing:
-- **Timer period jitter**: Deviation from expected 100ms period
-- **Missed timer periods**: Instances where timer period exceeds 150% of expected
-- **Compute batch timing**: Duration of Monte Carlo compute batches
+```bash
+# Test (10 seconds)
+./test_single_config.sh
 
-### Experiment Configuration
+# Generate configs
+python3 generate_configs.py
 
-**Monte Carlo Parameters:**
-- **Batch sizes**: 1, 64, 4096, 16384, 65536, 262144
-- **Modes**: reactive, proactive
-- **Threading**: single-threaded, multi-threaded
-- **Runs per configuration**: 3 (configurable)
+# Run full experiments (~40 min)
+./run_interference_experiments.sh
 
-**Interference Timer (Fixed):**
-- **Timer period**: 100 ms (10 Hz)
-- **Execution time**: 10 ms (busy-wait)
-
-**Total configurations**: 24 (6 batch sizes × 2 modes × 2 threading)
-**Total runs**: 72 (24 configs × 3 runs)
-
-## Hypothesis
-
-As batch size increases, Monte Carlo computation will increasingly interfere with the periodic timer:
-- **Small batches (1, 64)**: Minimal interference, timer runs close to 100ms period
-- **Large batches (65536, 262144)**: Significant interference, timer may miss periods or experience large jitter
-
-The effect should be more pronounced in **single-threaded** configurations where both tasks compete on the same executor.
-
-## Directory Structure
-
+# View results
+cat results/aggregated_results.csv
+ls results/plots/
 ```
-interference/
-├── configs/                    # YAML configuration files (72 files)
-│   ├── batch_1_reactive_single_server.yaml
-│   ├── batch_1_reactive_single_client.yaml
-│   ├── batch_1_reactive_single_interference.yaml
-│   └── ... (72 files total)
-├── traces/                     # LTTng trace data (created during experiments)
-│   ├── batch_1_reactive_single_run1/
-│   ├── batch_1_reactive_single_run2/
-│   └── ... (72 directories after full run)
-├── results/                    # Analysis results (created by evaluation)
-│   ├── individual_runs.csv
-│   ├── aggregated_results.csv
-│   ├── aggregated_results.json
-│   └── plots/
+
+## Configuration
+
+**Monte Carlo:**
+- Batch sizes: 1, 64, 4096, 16384, 65536, 262144
+- Modes: reactive, proactive
+- Threading: single, multi
+
+**Timer (Fixed):**
+- Period: 100ms (10 Hz)
+- Execution: 10ms busy-wait
+
+**Total**: 24 configs × 3 runs = 72 experiments
+
+## Metrics
+
+- Timer period jitter
+- Missed timer periods (>150% expected)
+- Compute batch timing
+- Interference severity
 │       ├── timer_period_vs_batch_size.png
 │       ├── jitter_vs_batch_size.png
 │       ├── missed_periods_percentage.png

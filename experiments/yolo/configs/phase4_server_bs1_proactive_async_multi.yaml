@@ -1,0 +1,8 @@
+anytime_server:
+  ros__parameters:
+    is_reactive_proactive: proactive
+    multi_threading: true
+    batch_size: 1
+    is_sync_async: async
+    weights_path: /home/vscode/workspace/packages/src/anytime_yolo/weights_32
+    log_level: info

@@ -1,59 +1,52 @@
 # YOLO Experiments
 
-This directory contains experiments for analyzing the Anytime YOLO performance as described in the experimental plan.
+Evaluate Anytime YOLO performance with different cancellation strategies and configurations.
 
-## Experiment Overview
+## Quick Start
 
-The YOLO experiments are divided into phases:
+```bash
+# Test setup
+./test_single_config.sh
 
-### Phase 1: Baseline Run
-- **Purpose**: Collect layer-wise detection data to analyze quality progression
-- **Configuration**: batch_size=1, proactive mode
-- **Script**: `run_phase1_baseline.sh`
-- **Output**: Layer-by-layer detection quality data for quality analysis
+# Phase 1: Baseline (collect quality data)
+./run_phase1_baseline.sh
 
-### Phase 2: Quality Analysis
-- **Purpose**: Determine optimal cancellation points based on Phase 1 data
-- **Script**: `analyze_quality.py` (to be implemented)
-- **Output**: Recommended cancellation thresholds
+# Phase 3: Max throughput (4 configs × 3 trials)
+./run_phase3_max_throughput.sh
+
+# Phase 4: Cancellation performance (24 configs × 3 trials)
+./run_phase4_experiments.sh
+
+# Analyze results
+python3 evaluate_yolo.py
+python3 analyze_quality.py
+python3 analyze_runtime.py
+python3 analyze_phase4.py
+```
+
+## Phases
+
+### Phase 1: Baseline Quality
+- Collect layer-wise detection data
+- Single-threaded, batch_size=1
+- No cancellation (all 25 layers)
 
 ### Phase 3: Maximum Throughput
-- **Purpose**: Measure maximum throughput with all layers processed at once
-- **Configuration**: batch_size=25, proactive mode
-- **Script**: `run_phase3_max_throughput.sh`
-- **Output**: Throughput and performance metrics
+- Test 4 configurations: sync/async × single/multi-threaded
+- batch_size=25 (all layers at once)
+- Compare throughput and layer processing times
 
-### Phase 4: Full Configuration Sweep
-- **Purpose**: Test various configurations with optimized cancellation
-- **Script**: `run_full_sweep.sh` (to be implemented)
-- **Configurations**: Multiple batch sizes, modes, and threading options
+### Phase 4: Cancellation Performance
+- 24 configurations: 3 block sizes × 2 modes × 2 sync modes × 2 threading
+- Cancel after 16 layers or score threshold 0.8
+- Measure cancellation delay and total runtime
 
-## Directory Structure
+## Analysis Scripts
 
-```
-experiments/yolo/
-├── configs/                    # Experiment configuration files
-│   ├── phase1_baseline.yaml
-│   └── phase3_max_throughput.yaml
-├── traces/                     # LTTng trace data
-│   ├── phase1_baseline_trial1/
-│   ├── phase1_baseline_trial2/
-│   ├── phase3_max_throughput_trial1/
-│   └── ...
-├── results/                    # Analysis results
-│   ├── plots/                  # Generated plots
-│   ├── yolo_summary.csv        # Summary metrics
-│   └── yolo_detailed.json      # Detailed results
-├── run_phase1_baseline.sh      # Run Phase 1 experiments
-├── run_phase3_max_throughput.sh # Run Phase 3 experiments
-├── evaluate_yolo.py            # Evaluate experiment results
-├── analyze_quality.py          # Analyze detection quality (Phase 2)
-└── README.md                   # This file
-```
-
-## Prerequisites
-
-1. **Build the workspace**:
+- `analyze_quality.py` - Quality progression analysis
+- `analyze_runtime.py` - Layer computation timing
+- `analyze_phase4.py` - Cancellation performance
+- `analyze_blocks.py` - Block size impact
    ```bash
    cd /home/vscode/workspace/packages
    colcon build --symlink-install

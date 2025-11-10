@@ -1,67 +1,37 @@
-# Monte Carlo Experimental Evaluation
+# Monte Carlo Experiments
 
-This directory contains the complete experimental setup for evaluating Monte Carlo performance with different configurations.
-
-## Overview
-
-The experiments test Monte Carlo with:
-- **Batch sizes**: 1, 64, 4096, 16384, 65536, 262144
-- **Modes**: reactive, proactive
-- **Threading**: single-threaded, multi-threaded
-- **Runs per configuration**: 3 (configurable)
-
-**Total configurations**: 24 (6 batch sizes × 2 modes × 2 threading)
-**Total runs**: 72 (24 configs × 3 runs)
-
-## Directory Structure
-
-```
-monte_carlo/
-├── configs/                    # YAML configuration files (24 pairs)
-│   ├── batch_1_reactive_single_server.yaml
-│   ├── batch_1_reactive_single_client.yaml
-│   └── ... (48 files total)
-├── traces/                     # LTTng trace data (created during experiments)
-│   ├── batch_1_reactive_single_run1/
-│   ├── batch_1_reactive_single_run2/
-│   └── ... (72 directories after full run)
-├── results/                    # Analysis results (created by evaluation)
-│   ├── individual_runs.csv
-│   ├── aggregated_results.csv
-│   ├── aggregated_results.json
-│   └── plots/
-│       ├── batch_size_vs_iterations.png
-│       ├── batch_size_vs_time.png
-│       ├── cancellation_delay.png
-│       ├── threading_comparison.png
-│       └── throughput.png
-├── generate_configs.py         # Script to generate configuration files
-├── run_monte_carlo_experiments.sh  # Main experiment execution script
-├── evaluate_monte_carlo.py     # Analysis and plotting script
-├── test_single_config.sh       # Quick test with one configuration
-└── README.md                   # This file
-```
+Evaluate Monte Carlo batch size scaling and threading impact.
 
 ## Quick Start
 
-### 1. Generate Configuration Files
-
 ```bash
-cd /home/vscode/workspace/experiments/monte_carlo
-python3 generate_configs.py
-```
-
-This creates 48 YAML files (24 server + 24 client configs) in the `configs/` directory.
-
-### 2. Test with a Single Configuration
-
-Before running the full experiment suite, test with a single configuration:
-
-```bash
+# Test (10 seconds)
 ./test_single_config.sh
+
+# Generate configs
+python3 generate_configs.py
+
+# Run full experiments (~40 min)
+./run_monte_carlo_experiments.sh
+
+# View results
+cat results/aggregated_results.csv
+ls results/plots/
 ```
 
-This runs one configuration for 10 seconds to verify everything works.
+## Configuration
+
+- **Batch sizes**: 1, 64, 4096, 16384, 65536, 262144
+- **Modes**: reactive, proactive
+- **Threading**: single, multi
+- **Total**: 24 configs × 3 runs = 72 experiments
+
+## Metrics
+
+- Iterations per batch
+- Time per batch
+- Throughput (iterations/second)
+- Cancellation delay
 
 ### 3. Run All Experiments
 
