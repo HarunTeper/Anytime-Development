@@ -19,7 +19,7 @@ THREADING=("single" "multi")
 NUM_RUNS=1  # Number of trials per configuration
 
 # Duration for each experiment run (in seconds)
-RUN_DURATION=10
+RUN_DURATION=30
 
 # Interference timer parameters (fixed)
 TIMER_PERIOD_MS=100

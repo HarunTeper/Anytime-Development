@@ -1,8 +1,0 @@
-anytime_client:
-  ros__parameters:
-    image_topic: video_frames
-    cancel_after_layers: 16
-    cancel_layer_score: true
-    score_threshold: 0.8
-    target_class_id: '9'
-    log_level: info
