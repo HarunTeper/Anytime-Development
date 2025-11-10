@@ -27,6 +27,19 @@ RESULTS_DIR = EXPERIMENT_DIR / "results"
 PLOTS_DIR = RESULTS_DIR / "plots"
 BLOCK_DIR = RESULTS_DIR / "block_analysis"
 
+# Plot configuration
+PLOT_WIDTH = 14
+PLOT_HEIGHT = 7
+PLOT_DPI = 300
+FONT_SIZE_TITLE = 20
+FONT_SIZE_LABEL = 20
+FONT_SIZE_LEGEND = 20
+FONT_SIZE_TICK_LABELS = 18
+LEGEND_SIZE = 20
+MARKER_SIZE = 8
+CAPSIZE = 5
+LINE_WIDTH = 2
+
 # Create output directories
 RESULTS_DIR.mkdir(exist_ok=True)
 PLOTS_DIR.mkdir(exist_ok=True)

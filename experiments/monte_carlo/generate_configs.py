@@ -6,7 +6,7 @@ Generate all Monte Carlo experiment configuration files
 import os
 
 # Configuration parameters
-batch_sizes = [1, 64, 4096, 16384, 65536, 262144]
+batch_sizes = [1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216]
 modes = ["reactive", "proactive"]
 threading = ["single", "multi"]
 
