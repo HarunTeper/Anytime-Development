@@ -1145,9 +1145,16 @@ public:
 
   std::vector<float> calculateLatestExit(InferenceState & state)
   {
-    std::lock_guard<std::mutex> lock(exitMutex);
     synchronize();
     CudaBuffer nmsOutputBuffer;
+
+    if (state.currentStage == InferenceState::NMS_PROCESSING) {
+      auto & input = state.exitOutputBuffer;
+      auto result = processNMSAndGetResults(input);
+      return result;
+    }
+
+    std::lock_guard<std::mutex> lock(exitMutex);
 
     // check the farthest exits for which all inputs are ready
     auto exitPtrs = findBestExit(state.possibleExits, state.currentIndex);
