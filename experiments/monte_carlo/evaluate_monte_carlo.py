@@ -30,13 +30,13 @@ PLOTS_DIR = RESULTS_DIR / "plots"
 # Plot configuration
 PLOT_WIDTH = 12
 PLOT_HEIGHT = 8
-PLOT_HEIGHT_SMALL = 6
+PLOT_HEIGHT_SMALL = 8
 PLOT_DPI = 300
-FONT_SIZE_TITLE = 20
-FONT_SIZE_LABEL = 20
-FONT_SIZE_LEGEND = 20
-FONT_SIZE_TICK_LABELS = 18
-LEGEND_SIZE = 20
+FONT_SIZE_TITLE = 30
+FONT_SIZE_LABEL = 30
+FONT_SIZE_LEGEND = 30
+FONT_SIZE_TICK_LABELS = 30
+LEGEND_SIZE = 30
 MARKER_SIZE = 12
 CAPSIZE = 5
 LINE_WIDTH = 2
@@ -446,11 +446,12 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, axis='y')
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'batch_size_vs_iterations.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'batch_size_vs_iterations.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 2: Batch Size vs Time per Batch
@@ -493,11 +494,12 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, axis='y')
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'batch_size_vs_time.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'batch_size_vs_time.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 3: Cancellation Delay Comparison
@@ -539,11 +541,12 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, axis='y')
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'cancellation_delay.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'cancellation_delay.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 4: Threading Comparison (removed - redundant with plots 1 and 2)
@@ -590,11 +593,12 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, axis='y')
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'throughput.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'throughput.pdf', dpi=PLOT_DPI,
+                bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 5: End-to-End Latency (Goal to Finish)
@@ -639,11 +643,12 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, axis='y')
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'goal_to_finish_latency.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'goal_to_finish_latency.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 6: Cancel Latency (Goal to Cancel)
@@ -688,11 +693,12 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, axis='y')
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'goal_to_cancel_latency.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'goal_to_cancel_latency.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 7: Cancel to Finish Latency
@@ -737,11 +743,12 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, axis='y')
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'cancel_to_finish_latency.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'cancel_to_finish_latency.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 8: Total Iterations (batch_size * num_batches)
@@ -781,11 +788,12 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, axis='y')
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'total_iterations.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'total_iterations.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 9: Total Cancellation Time (goal_to_cancel + cancellation_delay)
@@ -832,11 +840,38 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, axis='y')
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'total_cancellation_time.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'total_cancellation_time.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
+    plt.close()
+
+    # Create a separate legend-only plot with 4 columns in 1 row
+    print("  - Creating separate legend")
+
+    # Create dummy patches for the legend
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor=f'C{i*2+j}', label=f'{mode}-{threading}')
+        for i, mode in enumerate(['reactive', 'proactive'])
+        for j, threading in enumerate(['single', 'multi'])
+    ]
+
+    # Create a minimal figure just for the legend
+    fig_legend = plt.figure(figsize=(PLOT_WIDTH, 0.5))
+    legend = fig_legend.legend(
+        handles=legend_elements,
+        loc='center',
+        ncol=4,
+        fontsize=LEGEND_SIZE,
+        frameon=True
+    )
+
+    # Save with minimal margins
+    plt.savefig(PLOTS_DIR / 'legend.pdf', dpi=PLOT_DPI,
+                bbox_inches='tight', pad_inches=0)
     plt.close()
 
     print(f"  All plots saved to: {PLOTS_DIR}")
