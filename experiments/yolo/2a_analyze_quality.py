@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """
-YOLO Quality Analysis Script (Phase 2)
+Step 2a: Quality Analysis
 
-This script analyzes Phase 1 baseline traces to determine optimal cancellation points.
-It examines layer-wise detection quality to answer:
+Analyzes baseline traces (from Step 1) to determine optimal cancellation points.
+
+Key Questions:
 - After how many layers can we cancel while maintaining quality?
 - How does detection quality progress across layers?
 - What are the recommended cancellation thresholds?
 
-FILTERING: Set FILTER_BY_CLASS to True to filter by TARGET_CLASS_ID, 
-           or False to analyze all detections.
+Configuration:
+- FILTER_BY_CLASS: Set to True to filter by TARGET_CLASS_ID, False for all detections
+- TARGET_CLASS_ID: 9 = traffic light in COCO dataset
+
+Input:  traces/phase1_baseline_trial{1,2,3}/
+Output: results/quality_analysis/
 """
 
 import os
@@ -1016,23 +1021,23 @@ def export_quality_results(metrics, mean_thresholds, threshold_stats):
 def main():
     """Main quality analysis function"""
     print("="*80)
-    print("YOLO QUALITY ANALYSIS (Phase 2)")
+    print("STEP 2a: QUALITY ANALYSIS")
     print("="*80)
-    print(f"Trace directory: {TRACE_DIR}")
-    print(f"Quality results: {QUALITY_DIR}")
+    print(f"Input:  {TRACE_DIR}")
+    print(f"Output: {QUALITY_DIR}")
 
     if FILTER_BY_CLASS:
-        print(f"Mode: Filtering by class ID {TARGET_CLASS_ID}")
+        print(f"Filter: Class ID {TARGET_CLASS_ID} only")
     else:
-        print(f"Mode: Analyzing all detections")
+        print(f"Filter: All detections")
 
     # Find Phase 1 baseline traces
     phase1_traces = [d for d in TRACE_DIR.iterdir()
                      if d.is_dir() and ('phase1_baseline' in d.name or 'baseline' in d.name)]
 
     if not phase1_traces:
-        print("\nError: No Phase 1 baseline traces found!")
-        print(f"Please run Phase 1 experiments first: ./run_phase1_baseline.sh")
+        print("\n❌ Error: No Phase 1 baseline traces found!")
+        print(f"Please run Step 1 first: ./1_collect_baseline.sh")
         return 1
 
     print(f"\nFound {len(phase1_traces)} Phase 1 trace directories")
@@ -1079,10 +1084,11 @@ def main():
     export_quality_results(metrics, mean_thresholds, threshold_stats)
 
     print("\n" + "="*80)
-    print("QUALITY ANALYSIS COMPLETE")
+    print("✅ STEP 2a COMPLETE: QUALITY ANALYSIS")
     print("="*80)
-    print(f"Results saved to: {QUALITY_DIR}")
-    print(f"Plots saved to: {QUALITY_DIR}")
+    print(f"Results: {QUALITY_DIR}")
+    print(f"\nNext step:")
+    print(f"  2b. Analyze blocks: python3 2b_analyze_blocks.py")
 
     return 0
 

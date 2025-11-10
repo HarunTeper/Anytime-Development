@@ -1,7 +1,10 @@
 #!/bin/bash
 #
-# YOLO Phase 1: Baseline Experiment Runner
-# Purpose: Run baseline configuration to collect layer-wise detection data
+# Step 1: Collect Baseline Data
+#
+# Purpose: Run baseline configuration to collect layer-wise detection and timing data
+# Configuration: batch_size=1, proactive, single-threaded, all 25 layers
+# Output: traces/phase1_baseline_trial{1,2,3}/
 #
 
 set -e  # Exit on error
@@ -9,7 +12,6 @@ set -e  # Exit on error
 # Configuration
 WORKSPACE_DIR="/home/vscode/workspace"
 EXPERIMENT_DIR="${WORKSPACE_DIR}/experiments/yolo"
-CONFIG_FILE="${EXPERIMENT_DIR}/configs/phase1_baseline.yaml"
 TRACE_DIR="${EXPERIMENT_DIR}/traces/phase1_baseline"
 NUM_TRIALS=3
 
@@ -21,21 +23,17 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}YOLO Phase 1: Baseline Experiment${NC}"
+echo -e "${GREEN}Step 1: Collect Baseline Data${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Configuration:"
-echo "  - Batch size: 1"
+echo "  - Batch size: 1 (layer-by-layer)"
 echo "  - Mode: Proactive"
+echo "  - Threading: Single"
+echo "  - Layers: All 25 layers"
 echo "  - Trials: ${NUM_TRIALS}"
 echo "  - Trace output: ${TRACE_DIR}"
 echo ""
-
-# Check if config file exists
-if [ ! -f "${CONFIG_FILE}" ]; then
-    echo -e "${RED}Error: Configuration file not found: ${CONFIG_FILE}${NC}"
-    exit 1
-fi
 
 # Source ROS2 environment
 echo -e "${BLUE}Sourcing ROS2 environment...${NC}"
@@ -129,12 +127,12 @@ done
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}Phase 1 Baseline Experiment Complete!${NC}"
+echo -e "${GREEN}Step 1 Complete: Baseline Data Collected${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Traces saved to: ${TRACE_DIR}_trial*"
 echo ""
 echo "Next steps:"
-echo "  1. Run evaluation script: python3 ${EXPERIMENT_DIR}/evaluate_yolo.py"
-echo "  2. Analyze quality for Phase 2: python3 ${EXPERIMENT_DIR}/analyze_quality.py"
+echo "  2a. Analyze quality: python3 ${EXPERIMENT_DIR}/2a_analyze_quality.py"
+echo "  2b. Analyze blocks: python3 ${EXPERIMENT_DIR}/2b_analyze_blocks.py"
 echo ""

@@ -1,7 +1,9 @@
 #!/bin/bash
 #
-# Test Single YOLO Configuration
-# Purpose: Quick test to verify experiment setup works
+# Step 0: Test Setup (Optional)
+#
+# Purpose: Quick test to verify your environment is configured correctly
+# Tests: ROS2 workspace, YOLO weights, images, LTTng tracing
 #
 
 set -e  # Exit on error
@@ -19,7 +21,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}YOLO Single Configuration Test${NC}"
+echo -e "${GREEN}Step 0: Test Setup${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 

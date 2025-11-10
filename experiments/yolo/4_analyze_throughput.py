@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """
-YOLO Phase 3 Runtime Analysis Script
+Step 4: Throughput Analysis
 
-This script analyzes Phase 3 traces to evaluate computation times across different
-configurations (sync/async, single/multi-threaded).
+Analyzes throughput traces (from Step 3) to evaluate computation times across
+different configurations (sync/async, single/multi-threaded).
 
 Metrics analyzed:
 - Total processing time per image/goal
 - Layer computation times
 - Exit calculation times
 - Complete computation time (layer + exit stacked)
-- Throughput comparison across configurations
+- Throughput comparison (images/second)
+
+Input:  traces/phase3_{sync|async}_{single|multi}_trial{1,2,3}/
+Output: results/runtime_analysis/
 """
 
 import os
@@ -1125,18 +1128,18 @@ def export_runtime_results(summary):
 def main():
     """Main runtime analysis function"""
     print("="*80)
-    print("YOLO PHASE 3 RUNTIME ANALYSIS")
+    print("STEP 4: THROUGHPUT ANALYSIS")
     print("="*80)
-    print(f"Trace directory: {TRACE_DIR}")
-    print(f"Runtime results: {RUNTIME_DIR}")
+    print(f"Input:  {TRACE_DIR}")
+    print(f"Output: {RUNTIME_DIR}")
 
     # Find Phase 3 traces
     phase3_traces = [d for d in TRACE_DIR.iterdir()
                      if d.is_dir() and 'phase3' in d.name]
 
     if not phase3_traces:
-        print("\nError: No Phase 3 traces found!")
-        print(f"Please run Phase 3 experiments first: ./run_phase3_max_throughput.sh")
+        print("\n❌ Error: No Phase 3 traces found!")
+        print(f"Please run Step 3 first: ./3_measure_throughput.sh")
         return 1
 
     print(f"\nFound {len(phase3_traces)} Phase 3 trace directories")
@@ -1175,10 +1178,13 @@ def main():
     export_runtime_results(summary)
 
     print("\n" + "="*80)
-    print("RUNTIME ANALYSIS COMPLETE")
+    print("✅ STEP 4 COMPLETE: THROUGHPUT ANALYSIS")
     print("="*80)
-    print(f"Results saved to: {RUNTIME_DIR}")
-    print(f"Plots saved to: {RUNTIME_DIR}")
+    print(f"Results: {RUNTIME_DIR}")
+    print(f"\n⚠️  REVIEW OUTPUTS before proceeding!")
+    print(f"\nNext steps:")
+    print(f"  5. Generate configs: python3 5_generate_configs.py")
+    print(f"  6. Run experiments:  ./6_run_experiments.sh")
 
     return 0
 

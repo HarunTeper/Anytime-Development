@@ -1,8 +1,11 @@
 #!/bin/bash
 #
-# Test a single Phase 4 configuration
-# Usage: ./test_phase4_single.sh [config_name]
-# Example: ./test_phase4_single.sh bs1_reactive_sync_single
+# Step 6a: Test Single Cancellation Configuration
+#
+# Usage: ./6a_test_single_config.sh [config_name]
+# Example: ./6a_test_single_config.sh bs1_proactive_sync_single
+#
+# Tests a single configuration before running the full Step 6 experiment suite.
 #
 
 set -e  # Exit on error
@@ -23,7 +26,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}Phase 4 Single Configuration Test${NC}"
+echo -e "${GREEN}Step 6a: Test Single Configuration${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Testing configuration: ${CONFIG_NAME}"

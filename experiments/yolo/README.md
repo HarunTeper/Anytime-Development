@@ -2,51 +2,103 @@
 
 Evaluate Anytime YOLO performance with different cancellation strategies and configurations.
 
-## Quick Start
+## Complete Workflow (In Order)
 
+### Step 0a: Generate Baseline Configs (First Time Only)
 ```bash
-# Test setup
-./test_single_config.sh
-
-# Phase 1: Baseline (collect quality data)
-./run_phase1_baseline.sh
-
-# Phase 3: Max throughput (4 configs × 3 trials)
-./run_phase3_max_throughput.sh
-
-# Phase 4: Cancellation performance (24 configs × 3 trials)
-./run_phase4_experiments.sh
-
-# Analyze results
-python3 evaluate_yolo.py
-python3 analyze_quality.py
-python3 analyze_runtime.py
-python3 analyze_phase4.py
+python3 0_generate_baseline_configs.py
 ```
+Creates configuration files for Steps 1 and 3 (baseline and throughput).
+- **Output:** `configs/phase1_*.yaml` and `configs/phase3_*.yaml`
 
-## Phases
+### Step 0b: Test Setup (Optional)
+```bash
+./0_test_setup.sh
+```
+Quick test to verify your environment is working correctly.
 
-### Phase 1: Baseline Quality
-- Collect layer-wise detection data
-- Single-threaded, batch_size=1
-- No cancellation (all 25 layers)
+---
 
-### Phase 3: Maximum Throughput
-- Test 4 configurations: sync/async × single/multi-threaded
-- batch_size=25 (all layers at once)
-- Compare throughput and layer processing times
+### **SYSTEM EVALUATION**
 
-### Phase 4: Cancellation Performance
-- 24 configurations: 3 block sizes × 2 modes × 2 sync modes × 2 threading
-- Cancel after 16 layers or score threshold 0.8
-- Measure cancellation delay and total runtime
+### Step 1: Collect Baseline Data
+```bash
+./1_collect_baseline.sh
+```
+- Runs 3 trials with batch_size=1, single-threaded
+- Collects layer-wise detection quality and timing data
+- **Output:** `traces/phase1_baseline_trial{1,2,3}/`
 
-## Analysis Scripts
+### Step 2a: Analyze Detection Quality
+```bash
+python3 2a_analyze_quality.py
+```
+- Analyzes layer-wise detection progression
+- Determines optimal cancellation points
+- **Output:** `results/quality_analysis/` (plots + CSV)
 
-- `analyze_quality.py` - Quality progression analysis
-- `analyze_runtime.py` - Layer computation timing
-- `analyze_phase4.py` - Cancellation performance
-- `analyze_blocks.py` - Block size impact
+### Step 2b: Analyze Block Sizes
+```bash
+python3 2b_analyze_blocks.py
+```
+- Evaluates total delay for different block sizes
+- Shows cumulative computation costs
+- **Output:** `results/block_analysis/` (plots + CSV)
+
+### Step 3: Measure Maximum Throughput
+```bash
+./3_measure_throughput.sh
+```
+- Tests 4 configurations: sync/async × single/multi-threaded
+- All use batch_size=25 (full model, no cancellation)
+- **Output:** `traces/phase3_{sync|async}_{single|multi}_trial{1,2,3}/`
+
+### Step 4: Analyze Throughput Results
+```bash
+python3 4_analyze_throughput.py
+```
+- Compares throughput across configurations
+- Analyzes layer computation and exit calculation times
+- **Output:** `results/runtime_analysis/` (plots + CSV)
+
+**→ Review outputs from Steps 2a, 2b, and 4 before proceeding**
+
+---
+
+### **CANCELLATION EXPERIMENTS**
+
+### Step 5: Generate Cancellation Configurations
+```bash
+python3 5_generate_configs.py
+```
+- Creates configs for 16 combinations:
+  - Block sizes: 1, 8, 16, 25
+  - Mode: proactive
+  - Sync: sync, async
+  - Threading: single, multi
+- **Output:** `configs/phase4_*.yaml`
+
+### Step 6: Run Cancellation Experiments
+```bash
+./6_run_experiments.sh
+```
+- Runs all 16 configurations × 3 trials = 48 experiments
+- Client cancels after 16 layers OR score threshold 0.8
+- **Output:** `traces/phase4_bs{1,8,16,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/`
+- **Note:** To test a single config: `./6a_test_single_config.sh bs1_proactive_sync_single`
+
+### Step 7: Analyze Cancellation Performance
+```bash
+python3 7_analyze_cancellation.py
+```
+- Measures cancellation delay and total runtime
+- Compares performance across all configurations
+- **Output:** `results/phase4_analysis/` (plots + CSV)
+---
+
+## Prerequisites
+
+1. **Build ROS2 workspace**:
    ```bash
    cd /home/vscode/workspace/packages
    colcon build --symlink-install
@@ -54,7 +106,6 @@ python3 analyze_phase4.py
 
 2. **Download YOLO weights**:
    ```bash
-   # Run the download task or use:
    cd /home/vscode/workspace/packages/src/anytime_yolo
    wget https://tu-dortmund.sciebo.de/s/W86QE9hUscsUPeM/download -O weights.zip
    unzip -o weights.zip -d .
@@ -63,7 +114,6 @@ python3 analyze_phase4.py
 
 3. **Download test images**:
    ```bash
-   # Run the download task or use:
    mkdir -p /home/vscode/workspace/packages/src/video_publisher/images
    cd /home/vscode/workspace/packages/src/video_publisher/images
    wget https://tu-dortmund.sciebo.de/s/aA9MDhgN2lBmeZk/download -O images.zip
@@ -71,162 +121,180 @@ python3 analyze_phase4.py
    rm images.zip
    ```
 
-4. **Install LTTng** (should already be installed in dev container):
+4. **Install Python dependencies**:
    ```bash
-   sudo apt-get update
-   sudo apt-get install lttng-tools lttng-modules-dkms liblttng-ust-dev
+   pip3 install pandas numpy matplotlib pyyaml
    ```
 
-5. **Install Python dependencies**:
-   ```bash
-   pip3 install pandas numpy matplotlib
-   ```
+---
 
-## Running Experiments
+## What Each Script Does
 
-### Phase 1: Baseline
+### Baseline Collection (Step 1)
+- **Purpose:** Establish baseline performance and quality data
+- **Configuration:** Single-threaded, batch_size=1, all 25 layers
+- **Duration:** ~30-60 minutes for 3 trials
+- **Use cases:** Understanding layer-wise quality progression, identifying when detections stabilize
 
-Collect layer-wise detection data:
+### Quality Analysis (Step 2a)
+- **Purpose:** Determine optimal cancellation points
+- **Outputs:**
+  - Detection progression curves (how many detections at each layer)
+  - Quality ratio plots (percentage of final detections reached)
+  - Layer computation times
+  - Recommendations for cancellation thresholds
 
-```bash
-cd /home/vscode/workspace/experiments/yolo
-./run_phase1_baseline.sh
-```
+### Block Analysis (Step 2b)
+- **Purpose:** Understand cost of different block sizes
+- **Outputs:**
+  - Total delay vs block size
+  - Number of blocks vs block size
+  - Per-block delay distributions
+  - Helps choose block sizes for Step 6
 
-This will:
-- Run 3 trials of the baseline configuration
-- Process all images with batch_size=1
-- Collect traces for each trial
-- Save traces to `traces/phase1_baseline_trial1/`, `trial2/`, `trial3/`
+### Throughput Measurement (Step 3)
+- **Purpose:** Find maximum throughput configuration
+- **Configurations tested:**
+  - sync + single-threaded
+  - sync + multi-threaded
+  - async + single-threaded
+  - async + multi-threaded
+- **Duration:** ~20-40 minutes for 4 configs × 3 trials
 
-### Phase 3: Maximum Throughput
+### Throughput Analysis (Step 4)
+- **Purpose:** Compare performance of different configurations
+- **Outputs:**
+  - Total goal time comparisons
+  - Throughput (images/second)
+  - Layer and exit computation time breakdowns
+  - Cumulative runtime plots
 
-Measure maximum throughput:
+### Config Generation (Step 5)
+- **Purpose:** Auto-generate all configuration files for cancellation experiments
+- **Output:** 16 YAML files + 1 client config
 
-```bash
-cd /home/vscode/workspace/experiments/yolo
-./run_phase3_max_throughput.sh
-```
+### Cancellation Experiments (Step 6)
+- **Purpose:** Measure cancellation responsiveness
+- **Client behavior:** Cancel after 16 layers OR score ≥ 0.8 (whichever comes first)
+- **Duration:** ~1.5-3 hours for 16 configs × 3 trials
+- **Output:** Traces with cancellation timing data
 
-This will:
-- Run 3 trials of the max throughput configuration
-- Process all images with batch_size=25
-- Collect traces for each trial
-- Save traces to `traces/phase3_max_throughput_trial1/`, `trial2/`, `trial3/`
+### Cancellation Analysis (Step 7)
+- **Purpose:** Evaluate cancellation performance
+- **Outputs:**
+  - Cancellation delay (time from cancel request to result)
+  - Total runtime comparison
+  - Layers processed before cancellation
+  - Recommendations for best configuration
 
-## Analyzing Results
+---
 
-After running experiments, evaluate the results:
+## Technical Details
 
-```bash
-cd /home/vscode/workspace/experiments/yolo
-python3 evaluate_yolo.py
-```
+### Configuration Files (YAML)
+Located in `configs/`, these specify:
+- **batch_size**: Number of layers processed per block (1, 8, or 25)
+- **is_reactive_proactive**: Mode ("reactive" or "proactive")
+- **is_sync_async**: Executor type ("sync" or "async")
+- **multi_threading**: Threading mode (true/false)
+- **cancel_after_layers**: Client cancellation threshold (16 for Step 6)
+- **score_threshold**: Quality-based cancellation (0.8 for Step 6)
 
-This will:
-- Parse all trace directories
-- Calculate metrics (runtime, throughput, layer times)
-- Generate plots in `results/plots/`
-- Export summary CSV and detailed JSON
+### Metrics Collected
+- **Total runtime**: Goal start to result received
+- **Cancellation delay**: Cancel request to result received
+- **Layer computation time**: Per-layer processing duration
+- **Exit calculation time**: Time to compute detections after each block
+- **Detection counts**: Number of objects detected at each exit
+- **Throughput**: Images processed per second
 
-## Configuration Files
-
-Configuration files are in YAML format and specify:
-- **experiment**: name, phase, description
-- **server_params**: batch_size, mode (reactive/proactive), sync/async
-- **client_params**: cancellation settings
-- **video_publisher**: image path
-- **trace**: LTTng session configuration
-
-## Metrics Collected
-
-### Per-Goal Metrics
-- Total runtime (ms)
-- Number of detections
-- Layers processed
-
-### Layer-wise Metrics
-- Processing time per layer (ms)
-- Detection count after each layer
-- Exit calculation time
-
-### Summary Metrics
-- Average runtime
-- Throughput (images/second)
-- Average detections per image
-- Layer timing statistics
-
-## Tracepoints Used
-
-The following LTTng tracepoints are collected:
-- `anytime:yolo_init` - Server initialization
-- `anytime:yolo_layer_start` - Layer computation start
-- `anytime:yolo_layer_end` - Layer computation end
-- `anytime:yolo_exit_calculation_start` - Exit calculation start
-- `anytime:yolo_exit_calculation_end` - Exit calculation end (with detection count)
-- `anytime:yolo_result` - Final result with total detections
+### LTTng Tracepoints Used
+- `anytime:yolo_layer_start` / `yolo_layer_end` - Layer computation timing
+- `anytime:yolo_exit_calculation_start` / `yolo_exit_calculation_end` - Exit timing + detection count
 - `anytime:anytime_base_activate` - Goal start
 - `anytime:anytime_base_reset` - Goal reset
+- Additional tracepoints for initialization and results
+
+---
 
 ## Troubleshooting
 
-### LTTng Session Already Exists
+### LTTng Session Errors
 ```bash
+# Destroy any existing sessions
 lttng destroy yolo_phase1_baseline
-# or
-lttng destroy yolo_phase3_max_throughput
+lttng destroy verify_test
+lttng list  # Check active sessions
 ```
 
-### No Images Found
-Check that images are downloaded to:
-```
-/home/vscode/workspace/packages/src/video_publisher/images/
-```
+### Missing Images or Weights
+- **Images:** `/home/vscode/workspace/packages/src/video_publisher/images/`
+- **Weights:** `/home/vscode/workspace/packages/src/anytime_yolo/weights_32/`
+- Re-run download tasks or use manual wget commands above
 
-### YOLO Weights Not Found
-Check that weights are downloaded to:
-```
-/home/vscode/workspace/packages/src/anytime_yolo/weights_32/
-```
-
-### Permission Denied on Scripts
+### Script Permission Errors
 ```bash
 chmod +x /home/vscode/workspace/experiments/yolo/*.sh
 ```
 
-## Next Steps
+### Python Import Errors
+```bash
+pip3 install --upgrade pandas numpy matplotlib pyyaml
+```
 
-After completing Phase 1 and Phase 3:
+### Trace Parsing Errors
+- Check babeltrace is installed: `babeltrace2 --version`
+- Verify trace directory contains data: `ls -la traces/*/`
 
-1. **Implement Phase 2** (Quality Analysis):
-   - Create `analyze_quality.py` to analyze layer-wise detection quality
-   - Determine optimal cancellation points
-   - Generate quality progression plots
+---
 
-2. **Implement Phase 4** (Full Sweep):
-   - Create configurations for various batch sizes
-   - Test reactive vs proactive modes
-   - Test single vs multi-threaded executors
-   - Create `run_full_sweep.sh` script
+## Expected Outcomes
 
-3. **Write Paper**:
-   - Use generated plots and metrics
-   - Compare baseline vs maximum throughput
-   - Analyze quality-performance tradeoffs
-   - Discuss optimal cancellation strategies
+After completing all steps, you will have:
 
-## Expected Results
+1. **System characterization:**
+   - Baseline quality progression (when detections stabilize)
+   - Block size impact analysis (optimal block sizes)
+   - Maximum throughput measurements (best configuration)
 
-### Phase 1 (Baseline)
-- Layer-by-layer processing times
-- Detection quality progression across layers
-- Identify at which layer detection quality plateaus
+2. **Cancellation performance data:**
+   - Cancellation delay across 24 configurations
+   - Total runtime comparison
+   - Quality-performance tradeoffs
 
-### Phase 3 (Maximum Throughput)
-- Maximum achievable throughput
-- Comparison with baseline runtime
-- Understanding of batch processing benefits
+3. **Visualizations:**
+   - Quality progression plots
+   - Throughput comparison charts
+   - Cancellation delay heatmaps
+   - Block size impact graphs
 
-## Contact
+4. **Data exports:**
+   - CSV summaries for paper tables
+   - JSON files with detailed metrics
+   - Recommended configurations for production use
 
-For questions or issues, please refer to the main project README or the experimental plan document.
+---
+
+## File Organization
+
+```
+experiments/yolo/
+├── 0_generate_baseline_configs.py  # Generate baseline/throughput configs (run first!)
+├── 0_test_setup.sh                 # Optional environment test
+├── 1_collect_baseline.sh           # Step 1: Collect baseline traces
+├── 2a_analyze_quality.py           # Step 2a: Quality analysis
+├── 2b_analyze_blocks.py            # Step 2b: Block size analysis
+├── 3_measure_throughput.sh         # Step 3: Throughput experiments
+├── 4_analyze_throughput.py         # Step 4: Throughput analysis
+├── 5_generate_configs.py           # Step 5: Generate cancellation configs
+├── 6_run_experiments.sh            # Step 6: Run cancellation experiments
+├── 6a_test_single_config.sh        # Step 6: Test one config
+├── 7_analyze_cancellation.py       # Step 7: Cancellation analysis
+├── configs/                        # Generated YAML configurations
+├── traces/                         # LTTng trace outputs
+└── results/                        # Analysis outputs (plots, CSV, JSON)
+    ├── quality_analysis/
+    ├── block_analysis/
+    ├── runtime_analysis/
+    └── phase4_analysis/
+```

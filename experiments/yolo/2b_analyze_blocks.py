@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
-YOLO Block Size Analysis Script
+Step 2b: Block Size Analysis
 
-This script analyzes Phase 1 baseline traces to determine total delay for different block sizes.
-For each block size (0-25 layers), it calculates the total delay by summing:
+Analyzes baseline traces (from Step 1) to determine total delay for different block sizes.
+
+For each block size (1-25 layers), calculates total delay by summing:
 - Layer computation times within each block
 - Exit calculation time at the end of each block
 
-The script processes all layers (up to layer 25) and shows the cumulative delay
-for all blocks needed to complete processing.
+This helps choose optimal block sizes for Step 6 (cancellation experiments).
+
+Input:  traces/phase1_baseline_trial{1,2,3}/
+Output: results/block_analysis/
 """
 
 import sys
@@ -660,19 +663,19 @@ def export_block_results(block_size_stats):
 def main():
     """Main block analysis function"""
     print("="*80)
-    print("YOLO BLOCK SIZE ANALYSIS")
+    print("STEP 2b: BLOCK SIZE ANALYSIS")
     print("="*80)
-    print(f"Trace directory: {TRACE_DIR}")
-    print(f"Block results: {BLOCK_DIR}")
-    print(f"Maximum layer: {MAX_LAYER}")
+    print(f"Input:  {TRACE_DIR}")
+    print(f"Output: {BLOCK_DIR}")
+    print(f"Max layer: {MAX_LAYER}")
 
     # Find Phase 1 baseline traces
     phase1_traces = [d for d in TRACE_DIR.iterdir()
                      if d.is_dir() and ('phase1_baseline' in d.name or 'baseline' in d.name)]
 
     if not phase1_traces:
-        print("\nError: No Phase 1 baseline traces found!")
-        print(f"Please run Phase 1 experiments first: ./run_phase1_baseline.sh")
+        print("\n❌ Error: No Phase 1 baseline traces found!")
+        print(f"Please run Step 1 first: ./1_collect_baseline.sh")
         return 1
 
     print(f"\nFound {len(phase1_traces)} Phase 1 trace directories")
@@ -708,9 +711,11 @@ def main():
     export_block_results(block_size_stats)
 
     print("\n" + "="*80)
-    print("BLOCK ANALYSIS COMPLETE")
+    print("✅ STEP 2b COMPLETE: BLOCK SIZE ANALYSIS")
     print("="*80)
-    print(f"Results saved to: {BLOCK_DIR}")
+    print(f"Results: {BLOCK_DIR}")
+    print(f"\nNext step:")
+    print(f"  3. Measure throughput: ./3_measure_throughput.sh")
 
     return 0
 

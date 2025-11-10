@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 """
-YOLO Phase 4 Analysis Script
+Step 7: Cancellation Performance Analysis
 
-This script analyzes Phase 4 traces to evaluate cancellation performance across different
-configurations (block size, reactive/proactive, sync/async, single/multi-threaded).
+Analyzes cancellation traces (from Step 6) to evaluate responsiveness across
+different configurations.
 
 Key Metrics:
 1. Cancellation delay: Time from cancel request to result received
 2. Total runtime: Time from goal start to result received
-3. Number of layers processed: How many layers were computed before cancellation
+3. Layers processed: How many layers were computed before cancellation
 
-Configurations tested:
-- Block sizes: 1, 8, 25
-- Modes: reactive, proactive
+Configurations analyzed:
+- Block sizes: 1, 8, 16, 25
+- Mode: proactive
 - Sync modes: sync, async
 - Threading: single, multi
+
+Input:  traces/phase4_bs{1,8,16,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/
+Output: results/phase4_analysis/
 """
 
 import subprocess
@@ -448,12 +451,18 @@ def plot_cancellation_delay_comparison(summary):
     """
     print("\n  Creating cancellation delay comparison plot...")
 
-    configs = sorted(summary.keys())
+    # Sort configs by block size, then mode, sync, threading
+    def sort_key(config):
+        parts = config.split('_')
+        block_size = int(parts[0][2:])  # Extract number from 'bs1', 'bs8', etc.
+        return (block_size, parts[1], parts[2], parts[3])
+    
+    configs = sorted(summary.keys(), key=sort_key)
     if not configs:
         print("    No data to plot")
         return
 
-    # Filter out configs with no cancellation delay data
+    # Filter out configs with no cancellation delay data (keep sort order)
     configs = [c for c in configs if summary[c]
                ['avg_cancellation_delay_ms'] is not None]
     if not configs:
@@ -470,10 +479,11 @@ def plot_cancellation_delay_comparison(summary):
     bars = ax.bar(x, means, yerr=stds, capsize=5, alpha=0.7)
 
     # Color bars by block size
-    colors = {'bs1': '#1f77b4', 'bs8': '#ff7f0e', 'bs25': '#2ca02c'}
+    colors = {'bs1': '#1f77b4', 'bs8': '#ff7f0e',
+              'bs16': '#d62728', 'bs25': '#2ca02c'}
     for i, (bar, config) in enumerate(zip(bars, configs)):
-        bs = config.split('_')[0]
-        bar.set_color(colors.get(bs, '#888888'))
+        block_size = config.split('_')[0]
+        bar.set_color(colors.get(block_size, '#888888'))
 
     ax.set_xlabel('Configuration', fontsize=12)
     ax.set_ylabel('Cancellation Delay (ms)', fontsize=12)
@@ -487,6 +497,7 @@ def plot_cancellation_delay_comparison(summary):
     legend_elements = [
         Patch(facecolor=colors['bs1'], label='Block Size 1'),
         Patch(facecolor=colors['bs8'], label='Block Size 8'),
+        Patch(facecolor=colors['bs16'], label='Block Size 16'),
         Patch(facecolor=colors['bs25'], label='Block Size 25')
     ]
     ax.legend(handles=legend_elements, loc='upper left')
@@ -503,7 +514,13 @@ def plot_total_runtime_comparison(summary):
     """
     print("\n  Creating total runtime comparison plot...")
 
-    configs = sorted(summary.keys())
+    # Sort configs by block size, then mode, sync, threading
+    def sort_key(config):
+        parts = config.split('_')
+        block_size = int(parts[0][2:])  # Extract number from 'bs1', 'bs8', etc.
+        return (block_size, parts[1], parts[2], parts[3])
+    
+    configs = sorted(summary.keys(), key=sort_key)
     if not configs:
         print("    No data to plot")
         return
@@ -518,10 +535,11 @@ def plot_total_runtime_comparison(summary):
     bars = ax.bar(x, means, yerr=stds, capsize=5, alpha=0.7)
 
     # Color bars by block size
-    colors = {'bs1': '#1f77b4', 'bs8': '#ff7f0e', 'bs25': '#2ca02c'}
+    colors = {'bs1': '#1f77b4', 'bs8': '#ff7f0e',
+              'bs16': '#d62728', 'bs25': '#2ca02c'}
     for i, (bar, config) in enumerate(zip(bars, configs)):
-        bs = config.split('_')[0]
-        bar.set_color(colors.get(bs, '#888888'))
+        block_size = config.split('_')[0]
+        bar.set_color(colors.get(block_size, '#888888'))
 
     ax.set_xlabel('Configuration', fontsize=12)
     ax.set_ylabel('Total Runtime (ms)', fontsize=12)
@@ -535,6 +553,7 @@ def plot_total_runtime_comparison(summary):
     legend_elements = [
         Patch(facecolor=colors['bs1'], label='Block Size 1'),
         Patch(facecolor=colors['bs8'], label='Block Size 8'),
+        Patch(facecolor=colors['bs16'], label='Block Size 16'),
         Patch(facecolor=colors['bs25'], label='Block Size 25')
     ]
     ax.legend(handles=legend_elements, loc='upper left')
@@ -551,7 +570,13 @@ def plot_layers_processed_comparison(summary):
     """
     print("\n  Creating layers processed comparison plot...")
 
-    configs = sorted(summary.keys())
+    # Sort configs by block size, then mode, sync, threading
+    def sort_key(config):
+        parts = config.split('_')
+        block_size = int(parts[0][2:])  # Extract number from 'bs1', 'bs8', etc.
+        return (block_size, parts[1], parts[2], parts[3])
+    
+    configs = sorted(summary.keys(), key=sort_key)
     if not configs:
         print("    No data to plot")
         return
@@ -566,7 +591,8 @@ def plot_layers_processed_comparison(summary):
     bars = ax.bar(x, means, yerr=stds, capsize=5, alpha=0.7)
 
     # Color bars by block size
-    colors = {'bs1': '#1f77b4', 'bs8': '#ff7f0e', 'bs25': '#2ca02c'}
+    colors = {'bs1': '#1f77b4', 'bs8': '#ff7f0e',
+              'bs16': '#d62728', 'bs25': '#2ca02c'}
     for i, (bar, config) in enumerate(zip(bars, configs)):
         bs = config.split('_')[0]
         bar.set_color(colors.get(bs, '#888888'))
@@ -585,6 +611,7 @@ def plot_layers_processed_comparison(summary):
     legend_elements = [
         Patch(facecolor=colors['bs1'], label='Block Size 1'),
         Patch(facecolor=colors['bs8'], label='Block Size 8'),
+        Patch(facecolor=colors['bs16'], label='Block Size 16'),
         Patch(facecolor=colors['bs25'], label='Block Size 25'),
     ]
     ax.legend(handles=legend_elements, loc='upper left')
@@ -632,7 +659,7 @@ def plot_metrics_by_block_size(summary):
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
 
     block_sizes = sorted(block_size_data.keys())
-    colors_bs = {1: '#1f77b4', 8: '#ff7f0e', 25: '#2ca02c'}
+    colors_bs = {1: '#1f77b4', 8: '#ff7f0e', 16: '#d62728', 25: '#2ca02c'}
 
     for idx, (ax, metric, title, ylabel) in enumerate([
         (axes[0], 'cancellation_delays',
@@ -668,14 +695,19 @@ def plot_distribution_boxplots(summary):
 
     fig, axes = plt.subplots(3, 1, figsize=(16, 12))
 
-    configs = sorted(summary.keys())
+    # Sort configs by block size, then mode, sync, threading
+    def sort_key(config):
+        parts = config.split('_')
+        block_size = int(parts[0][2:])  # Extract number from 'bs1', 'bs8', etc.
+        return (block_size, parts[1], parts[2], parts[3])
+    
+    configs = sorted(summary.keys(), key=sort_key)
     labels = [format_config_label(c) for c in configs]
 
-    # Cancellation delay distribution
-    cancel_data = [summary[c]['cancellation_delays']
-                   for c in configs if summary[c]['cancellation_delays']]
-    cancel_labels = [format_config_label(
-        c) for c in configs if summary[c]['cancellation_delays']]
+    # Cancellation delay distribution (keep sort order)
+    cancel_configs = [c for c in configs if summary[c]['cancellation_delays']]
+    cancel_data = [summary[c]['cancellation_delays'] for c in cancel_configs]
+    cancel_labels = [format_config_label(c) for c in cancel_configs]
 
     if cancel_data:
         axes[0].boxplot(cancel_data, labels=cancel_labels)
@@ -890,19 +922,19 @@ def export_phase4_results(summary):
 def main():
     """Main Phase 4 analysis function"""
     print("="*80)
-    print("YOLO PHASE 4 CANCELLATION ANALYSIS")
+    print("STEP 7: CANCELLATION ANALYSIS")
     print("="*80)
-    print(f"Trace directory: {TRACE_DIR}")
-    print(f"Results directory: {PHASE4_DIR}")
+    print(f"Input:  {TRACE_DIR}")
+    print(f"Output: {PHASE4_DIR}")
 
     # Find Phase 4 traces (only proactive architecture)
     phase4_traces = [d for d in TRACE_DIR.iterdir()
                      if d.is_dir() and 'phase4_' in d.name and 'proactive' in d.name]
 
     if not phase4_traces:
-        print("\nERROR: No Phase 4 trace directories found!")
+        print("\n❌ Error: No Phase 4 traces found!")
         print(f"Expected traces in: {TRACE_DIR}")
-        print("Run experiments first: ./run_phase4_experiments.sh")
+        print("Please run Step 6 first: ./6_run_experiments.sh")
         return
 
     print(
@@ -942,10 +974,10 @@ def main():
     export_phase4_results(summary)
 
     print("\n" + "="*80)
-    print("ANALYSIS COMPLETE!")
+    print("✅ STEP 7 COMPLETE: CANCELLATION ANALYSIS")
     print("="*80)
-    print(f"\nResults saved to: {PHASE4_DIR}")
-    print("\nGenerated files:")
+    print(f"Results: {PHASE4_DIR}")
+    print("\nGenerated outputs:")
     print("  - phase4_analysis.json (machine-readable)")
     print("  - phase4_summary.txt (human-readable)")
     print("  - cancellation_delay_comparison.png")
@@ -953,6 +985,7 @@ def main():
     print("  - layers_processed_comparison.png")
     print("  - metrics_by_block_size.png")
     print("  - distribution_boxplots.png")
+    print("\n🎉 All experiments complete!")
 
 
 if __name__ == '__main__':

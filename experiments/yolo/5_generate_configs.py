@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
 """
-Generate Phase 4 Configuration Files
+Step 5: Generate Cancellation Experiment Configurations
 
-Creates all combinations of:
-- Block sizes: 1, 8, 25
-- Modes: proactive
-- Sync: sync, async
+Creates configuration files for all combinations:
+- Block sizes: 1, 8, 16, 25
+- Mode: proactive
+- Sync modes: sync, async
 - Threading: single, multi
+
+Total: 4 × 1 × 2 × 2 = 16 server configs + 1 client config
+
+Client cancellation settings:
+- Cancel after 16 layers
+- Score threshold: 0.8
+- Target class: 9 (traffic light)
+
+Output: configs/phase4_*.yaml
 """
 
 from pathlib import Path
@@ -19,7 +28,7 @@ CONFIG_DIR = EXPERIMENT_DIR / "configs"
 CONFIG_DIR.mkdir(exist_ok=True)
 
 # Configuration parameters
-BLOCK_SIZES = [1, 8, 25]
+BLOCK_SIZES = [1, 8, 16, 25]
 MODES = ["proactive"]
 SYNC_MODES = ["sync", "async"]
 THREADING_MODES = ["single", "multi"]
@@ -60,9 +69,9 @@ def create_server_config(block_size, mode, sync_mode, threading_mode):
 
 def main():
     print("="*80)
-    print("PHASE 4 CONFIGURATION GENERATOR")
+    print("STEP 5: GENERATE CANCELLATION CONFIGS")
     print("="*80)
-    print(f"\nGenerating configurations in: {CONFIG_DIR}")
+    print(f"\nOutput: {CONFIG_DIR}")
     print(f"\nBlock sizes: {BLOCK_SIZES}")
     print(f"Modes: {MODES}")
     print(f"Sync modes: {SYNC_MODES}")
@@ -98,10 +107,10 @@ def main():
                     print(f"✓ Created: {filename}")
 
     print(f"\n" + "="*80)
-    print(
-        f"Generated {config_count} server configurations + 1 client configuration")
-    print(f"Total: {config_count + 1} configuration files")
+    print(f"✅ STEP 5 COMPLETE: CONFIGS GENERATED")
     print("="*80)
+    print(
+        f"Created {config_count} server configs + 1 client config = {config_count + 1} files")
 
     # Print summary
     print("\nConfiguration Summary:")
@@ -110,15 +119,15 @@ def main():
     print(f"  Sync modes: {len(SYNC_MODES)}")
     print(f"  Threading modes: {len(THREADING_MODES)}")
     print(
-        f"  Total combinations: {len(BLOCK_SIZES) * len(MODES) * len(SYNC_MODES) * len(THREADING_MODES)}")
+        f"  Total: {len(BLOCK_SIZES) * len(MODES) * len(SYNC_MODES) * len(THREADING_MODES)} combinations")
 
-    print("\nClient Configuration:")
-    print(f"  Cancel after layers: 16")
-    print(f"  Score threshold: 0.8")
+    print("\nClient Cancellation Settings:")
+    print(f"  Cancel after: 16 layers")
+    print(f"  Score threshold: ≥ 0.8")
     print(f"  Target class: 9 (traffic light)")
 
     print("\nNext step:")
-    print(f"  Run experiments: ./run_phase4_experiments.sh")
+    print(f"  6. Run experiments: ./6_run_experiments.sh")
 
 
 if __name__ == "__main__":

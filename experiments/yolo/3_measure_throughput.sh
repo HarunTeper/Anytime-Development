@@ -1,8 +1,11 @@
 #!/bin/bash
 #
-# YOLO Phase 3: Maximum Throughput Experiment Runner
-# Purpose: Test different configurations (sync/async, single/multi-threaded) 
-#          to measure throughput and full processing times without cancellation
+# Step 3: Measure Maximum Throughput
+#
+# Purpose: Test different configurations to find maximum throughput
+# Configurations: sync/async × single/multi-threaded (4 total)
+# Each uses batch_size=25 (all layers, no cancellation)
+# Output: traces/phase3_{sync|async}_{single|multi}_trial{1,2,3}/
 #
 
 set -e  # Exit on error
@@ -30,14 +33,14 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}YOLO Phase 3: Maximum Throughput${NC}"
+echo -e "${GREEN}Step 3: Measure Maximum Throughput${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Testing configurations:"
 echo "  - Batch size: 25 (all layers, no cancellation)"
 echo "  - Mode: Proactive"
-echo "  - Trials per config: ${NUM_TRIALS}"
 echo "  - Configurations: ${#CONFIGS[@]}"
+echo "  - Trials per config: ${NUM_TRIALS}"
 echo ""
 for config in "${CONFIGS[@]}"; do
     IFS=':' read -r sync_mode threading_mode desc <<< "$config"
@@ -239,7 +242,7 @@ done
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}Phase 3 Maximum Throughput Complete!${NC}"
+echo -e "${GREEN}Step 3 Complete: Throughput Measured${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "All configurations tested:"
@@ -253,7 +256,6 @@ echo ""
 echo "Results summary:"
 cat "${RESULTS_FILE}"
 echo ""
-echo "Next steps:"
-echo "  1. Review timing summary: cat ${RESULTS_FILE}"
-echo "  2. Run evaluation script: python3 ${EXPERIMENT_DIR}/evaluate_yolo.py"
+echo "Next step:"
+echo "  4. Analyze throughput: python3 ${EXPERIMENT_DIR}/4_analyze_throughput.py"
 echo ""

@@ -1,8 +1,11 @@
 #!/bin/bash
 #
-# YOLO Phase 4: Final Cancellation Experiment Runner
-# Purpose: Test different block sizes and configurations with cancellation
-#          Client cancels either after 16 layers or when score threshold 0.8 is reached
+# Step 6: Run Cancellation Experiments
+#
+# Purpose: Test cancellation performance across different configurations
+# Configurations: 3 block sizes × 1 mode × 2 sync × 2 threading = 12 configs
+# Client cancellation: After 16 layers OR score threshold ≥ 0.8
+# Output: traces/phase4_bs{1,8,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/
 #
 
 set -e  # Exit on error
@@ -14,7 +17,7 @@ TRACE_BASE_DIR="${EXPERIMENT_DIR}/traces"
 NUM_TRIALS=1
 
 # Test parameters
-BLOCK_SIZES=(1 8 25)
+BLOCK_SIZES=(1 8 16 25)
 MODES=("proactive")
 SYNC_MODES=("sync" "async")
 THREADING_MODES=("single" "multi")
@@ -29,7 +32,7 @@ MAGENTA='\033[0;35m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}YOLO Phase 4: Final Cancellation Experiments${NC}"
+echo -e "${GREEN}Step 6: Run Cancellation Experiments${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Testing configurations:"
@@ -39,15 +42,16 @@ echo "  - Sync modes: ${SYNC_MODES[@]}"
 echo "  - Threading modes: ${THREADING_MODES[@]}"
 echo "  - Trials per config: ${NUM_TRIALS}"
 echo ""
-echo "Client configuration:"
-echo "  - Cancel after layers: 16"
-echo "  - Score threshold: 0.8"
+echo "Client cancellation settings:"
+echo "  - Cancel after: 16 layers"
+echo "  - Score threshold: ≥ 0.8"
 echo "  - Target class: 9 (traffic light)"
 echo ""
 
 # Calculate total configurations
 TOTAL_CONFIGS=$((${#BLOCK_SIZES[@]} * ${#MODES[@]} * ${#SYNC_MODES[@]} * ${#THREADING_MODES[@]}))
-echo "Total configurations to test: ${TOTAL_CONFIGS}"
+echo "Total configurations: ${TOTAL_CONFIGS}"
+echo "Total experiments: $((TOTAL_CONFIGS * NUM_TRIALS))"
 echo ""
 
 # Source ROS2 environment
@@ -217,14 +221,14 @@ done
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}Phase 4 Experiments Complete!${NC}"
+echo -e "${GREEN}Step 6 Complete: Cancellation Experiments Done${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
-echo "All ${TOTAL_CONFIGS} configurations tested with ${NUM_TRIALS} trials each"
+echo "Tested ${TOTAL_CONFIGS} configurations × ${NUM_TRIALS} trials = $((TOTAL_CONFIGS * NUM_TRIALS)) experiments"
 echo ""
 echo "Traces saved to: ${TRACE_BASE_DIR}/phase4_*"
 echo "Summary saved to: ${RESULTS_FILE}"
 echo ""
-echo "Next steps:"
-echo "  1. Analyze results: python3 ${EXPERIMENT_DIR}/analyze_phase4.py"
+echo "Next step:"
+echo "  7. Analyze cancellation: python3 ${EXPERIMENT_DIR}/7_analyze_cancellation.py"
 echo ""
