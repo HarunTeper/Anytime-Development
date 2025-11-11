@@ -42,16 +42,16 @@ FILTER_BY_CLASS = True
 TARGET_CLASS_ID = 9
 
 # Plot configuration
-PLOT_WIDTH = 14
-PLOT_HEIGHT = 7
-PLOT_HEIGHT_SMALL = 6
+PLOT_WIDTH = 12
+PLOT_HEIGHT = 8
+PLOT_HEIGHT_SMALL = 8
 PLOT_DPI = 300
-FONT_SIZE_TITLE = 20
-FONT_SIZE_LABEL = 20
-FONT_SIZE_LEGEND = 20
-FONT_SIZE_TICK_LABELS = 18
-LEGEND_SIZE = 20
-MARKER_SIZE = 8
+FONT_SIZE_TITLE = 30
+FONT_SIZE_LABEL = 30
+FONT_SIZE_LEGEND = 30
+FONT_SIZE_TICK_LABELS = 30
+LEGEND_SIZE = 30
+MARKER_SIZE = 12
 CAPSIZE = 5
 LINE_WIDTH = 2
 
@@ -509,20 +509,22 @@ def plot_detection_progression(metrics):
 
     ax.errorbar(layers, means, yerr=stds, marker='o',
                 capsize=5, linewidth=2, markersize=8)
-    ax.set_xlabel('Layer Number')
-    ax.set_ylabel('Average Detection Count')
+    ax.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Average Detection Count', fontsize=FONT_SIZE_LABEL)
+    ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
 
     if FILTER_BY_CLASS:
         title = f'YOLO Detection Count Progression Across Layers (Class {TARGET_CLASS_ID})'
     else:
         title = 'YOLO Detection Count Progression Across Layers (All Classes)'
-    ax.set_title(title)
+    ax.set_title(title, fontsize=FONT_SIZE_TITLE)
     ax.grid(True, alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(QUALITY_DIR / 'detection_progression.png', dpi=300)
+    plt.tight_layout(pad=0)
+    plt.savefig(QUALITY_DIR / 'detection_progression.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
-    print(f"    Saved: {QUALITY_DIR / 'detection_progression.png'}")
+    print(f"    Saved: {QUALITY_DIR / 'detection_progression.pdf'}")
 
 
 def plot_quality_ratio_progression(metrics):
@@ -547,22 +549,25 @@ def plot_quality_ratio_progression(metrics):
     ax.axhline(y=0.95, color='orange', linestyle='--', label='95% Quality')
     ax.axhline(y=0.99, color='r', linestyle='--', label='99% Quality')
 
-    ax.set_xlabel('Layer Number')
-    ax.set_ylabel('Quality Ratio (Detections / Final)')
+    ax.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Quality Ratio (Detections / Final)',
+                  fontsize=FONT_SIZE_LABEL)
+    ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
 
     if FILTER_BY_CLASS:
         title = f'YOLO Detection Quality Progression Across Layers (Class {TARGET_CLASS_ID})'
     else:
         title = 'YOLO Detection Quality Progression Across Layers (All Classes)'
-    ax.set_title(title)
+    ax.set_title(title, fontsize=FONT_SIZE_TITLE)
     ax.set_ylim([0, 1.05])
-    ax.legend()
+    ax.legend(fontsize=LEGEND_SIZE)
     ax.grid(True, alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(QUALITY_DIR / 'quality_ratio_progression.png', dpi=300)
+    plt.tight_layout(pad=0)
+    plt.savefig(QUALITY_DIR / 'quality_ratio_progression.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
-    print(f"    Saved: {QUALITY_DIR / 'quality_ratio_progression.png'}")
+    print(f"    Saved: {QUALITY_DIR / 'quality_ratio_progression.pdf'}")
 
 
 def plot_cancellation_histogram(metrics):
@@ -594,10 +599,12 @@ def plot_cancellation_histogram(metrics):
         ax.axvline(np.median(layers), color='g', linestyle='--',
                    linewidth=2, label=f"Median: {np.median(layers):.1f}")
 
-        ax.set_xlabel('Layer Number')
-        ax.set_ylabel('Number of Images')
-        ax.set_title(f'{threshold_pct}% Quality Threshold')
-        ax.legend(fontsize=8)
+        ax.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+        ax.set_ylabel('Number of Images', fontsize=FONT_SIZE_LABEL)
+        ax.set_title(f'{threshold_pct}% Quality Threshold',
+                     fontsize=FONT_SIZE_TITLE)
+        ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
+        ax.legend(fontsize=LEGEND_SIZE)
         ax.grid(True, alpha=0.3, axis='y')
 
     # Remove extra subplot
@@ -610,11 +617,12 @@ def plot_cancellation_histogram(metrics):
         fig.suptitle('Distribution: After How Many Layers Can We Cancel? (All Classes)',
                      fontsize=14, y=0.995)
 
-    plt.tight_layout()
+    plt.tight_layout(pad=0)
 
     if plotted:
-        plt.savefig(QUALITY_DIR / 'cancellation_histograms.png', dpi=300)
-        print(f"    Saved: {QUALITY_DIR / 'cancellation_histograms.png'}")
+        plt.savefig(QUALITY_DIR / 'cancellation_histograms.pdf',
+                    dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
+        print(f"    Saved: {QUALITY_DIR / 'cancellation_histograms.pdf'}")
     else:
         print("    No data for histograms")
 
@@ -650,22 +658,24 @@ def plot_layer_wise_boxplot(metrics):
     ax.axhline(y=0.99, color='r', linestyle='--',
                alpha=0.5, label='99% Quality')
 
-    ax.set_xlabel('Layer Number')
-    ax.set_ylabel('Quality Ratio')
+    ax.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Quality Ratio', fontsize=FONT_SIZE_LABEL)
+    ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
 
     if FILTER_BY_CLASS:
         title = f'Quality Distribution at Each Layer (Class {TARGET_CLASS_ID})'
     else:
         title = 'Quality Distribution at Each Layer (All Classes)'
-    ax.set_title(title)
+    ax.set_title(title, fontsize=FONT_SIZE_TITLE)
     ax.set_ylim([0, 1.05])
-    ax.legend()
+    ax.legend(fontsize=LEGEND_SIZE)
     ax.grid(True, alpha=0.3, axis='y')
 
-    plt.tight_layout()
-    plt.savefig(QUALITY_DIR / 'quality_boxplot.png', dpi=300)
+    plt.tight_layout(pad=0)
+    plt.savefig(QUALITY_DIR / 'quality_boxplot.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
-    print(f"    Saved: {QUALITY_DIR / 'quality_boxplot.png'}")
+    print(f"    Saved: {QUALITY_DIR / 'quality_boxplot.pdf'}")
 
 
 def plot_layer_computation_times(metrics):
@@ -687,15 +697,18 @@ def plot_layer_computation_times(metrics):
 
     ax.errorbar(layers, means, yerr=stds, marker='o',
                 capsize=5, linewidth=2, markersize=8, color='blue')
-    ax.set_xlabel('Layer Number')
-    ax.set_ylabel('Computation Time (ms)')
-    ax.set_title('Layer Computation Time Across Layers')
+    ax.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Computation Time (ms)', fontsize=FONT_SIZE_LABEL)
+    ax.set_title('Layer Computation Time Across Layers',
+                 fontsize=FONT_SIZE_TITLE)
+    ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
     ax.grid(True, alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(QUALITY_DIR / 'layer_computation_times.png', dpi=300)
+    plt.tight_layout(pad=0)
+    plt.savefig(QUALITY_DIR / 'layer_computation_times.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
-    print(f"    Saved: {QUALITY_DIR / 'layer_computation_times.png'}")
+    print(f"    Saved: {QUALITY_DIR / 'layer_computation_times.pdf'}")
 
 
 def plot_exit_calculation_times(metrics):
@@ -716,15 +729,18 @@ def plot_exit_calculation_times(metrics):
 
     ax.errorbar(layers, means, yerr=stds, marker='s',
                 capsize=5, linewidth=2, markersize=8, color='green')
-    ax.set_xlabel('Layer Number')
-    ax.set_ylabel('Calculation Time (ms)')
-    ax.set_title('Exit/Result Calculation Time Across Layers')
+    ax.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Calculation Time (ms)', fontsize=FONT_SIZE_LABEL)
+    ax.set_title('Exit/Result Calculation Time Across Layers',
+                 fontsize=FONT_SIZE_TITLE)
+    ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
     ax.grid(True, alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(QUALITY_DIR / 'exit_calculation_times.png', dpi=300)
+    plt.tight_layout(pad=0)
+    plt.savefig(QUALITY_DIR / 'exit_calculation_times.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
-    print(f"    Saved: {QUALITY_DIR / 'exit_calculation_times.png'}")
+    print(f"    Saved: {QUALITY_DIR / 'exit_calculation_times.pdf'}")
 
 
 def plot_combined_timing(metrics):
@@ -762,12 +778,14 @@ def plot_combined_timing(metrics):
             label='Layer Computation', alpha=0.8, color='blue')
     ax1.bar(x + width/2, exit_means, width,
             label='Exit Calculation', alpha=0.8, color='green')
-    ax1.set_xlabel('Layer Number')
-    ax1.set_ylabel('Time (ms)')
-    ax1.set_title('Layer Computation vs Exit Calculation Time')
+    ax1.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+    ax1.set_ylabel('Time (ms)', fontsize=FONT_SIZE_LABEL)
+    ax1.set_title('Layer Computation vs Exit Calculation Time',
+                  fontsize=FONT_SIZE_TITLE)
     ax1.set_xticks(x)
-    ax1.set_xticklabels(common_layers)
-    ax1.legend()
+    ax1.set_xticklabels(common_layers, fontsize=FONT_SIZE_TICK_LABELS)
+    ax1.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
+    ax1.legend(fontsize=LEGEND_SIZE)
     ax1.grid(True, alpha=0.3, axis='y')
 
     # Plot 2: Stacked view showing total time per layer
@@ -778,16 +796,18 @@ def plot_combined_timing(metrics):
             label='Layer Computation', alpha=0.8, color='blue')
     ax2.bar(common_layers, exit_means, bottom=comp_means,
             label='Exit Calculation', alpha=0.8, color='green')
-    ax2.set_xlabel('Layer Number')
-    ax2.set_ylabel('Time (ms)')
-    ax2.set_title('Total Time per Layer (Stacked)')
-    ax2.legend()
+    ax2.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+    ax2.set_ylabel('Time (ms)', fontsize=FONT_SIZE_LABEL)
+    ax2.set_title('Total Time per Layer (Stacked)', fontsize=FONT_SIZE_TITLE)
+    ax2.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
+    ax2.legend(fontsize=LEGEND_SIZE)
     ax2.grid(True, alpha=0.3, axis='y')
 
-    plt.tight_layout()
-    plt.savefig(QUALITY_DIR / 'combined_timing.png', dpi=300)
+    plt.tight_layout(pad=0)
+    plt.savefig(QUALITY_DIR / 'combined_timing.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
-    print(f"    Saved: {QUALITY_DIR / 'combined_timing.png'}")
+    print(f"    Saved: {QUALITY_DIR / 'combined_timing.pdf'}")
 
 
 def plot_cumulative_timing(metrics):
@@ -830,10 +850,12 @@ def plot_cumulative_timing(metrics):
              linewidth=2, markersize=6, label='Cumulative Exit Calculation', color='green')
     ax1.plot(common_layers, cumulative_total, marker='^',
              linewidth=2, markersize=6, label='Total Cumulative Time', color='red', linestyle='--')
-    ax1.set_xlabel('Layer Number')
-    ax1.set_ylabel('Cumulative Time (ms)')
-    ax1.set_title('Cumulative Processing Time Up To Each Layer')
-    ax1.legend()
+    ax1.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+    ax1.set_ylabel('Cumulative Time (ms)', fontsize=FONT_SIZE_LABEL)
+    ax1.set_title('Cumulative Processing Time Up To Each Layer',
+                  fontsize=FONT_SIZE_TITLE)
+    ax1.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
+    ax1.legend(fontsize=LEGEND_SIZE)
     ax1.grid(True, alpha=0.3)
 
     # Plot 2: Stacked area showing cumulative contribution
@@ -843,16 +865,19 @@ def plot_cumulative_timing(metrics):
                      alpha=0.7, label='Exit Calculation', color='green')
     ax2.plot(common_layers, cumulative_total, marker='o',
              linewidth=2, markersize=6, color='red', label='Total Runtime')
-    ax2.set_xlabel('Layer Number')
-    ax2.set_ylabel('Cumulative Time (ms)')
-    ax2.set_title('Total Runtime if Cancelled at Each Layer (Stacked Area)')
-    ax2.legend()
+    ax2.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+    ax2.set_ylabel('Cumulative Time (ms)', fontsize=FONT_SIZE_LABEL)
+    ax2.set_title(
+        'Total Runtime if Cancelled at Each Layer (Stacked Area)', fontsize=FONT_SIZE_TITLE)
+    ax2.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
+    ax2.legend(fontsize=LEGEND_SIZE)
     ax2.grid(True, alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(QUALITY_DIR / 'cumulative_timing.png', dpi=300)
+    plt.tight_layout(pad=0)
+    plt.savefig(QUALITY_DIR / 'cumulative_timing.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
-    print(f"    Saved: {QUALITY_DIR / 'cumulative_timing.png'}")
+    print(f"    Saved: {QUALITY_DIR / 'cumulative_timing.pdf'}")
 
 
 def export_quality_results(metrics, mean_thresholds, threshold_stats):

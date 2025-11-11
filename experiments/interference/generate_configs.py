@@ -6,9 +6,9 @@ Generate all Interference experiment configuration files
 import os
 
 # Configuration parameters
-batch_sizes = [1024, 4096, 16384, 65536, 262144]
+batch_sizes = [1024, 2048, 4096, 8192, 16384, 32768, 65536]
 modes = ["reactive", "proactive"]
-threading = ["single", "multi"]
+threading = ["single"]
 
 # Interference timer fixed parameters
 TIMER_PERIOD_MS = 100  # 100ms = 10Hz timer frequency

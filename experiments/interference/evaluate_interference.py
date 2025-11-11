@@ -33,15 +33,13 @@ EXPECTED_TIMER_PERIOD_MS = 100.0
 # Plot configuration
 PLOT_WIDTH = 12
 PLOT_HEIGHT = 8
-PLOT_HEIGHT_SMALL = 6
+PLOT_HEIGHT_SMALL = 8
 PLOT_DPI = 300
-FONT_SIZE_TITLE = 20
-FONT_SIZE_LABEL = 20
-FONT_SIZE_LEGEND = 20
-FONT_SIZE_SUBTITLE = 20
-FONT_SIZE_AXIS = 20
-FONT_SIZE_TICK_LABELS = 18  # Size of the numbers on the axes
-LEGEND_SIZE = 20
+FONT_SIZE_TITLE = 30
+FONT_SIZE_LABEL = 30
+FONT_SIZE_LEGEND = 30
+FONT_SIZE_TICK_LABELS = 30
+LEGEND_SIZE = 30
 MARKER_SIZE = 12
 CAPSIZE = 5
 LINE_WIDTH = 2
@@ -353,29 +351,29 @@ def generate_plots(aggregated_metrics):
     print("  - Timer period vs batch size")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes
-    all_batch_sizes = sorted(df['batch_size'].unique())
+    # Get all unique batch sizes (reversed: high to low)
+    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
     x = np.arange(len(all_batch_sizes))
-    width = 0.2
+    width = 0.35
 
     for i, mode in enumerate(['reactive', 'proactive']):
-        for j, threading in enumerate(['single', 'multi']):
-            offset = (i * 2 + j - 1.5) * width
-            mask = (df['mode'] == mode) & (df['threading'] == threading)
-            data = df[mask].sort_values('batch_size')
+        threading = 'single'  # Only single-threaded
+        offset = (i - 0.5) * width
+        mask = (df['mode'] == mode) & (df['threading'] == threading)
+        data = df[mask].sort_values('batch_size')
 
-            if len(data) > 0:
-                label = f"{mode.capitalize()} - {threading}-threaded"
-                # Align with all_batch_sizes
-                y_values = [data[data['batch_size'] == bs]['avg_timer_period'].values[0]
-                            if bs in data['batch_size'].values else 0
-                            for bs in all_batch_sizes]
-                y_errors = [data[data['batch_size'] == bs]['std_timer_period'].values[0]
-                            if bs in data['batch_size'].values else 0
-                            for bs in all_batch_sizes]
+        if len(data) > 0:
+            label = f"{mode.capitalize()}"
+            # Align with all_batch_sizes
+            y_values = [data[data['batch_size'] == bs]['avg_timer_period'].values[0]
+                        if bs in data['batch_size'].values else 0
+                        for bs in all_batch_sizes]
+            y_errors = [data[data['batch_size'] == bs]['std_timer_period'].values[0]
+                        if bs in data['batch_size'].values else 0
+                        for bs in all_batch_sizes]
 
-                ax.bar(x + offset, y_values, width, yerr=y_errors,
-                       label=label, capsize=CAPSIZE)
+            ax.bar(x + offset, y_values, width, yerr=y_errors,
+                   label=label, capsize=CAPSIZE)
 
     # Add expected period line
     ax.axhline(y=EXPECTED_TIMER_PERIOD_MS, color='red',
@@ -388,40 +386,41 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)
     ax.grid(True, axis='y', alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'timer_period_vs_batch_size.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'timer_period_vs_batch_size.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 2: Absolute Jitter vs Batch Size
     print("  - Jitter vs batch size")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes
-    all_batch_sizes = sorted(df['batch_size'].unique())
+    # Get all unique batch sizes (reversed: high to low)
+    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
     x = np.arange(len(all_batch_sizes))
-    width = 0.2
+    width = 0.35
 
     for i, mode in enumerate(['reactive', 'proactive']):
-        for j, threading in enumerate(['single', 'multi']):
-            offset = (i * 2 + j - 1.5) * width
-            mask = (df['mode'] == mode) & (df['threading'] == threading)
-            data = df[mask].sort_values('batch_size')
+        threading = 'single'  # Only single-threaded
+        offset = (i - 0.5) * width
+        mask = (df['mode'] == mode) & (df['threading'] == threading)
+        data = df[mask].sort_values('batch_size')
 
-            if len(data) > 0:
-                label = f"{mode.capitalize()} - {threading}-threaded"
-                # Align with all_batch_sizes
-                y_values = [data[data['batch_size'] == bs]['max_abs_jitter'].values[0]
-                            if bs in data['batch_size'].values else 0
-                            for bs in all_batch_sizes]
-                y_errors = [data[data['batch_size'] == bs]['std_jitter'].values[0]
-                            if bs in data['batch_size'].values else 0
-                            for bs in all_batch_sizes]
+        if len(data) > 0:
+            label = f"{mode.capitalize()}"
+            # Align with all_batch_sizes
+            y_values = [data[data['batch_size'] == bs]['max_abs_jitter'].values[0]
+                        if bs in data['batch_size'].values else 0
+                        for bs in all_batch_sizes]
+            y_errors = [data[data['batch_size'] == bs]['std_jitter'].values[0]
+                        if bs in data['batch_size'].values else 0
+                        for bs in all_batch_sizes]
 
-                ax.bar(x + offset, y_values, width, yerr=y_errors,
-                       label=label, capsize=CAPSIZE)
+            ax.bar(x + offset, y_values, width, yerr=y_errors,
+                   label=label, capsize=CAPSIZE)
 
     ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Maximum Absolute Jitter (ms)', fontsize=FONT_SIZE_LABEL)
@@ -430,36 +429,37 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)
     ax.grid(True, axis='y', alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'jitter_vs_batch_size.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'jitter_vs_batch_size.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 3: Missed Periods Percentage
     print("  - Missed periods analysis")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT_SMALL))
 
-    # Get all unique batch sizes
-    all_batch_sizes = sorted(df['batch_size'].unique())
+    # Get all unique batch sizes (reversed: high to low)
+    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
     x = np.arange(len(all_batch_sizes))
-    width = 0.2
+    width = 0.35
 
     for i, mode in enumerate(['reactive', 'proactive']):
-        for j, threading in enumerate(['single', 'multi']):
-            offset = (i * 2 + j - 1.5) * width
-            mask = (df['mode'] == mode) & (df['threading'] == threading)
-            data = df[mask].sort_values('batch_size')
+        threading = 'single'  # Only single-threaded
+        offset = (i - 0.5) * width
+        mask = (df['mode'] == mode) & (df['threading'] == threading)
+        data = df[mask].sort_values('batch_size')
 
-            if len(data) > 0:
-                label = f"{mode.capitalize()} - {threading}-threaded"
-                # Align with all_batch_sizes
-                y_values = [data[data['batch_size'] == bs]['missed_periods_percent'].values[0]
-                            if bs in data['batch_size'].values else 0
-                            for bs in all_batch_sizes]
+        if len(data) > 0:
+            label = f"{mode.capitalize()}"
+            # Align with all_batch_sizes
+            y_values = [data[data['batch_size'] == bs]['missed_periods_percent'].values[0]
+                        if bs in data['batch_size'].values else 0
+                        for bs in all_batch_sizes]
 
-                ax.bar(x + offset, y_values, width, label=label)
+            ax.bar(x + offset, y_values, width, label=label)
 
     ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Missed Periods (%)', fontsize=FONT_SIZE_LABEL)
@@ -468,40 +468,41 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)
     ax.grid(True, axis='y', alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'missed_periods_percentage.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'missed_periods_percentage.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 4: Compute Time vs Batch Size
     print("  - Compute time vs batch size")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes
-    all_batch_sizes = sorted(df['batch_size'].unique())
+    # Get all unique batch sizes (reversed: high to low)
+    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
     x = np.arange(len(all_batch_sizes))
-    width = 0.2
+    width = 0.35
 
     for i, mode in enumerate(['reactive', 'proactive']):
-        for j, threading in enumerate(['single', 'multi']):
-            offset = (i * 2 + j - 1.5) * width
-            mask = (df['mode'] == mode) & (df['threading'] == threading)
-            data = df[mask].sort_values('batch_size')
+        threading = 'single'  # Only single-threaded
+        offset = (i - 0.5) * width
+        mask = (df['mode'] == mode) & (df['threading'] == threading)
+        data = df[mask].sort_values('batch_size')
 
-            if len(data) > 0:
-                label = f"{mode.capitalize()} - {threading}-threaded"
-                # Align with all_batch_sizes
-                y_values = [data[data['batch_size'] == bs]['avg_compute_time'].values[0]
-                            if bs in data['batch_size'].values else 0
-                            for bs in all_batch_sizes]
-                y_errors = [data[data['batch_size'] == bs]['std_compute_time'].values[0]
-                            if bs in data['batch_size'].values else 0
-                            for bs in all_batch_sizes]
+        if len(data) > 0:
+            label = f"{mode.capitalize()}"
+            # Align with all_batch_sizes
+            y_values = [data[data['batch_size'] == bs]['avg_compute_time'].values[0]
+                        if bs in data['batch_size'].values else 0
+                        for bs in all_batch_sizes]
+            y_errors = [data[data['batch_size'] == bs]['std_compute_time'].values[0]
+                        if bs in data['batch_size'].values else 0
+                        for bs in all_batch_sizes]
 
-                ax.bar(x + offset, y_values, width, yerr=y_errors,
-                       label=label, capsize=CAPSIZE)
+            ax.bar(x + offset, y_values, width, yerr=y_errors,
+                   label=label, capsize=CAPSIZE)
 
     ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Average Compute Batch Time (ms)', fontsize=FONT_SIZE_LABEL)
@@ -510,61 +511,90 @@ def generate_plots(aggregated_metrics):
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)
     ax.grid(True, axis='y', alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'compute_time_vs_batch_size.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'compute_time_vs_batch_size.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 5: Timer Period Distribution (Box Plot)
     print("  - Timer period distribution")
-    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    fig, axes = plt.subplots(1, 2, figsize=(16, 8))
 
-    threading_modes = ['single', 'multi']
+    threading = 'single'  # Only single-threaded
     algorithm_modes = ['reactive', 'proactive']
 
-    for i, threading in enumerate(threading_modes):
-        for j, mode in enumerate(algorithm_modes):
-            ax = axes[i, j]
+    for j, mode in enumerate(algorithm_modes):
+        ax = axes[j]
 
-            mask = (df['mode'] == mode) & (df['threading'] == threading)
-            data = df[mask].sort_values('batch_size')
+        mask = (df['mode'] == mode) & (df['threading'] == threading)
+        data = df[mask].sort_values('batch_size')
 
-            if len(data) > 0:
-                # Create box plot data
-                batch_labels = []
-                period_data = []
+        if len(data) > 0:
+            # Create box plot data
+            batch_labels = []
+            period_data = []
 
-                for _, row in data.iterrows():
-                    batch_labels.append(str(row['batch_size']))
-                    # Simulate distribution from mean and std
-                    # (In reality, you'd want to preserve raw period data)
-                    period_data.append([row['avg_timer_period']])
+            for _, row in data.iterrows():
+                batch_labels.append(str(row['batch_size']))
+                # Simulate distribution from mean and std
+                # (In reality, you'd want to preserve raw period data)
+                period_data.append([row['avg_timer_period']])
 
-                bp = ax.boxplot(period_data, labels=batch_labels,
-                                patch_artist=True, showmeans=True)
+            bp = ax.boxplot(period_data, labels=batch_labels,
+                            patch_artist=True, showmeans=True)
 
-                # Color boxes
-                for patch in bp['boxes']:
-                    patch.set_facecolor('lightblue')
+            # Color boxes
+            for patch in bp['boxes']:
+                patch.set_facecolor('lightblue')
 
-                # Add expected period line
-                ax.axhline(y=EXPECTED_TIMER_PERIOD_MS, color='red',
-                           linestyle=':', linewidth=LINE_WIDTH, label='Expected')
+            # Add expected period line
+            ax.axhline(y=EXPECTED_TIMER_PERIOD_MS, color='red',
+                       linestyle=':', linewidth=LINE_WIDTH, label='Expected')
 
-            ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_AXIS)
-            ax.set_ylabel('Timer Period (ms)', fontsize=FONT_SIZE_AXIS)
-            # ax.set_title(f'{mode.capitalize()} - {threading}-threaded',
-            #              fontsize=FONT_SIZE_SUBTITLE, fontweight='bold')
-            ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-            ax.grid(True, alpha=0.3)
-            ax.legend()
+        ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+        ax.set_ylabel('Timer Period (ms)', fontsize=FONT_SIZE_LABEL)
+        # ax.set_title(f'{mode.capitalize()}',
+        #              fontsize=FONT_SIZE_TITLE, fontweight='bold')
+        ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
+        ax.grid(True, alpha=0.3)
+        # ax.legend()
 
     # plt.suptitle('Timer Period Distribution by Configuration',
     #              fontsize=FONT_SIZE_TITLE, fontweight='bold')
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / 'timer_period_distribution.pdf', dpi=PLOT_DPI)
+    plt.tight_layout(pad=0)
+    plt.savefig(PLOTS_DIR / 'timer_period_distribution.pdf',
+                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
+    plt.close()
+
+    # Create separate legend file
+    print("  - Creating separate legend")
+
+    # Create legend entries with correct colors matching the plots
+    from matplotlib.patches import Patch
+    legend_elements = []
+    for i, mode in enumerate(['reactive', 'proactive']):
+        label = f"{mode.capitalize()}"
+        legend_elements.append(Patch(facecolor=f'C{i}', label=label))
+
+    # Add expected period line to legend
+    legend_elements.append(plt.Line2D([0], [0], color='red', linestyle=':',
+                                      linewidth=LINE_WIDTH, label=f'Expected ({EXPECTED_TIMER_PERIOD_MS} ms)'))
+
+    # Create a minimal figure just for the legend
+    fig_legend = plt.figure(figsize=(PLOT_WIDTH, 0.5))
+    legend = fig_legend.legend(
+        handles=legend_elements,
+        loc='center',
+        ncol=3,
+        fontsize=LEGEND_SIZE,
+        frameon=False
+    )
+
+    plt.savefig(PLOTS_DIR / 'legend.pdf', dpi=PLOT_DPI,
+                bbox_inches='tight', pad_inches=0)
     plt.close()
 
     print(f"\nAll plots saved to: {PLOTS_DIR}")

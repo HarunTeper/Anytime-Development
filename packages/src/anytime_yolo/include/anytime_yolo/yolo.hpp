@@ -1238,7 +1238,7 @@ private:
       std::cerr << "Failed to load cached NMS engine, falling back to build" << std::endl;
       buildOnnxEngine(weightsPath, enginePath, halfPrecision);
 
-      // std::cout << "Successfully built NMS engine" << std::endl;
+      std::cout << "Successfully built NMS engine" << std::endl;
       if (!loadEngine(enginePath, runtime, nmsEngine)) {
         throw std::runtime_error("Failed to load NMS engine");
       }
@@ -1276,7 +1276,7 @@ private:
       std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
       buildOnnxEngine(weightsPath, enginePath, halfPrecision);
 
-      // std::cout << "Successfully built layer" << std::endl;
+      std::cout << "Successfully built layer" << std::endl;
 
       if (!loadEngine(enginePath, runtime, engine)) {
         throw std::runtime_error("Failed to load engine");
@@ -1315,7 +1315,7 @@ private:
       std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
       buildOnnxEngine(weightsPath, enginePath, halfPrecision);
 
-      // std::cout << "Successfully built exit" << std::endl;
+      std::cout << "Successfully built exit" << std::endl;
 
       if (!loadEngine(enginePath, runtime, engine)) {
         throw std::runtime_error("Failed to load engine");
@@ -1354,7 +1354,7 @@ public:
       std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
       buildOnnxEngine(weightsPath, enginePath, halfPrecision);
 
-      // std::cout << "Successfully built subexit combiner" << std::endl;
+      std::cout << "Successfully built subexit combiner" << std::endl;
 
       if (!loadEngine(enginePath, runtime, engine)) {
         throw std::runtime_error("Failed to load engine");

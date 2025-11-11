@@ -38,7 +38,7 @@ CLIENT_CONFIG = {
     "anytime_client": {
         "ros__parameters": {
             "image_topic": "video_frames",
-            "cancel_after_layers": 16,  # Cancel after 16 layers
+            "cancel_after_layers": 25,  # Cancel after 16 layers
             "cancel_layer_score": True,  # Enable score-based cancellation
             "score_threshold": 0.8,       # Threshold of 0.8
             "target_class_id": "9",       # Traffic light

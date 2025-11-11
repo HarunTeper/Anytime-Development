@@ -866,7 +866,7 @@ def generate_plots(aggregated_metrics):
         loc='center',
         ncol=4,
         fontsize=LEGEND_SIZE,
-        frameon=True
+        frameon=False
     )
 
     # Save with minimal margins
