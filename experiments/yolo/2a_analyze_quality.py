@@ -54,6 +54,8 @@ LEGEND_SIZE = 30
 MARKER_SIZE = 12
 CAPSIZE = 5
 LINE_WIDTH = 2
+# Show every Nth x-axis label (1 = all, 2 = every other, etc.)
+X_LABEL_SKIP = 2
 
 # Create output directories
 RESULTS_DIR.mkdir(exist_ok=True)
@@ -541,27 +543,40 @@ def plot_quality_ratio_progression(metrics):
     means = [np.mean(metrics['layer_quality_ratio'][l]) for l in layers]
     stds = [np.std(metrics['layer_quality_ratio'][l]) for l in layers]
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    ax.errorbar(layers, means, yerr=stds, marker='o',
-                capsize=5, linewidth=2, markersize=8)
-    ax.axhline(y=0.90, color='g', linestyle='--', label='90% Quality')
-    ax.axhline(y=0.95, color='orange', linestyle='--', label='95% Quality')
-    ax.axhline(y=0.99, color='r', linestyle='--', label='99% Quality')
+    # Use bar chart instead of line plot
+    x = np.arange(len(layers))
+    ax.bar(x, means, yerr=stds, capsize=CAPSIZE, alpha=0.8,
+           color='#1f77b4', error_kw={'linewidth': LINE_WIDTH})
+
+    # Add threshold lines
+    ax.axhline(y=0.90, color='g', linestyle='--',
+               linewidth=LINE_WIDTH, label='90% Quality')
+    ax.axhline(y=0.95, color='orange', linestyle='--',
+               linewidth=LINE_WIDTH, label='95% Quality')
+    ax.axhline(y=0.99, color='r', linestyle='--',
+               linewidth=LINE_WIDTH, label='99% Quality')
 
     ax.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Quality Ratio (Detections / Final)',
                   fontsize=FONT_SIZE_LABEL)
-    ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
+
+    # Show only every Nth label to prevent overlap
+    ax.set_xticks(x)
+    x_labels = [layers[i] if i % X_LABEL_SKIP ==
+                0 else '' for i in range(len(layers))]
+    ax.set_xticklabels(x_labels, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
 
     if FILTER_BY_CLASS:
         title = f'YOLO Detection Quality Progression Across Layers (Class {TARGET_CLASS_ID})'
     else:
         title = 'YOLO Detection Quality Progression Across Layers (All Classes)'
-    ax.set_title(title, fontsize=FONT_SIZE_TITLE)
+    # ax.set_title(title, fontsize=FONT_SIZE_TITLE)
     ax.set_ylim([0, 1.05])
     ax.legend(fontsize=LEGEND_SIZE)
-    ax.grid(True, alpha=0.3)
+    ax.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout(pad=0)
     plt.savefig(QUALITY_DIR / 'quality_ratio_progression.pdf',

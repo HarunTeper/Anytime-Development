@@ -85,7 +85,7 @@ The evaluation script extracts and analyzes:
 
 ### Overall Metrics
 - **Total batches completed**: Number of batches finished in 30s
-- **Total iterations**: Total Monte Carlo iterations executed
+- **Total Segments**: Total Monte Carlo iterations executed
 - **Cancellation delay**: Time from cancel request to deactivation (ms)
 - **Throughput**: Iterations per second
 
