@@ -17,7 +17,6 @@ Input:  traces/phase1_baseline_trial{1,2,3}/
 Output: results/quality_analysis/
 """
 
-import os
 import sys
 import json
 import subprocess

@@ -4,8 +4,8 @@
   <name>experiments</name>
   <version>1.0.0</version>
   <description>Experimental configurations and launch files for anytime algorithms</description>
-  <maintainer email="your.email@example.com">Your Name</maintainer>
-  <license>MIT</license>
+  <maintainer email="harun.teper@tu-dortmund.de">Harun Teper</maintainer>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

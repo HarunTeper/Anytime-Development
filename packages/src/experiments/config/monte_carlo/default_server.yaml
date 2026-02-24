@@ -9,5 +9,8 @@ anytime_server:
     # Batch processing configuration
     batch_size: 1  # Number of iterations to compute per batch
     
+    # Reproducibility
+    random_seed: 42  # Seed for reproducible Monte Carlo results
+
     # Logging configuration
     log_level: "info"  # Options: "debug", "info", "warn", "error", "fatal"

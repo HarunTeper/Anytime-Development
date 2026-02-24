@@ -8,7 +8,6 @@ This script parses LTTng traces from Monte Carlo experiments and generates:
 - CSV/JSON exports of results
 """
 
-import os
 import sys
 import json
 import subprocess
@@ -19,7 +18,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor
-import multiprocessing
 
 # Configuration
 SCRIPT_DIR = Path(__file__).resolve().parent

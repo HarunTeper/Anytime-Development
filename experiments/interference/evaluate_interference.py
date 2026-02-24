@@ -19,7 +19,6 @@ from collections import defaultdict
 import re
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor
-import sys
 
 # Configuration
 SCRIPT_DIR = Path(__file__).resolve().parent

@@ -6,6 +6,23 @@
 
 set -e  # Exit on error
 
+# Cleanup on interrupt
+cleanup() {
+    echo ""
+    echo "Interrupted — cleaning up..."
+    lttng stop 2>/dev/null || true
+    lttng destroy monte_carlo_exp 2>/dev/null || true
+    pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
+    pkill -9 -f 'ros2' 2>/dev/null || true
+}
+trap cleanup INT TERM
+
+# Preflight checks
+if ! command -v lttng &>/dev/null; then
+    echo "ERROR: lttng not found. Install lttng-tools."
+    exit 1
+fi
+
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"

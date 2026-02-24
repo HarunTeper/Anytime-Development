@@ -252,16 +252,7 @@ public:
     TRACE_ANYTIME_CALCULATE_RESULT_EXIT(node_);
   }
 
-  virtual void notify_cancel()
-  {
-    std::string goal_id_str =
-      goal_handle_ ? rclcpp_action::to_string(goal_handle_->get_goal_id()) : "null";
-    RCLCPP_DEBUG(node_->get_logger(), "[Goal ID: %s] Notify cancel function", goal_id_str.c_str());
-    // Trigger the waitable to process the cancellation
-    // this->notify_waitable();
-    RCLCPP_DEBUG(
-      node_->get_logger(), "[Goal ID: %s] Notify cancel function finished", goal_id_str.c_str());
-  }
+  virtual void notify_cancel() {}
 
   virtual void reset()
   {

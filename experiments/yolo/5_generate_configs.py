@@ -11,8 +11,8 @@ Creates configuration files for all combinations:
 Total: 4 × 1 × 2 × 2 = 16 server configs + 1 client config
 
 Client cancellation settings:
-- Cancel after 16 layers
-- Score threshold: 0.8
+- Cancel after 25 layers (full network)
+- Score threshold: 0.7
 - Target class: 9 (traffic light)
 
 Output: configs/phase4_*.yaml
@@ -40,9 +40,9 @@ CLIENT_CONFIG = {
     "anytime_client": {
         "ros__parameters": {
             "image_topic": "video_frames",
-            "cancel_after_layers": 25,  # Cancel after 16 layers
+            "cancel_after_layers": 25,  # Cancel after 25 layers (full network)
             "cancel_layer_score": True,  # Enable score-based cancellation
-            "score_threshold": 0.7,       # Threshold of 0.8
+            "score_threshold": 0.7,       # Score threshold for detection quality
             "target_class_id": "9",       # Traffic light
             "log_level": "info"
         }
@@ -124,8 +124,8 @@ def main():
         f"  Total: {len(BLOCK_SIZES) * len(MODES) * len(SYNC_MODES) * len(THREADING_MODES)} combinations")
 
     print("\nClient Cancellation Settings:")
-    print(f"  Cancel after: 16 layers")
-    print(f"  Score threshold: ≥ 0.8")
+    print(f"  Cancel after: 25 layers")
+    print(f"  Score threshold: \u2265 0.7")
     print(f"  Target class: 9 (traffic light)")
 
     print("\nNext step:")

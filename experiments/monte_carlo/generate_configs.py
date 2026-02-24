@@ -25,7 +25,10 @@ server_template = """anytime_server:
     
     # Batch processing configuration
     batch_size: {batch_size}  # Number of iterations to compute per batch
-    
+
+    # Reproducibility
+    random_seed: 42  # Seed for reproducible Monte Carlo results
+
     # Logging configuration
     log_level: "info"  # Options: "debug", "info", "warn", "error", "fatal"
 """

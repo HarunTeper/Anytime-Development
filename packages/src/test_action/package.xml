@@ -4,8 +4,8 @@
   <name>test_action</name>
   <version>1.0.0</version>
   <description>Test action package for multi-threaded executor testing</description>
-  <maintainer email="test@test.com">Test User</maintainer>
-  <license>TODO</license>
+  <maintainer email="harun.teper@tu-dortmund.de">Harun Teper</maintainer>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>rosidl_default_generators</buildtool_depend>

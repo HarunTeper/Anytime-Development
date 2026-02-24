@@ -26,6 +26,13 @@ public:
     // Initialize common base class functionality
     this->template initialize_anytime_base<isReactiveProactive>(node, batch_size);
 
+    // Initialize reproducible RNG from ROS parameter
+    if (!node->has_parameter("random_seed")) {
+      node->declare_parameter("random_seed", 42);
+    }
+    int seed = node->get_parameter("random_seed").as_int();
+    rng_ = std::mt19937(static_cast<unsigned int>(seed));
+
     TRACE_MONTE_CARLO_INIT(node, batch_size, isReactiveProactive);
   }
 
@@ -35,10 +42,10 @@ public:
   {
     RCLCPP_DEBUG(this->node_->get_logger(), "Monte Carlo compute single iteration called");
 
-    x = (float)rand() / RAND_MAX;
-    y = (float)rand() / RAND_MAX;
+    x = dist_(rng_);
+    y = dist_(rng_);
 
-    if (sqrt(pow(x, 2) + pow(y, 2)) <= 1) {
+    if (x * x + y * y <= 1.0f) {
       count_inside_++;
     }
     count_total_++;
@@ -78,7 +85,6 @@ public:
     // Reset the count variables
     count_total_ = 0;
     count_inside_ = 0;
-    count_outside_ = 0;
     loop_count_ = 0;
   }
 
@@ -91,12 +97,14 @@ protected:
   // Count variables
   int count_total_ = 0;
   int count_inside_ = 0;
-  int count_outside_ = 0;
-
   int loop_count_ = 0;
 
-  float x = 0.0;
-  float y = 0.0;
+  float x = 0.0f;
+  float y = 0.0f;
+
+  // Reproducible RNG
+  std::mt19937 rng_;
+  std::uniform_real_distribution<float> dist_{0.0f, 1.0f};
 };
 
 #endif  // ANYTIME_MANAGEMENT_HPP

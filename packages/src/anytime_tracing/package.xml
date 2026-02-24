@@ -4,8 +4,8 @@
   <name>anytime_tracing</name>
   <version>1.0.0</version>
   <description>Custom tracing instrumentation for anytime system</description>
-  <maintainer email="user@example.com">User</maintainer>
-  <license>Apache 2.0</license>
+  <maintainer email="harun.teper@tu-dortmund.de">Harun Teper</maintainer>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
   <buildtool_depend>pkg-config</buildtool_depend>

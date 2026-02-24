@@ -16,7 +16,6 @@ Input:  traces/phase3_{sync|async}_{single|multi}_trial{1,2,3}/
 Output: results/runtime_analysis/
 """
 
-import os
 import sys
 import json
 import subprocess

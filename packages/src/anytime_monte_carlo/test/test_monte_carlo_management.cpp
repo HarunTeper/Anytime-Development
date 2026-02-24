@@ -29,7 +29,6 @@ public:
   using AnytimeManagement<isReactiveProactive>::count_total_;
   using AnytimeManagement<isReactiveProactive>::count_inside_;
   using AnytimeManagement<isReactiveProactive>::loop_count_;
-  using AnytimeManagement<isReactiveProactive>::count_outside_;
 };
 
 class MonteCarloManagementTest : public ::testing::Test
@@ -108,7 +107,6 @@ TEST_F(MonteCarloManagementTest, ResetClearsState)
 
   EXPECT_EQ(mc.count_total_, 0);
   EXPECT_EQ(mc.count_inside_, 0);
-  EXPECT_EQ(mc.count_outside_, 0);
   EXPECT_EQ(mc.loop_count_, 0);
 }
 
