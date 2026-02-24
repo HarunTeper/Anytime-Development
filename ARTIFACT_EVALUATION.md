@@ -262,21 +262,22 @@ Each experiment generates additional plots beyond the paper figures:
 Before running YOLO experiments on Path B (or to re-download on Path A), download the model weights and test images:
 
 ```bash
-# Download YOLO weights
+# Download YOLO weights (extracts to packages/src/anytime_yolo/weights_32/)
 cd packages/src/anytime_yolo
 wget https://tu-dortmund.sciebo.de/s/gmGSJEsFgwKb6MY/download -O weights.zip
-unzip -o weights.zip -d .
+unzip -o weights.zip
 rm weights.zip
 cd ../../..
 
-# Download test images
-mkdir -p packages/src/video_publisher/images
-cd packages/src/video_publisher/images
+# Download test images (extracts to packages/src/video_publisher/images/)
+cd packages/src/video_publisher
 wget https://tu-dortmund.sciebo.de/s/BQRaiztJkmx33tt/download -O images.zip
-unzip -o images.zip -d .
+unzip -o images.zip
 rm images.zip
-cd ../../../..
+cd ../../../
 ```
+
+> **First run after downloading weights:** The YOLO weights are distributed as ONNX models. On first use, TensorRT compiles each ONNX model into an optimized `.engine` file for your specific GPU. This one-time compilation adds **10–20 minutes** to the first YOLO experiment run. Subsequent runs reuse the cached `.engine` files and start immediately.
 
 ## Experiment Details
 

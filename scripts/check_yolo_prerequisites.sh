@@ -19,7 +19,7 @@ if [ ! -f "${WEIGHTS_DIR}/model.json" ]; then
     echo "Download weights:"
     echo "  cd packages/src/anytime_yolo"
     echo "  wget https://tu-dortmund.sciebo.de/s/gmGSJEsFgwKb6MY/download -O weights.zip"
-    echo "  unzip -o weights.zip -d ."
+    echo "  unzip -o weights.zip"
     echo "  rm weights.zip"
     echo ""
     errors=1
@@ -32,10 +32,9 @@ if [ "${image_count}" -eq 0 ]; then
     echo "       Expected files: image_*.jpg"
     echo ""
     echo "Download images:"
-    echo "  mkdir -p packages/src/video_publisher/images"
-    echo "  cd packages/src/video_publisher/images"
+    echo "  cd packages/src/video_publisher"
     echo "  wget https://tu-dortmund.sciebo.de/s/BQRaiztJkmx33tt/download -O images.zip"
-    echo "  unzip -o images.zip -d ."
+    echo "  unzip -o images.zip"
     echo "  rm images.zip"
     echo ""
     errors=1
