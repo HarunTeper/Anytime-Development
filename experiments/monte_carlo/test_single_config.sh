@@ -67,6 +67,11 @@ LAUNCH_PID=$!
 # Wait for completion
 wait ${LAUNCH_PID} 2>/dev/null || true
 
+# Stop tracing (before killing processes to flush trace buffers)
+echo "[5/5] Stopping trace..."
+lttng stop
+sleep 1
+
 # Kill any remaining processes
 kill ${LAUNCH_PID} 2>/dev/null || true
 sleep 1
@@ -76,11 +81,8 @@ kill -9 ${LAUNCH_PID} 2>/dev/null || true
 pkill -9 -f 'component_container' 2>/dev/null || true
 pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
 pkill -9 -f 'ros2' 2>/dev/null || true
+sleep 1
 
-sleep 2
-
-echo "[5/5] Stopping trace..."
-lttng stop
 lttng destroy test_monte_carlo
 
 # Verify trace
@@ -94,7 +96,7 @@ if [ -d "${test_trace}" ] && [ "$(ls -A ${test_trace})" ]; then
     echo "✓ Trace directory created: ${test_trace}"
     
     # Count events
-    event_count=$(babeltrace "${test_trace}" | grep -c "anytime:" || echo "0")
+    event_count=$(babeltrace "${test_trace}" | grep -c "anytime:" || true)
     echo "✓ Events captured: ${event_count}"
     
     if [ ${event_count} -gt 0 ]; then

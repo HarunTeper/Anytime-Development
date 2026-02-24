@@ -29,8 +29,10 @@ class VideoPublisher(Node):
             f'Files in directory "{self.image_path}": {filenames}')
 
         # Filter for files in the format image_*.jpg
-        self.image_files = [f for f in filenames if f.startswith(
-            'image_') and f.endswith('.jpg')]
+        self.image_files = sorted(
+            [f for f in filenames if f.startswith('image_') and f.endswith('.jpg')],
+            key=lambda f: int(f.split('_')[1].split('.')[0])
+        )
         self.get_logger().debug(
             f'Filtered image files: {self.image_files}')
 
@@ -65,8 +67,8 @@ class VideoPublisher(Node):
         self.get_logger().debug(f'Publishing image: {image_path}')
 
         image = cv2.imread(image_path)
-        if image is None:
-            self.get_logger().error(f'Failed to load image: {image_path}')
+        if image is None or image.size == 0:
+            self.get_logger().error(f'Failed to load image or image is empty: {image_path}')
             rclpy.shutdown()
             return
 

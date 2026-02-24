@@ -9,11 +9,11 @@ set -e
 cleanup() {
     echo ""
     echo "Interrupted — cleaning up..."
+    lttng stop 2>/dev/null || true
     pkill -9 -f 'component_container' 2>/dev/null || true
     pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
     pkill -9 -f 'ros2' 2>/dev/null || true
     sleep 1
-    lttng stop 2>/dev/null || true
     lttng destroy smoke_test 2>/dev/null || true
 }
 trap cleanup INT TERM
@@ -160,6 +160,10 @@ LAUNCH_PID=$!
 # Wait for experiment duration
 sleep ${RUN_DURATION}
 
+# Stop tracing (before killing processes to flush trace buffers)
+lttng stop
+sleep 1
+
 # Cleanup
 kill ${LAUNCH_PID} 2>/dev/null || true
 sleep 1
@@ -167,10 +171,8 @@ kill -9 ${LAUNCH_PID} 2>/dev/null || true
 pkill -9 -f 'component_container' 2>/dev/null || true
 pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
 pkill -9 -f 'ros2' 2>/dev/null || true
-sleep 2
+sleep 1
 
-# Stop tracing
-lttng stop
 lttng destroy smoke_test
 
 if [ -d "${test_trace}" ] && [ "$(ls -A ${test_trace})" ]; then
@@ -187,7 +189,7 @@ echo "-----------------------------------------"
 echo "Phase 6/6: Verifying traces"
 echo "-----------------------------------------"
 
-event_count=$(babeltrace "${test_trace}" | grep -c "anytime:" || echo "0")
+event_count=$(babeltrace "${test_trace}" | grep -c "anytime:" || true)
 echo "  Events captured: ${event_count}"
 
 if [ "${event_count}" -gt 0 ]; then

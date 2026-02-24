@@ -169,28 +169,25 @@ for config in "${CONFIGS[@]}"; do
         
         echo -e "${BLUE}Processing completed in ${ELAPSED_TIME} seconds, cleaning up...${NC}"
         
-        # Kill background processes first (before LTTng teardown to avoid destroy hang)
+        # Stop trace (before killing processes to flush trace buffers)
+        echo -e "${BLUE}Stopping trace session...${NC}"
+        lttng stop
+        sleep 1
+
+        # Kill background processes
         echo -e "${BLUE}Stopping background processes...${NC}"
         kill ${VIDEO_PUB_PID} 2>/dev/null || true
         kill ${YOLO_PID} 2>/dev/null || true
-
-        # Wait for processes to stop
-        sleep 2
-
-        # Force kill if still running
+        sleep 1
         kill -9 ${VIDEO_PUB_PID} 2>/dev/null || true
         kill -9 ${YOLO_PID} 2>/dev/null || true
-
-        # Kill any remaining YOLO processes
         pkill -9 -f 'component_container' 2>/dev/null || true
         pkill -9 -f 'anytime_yolo' 2>/dev/null || true
         pkill -9 -f 'video_publisher' 2>/dev/null || true
-
-        # Stop trace
-        echo -e "${BLUE}Stopping trace session...${NC}"
-        lttng stop
-        lttng destroy
         pkill -9 -f 'ros2' 2>/dev/null || true
+        sleep 1
+
+        lttng destroy
         
         echo -e "${GREEN}Trial ${trial} complete! Time: ${ELAPSED_TIME}s${NC}"
         echo -e "Trace saved to: ${TRIAL_TRACE_DIR}"

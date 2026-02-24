@@ -42,12 +42,12 @@ set -e
 cleanup() {
     echo ""
     echo "Interrupted — cleaning up..."
+    lttng stop 2>/dev/null || true
     pkill -9 -f 'component_container' 2>/dev/null || true
     pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
     pkill -9 -f 'interference_timer' 2>/dev/null || true
     pkill -9 -f 'ros2' 2>/dev/null || true
     sleep 1
-    lttng stop 2>/dev/null || true
     lttng destroy 2>/dev/null || true
 }
 trap cleanup INT TERM
@@ -291,15 +291,17 @@ if [ "${RUN_YOLO}" = true ]; then
         echo "-----------------------------------------"
 
         # Check YOLO prerequisites (weights + images)
+        yolo_prereqs_ok=true
         if [ "${NO_PREREQS}" = true ]; then
             echo "  Skipping prerequisite check (--no-prerequisites)"
         elif ! "${SCRIPT_DIR}/check_yolo_prerequisites.sh"; then
             echo "  FAILED: YOLO experiments (missing prerequisites)"
             failed=$((failed + 1))
+            yolo_prereqs_ok=false
         fi
 
-        # Only proceed if we haven't already failed
-        if [ "${failed}" -eq 0 ] || [ "${NO_PREREQS}" = true ]; then
+        # Only proceed if prerequisites passed
+        if [ "${yolo_prereqs_ok}" = true ]; then
 
         cd "${PACKAGES_DIR}"
         source install/setup.bash

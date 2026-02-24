@@ -84,6 +84,11 @@ LAUNCH_PID=$!
 # Wait for completion
 wait ${LAUNCH_PID} 2>/dev/null || true
 
+# Stop tracing (before killing processes to flush trace buffers)
+echo "[5/5] Stopping trace..."
+lttng stop
+sleep 1
+
 # Kill any remaining processes
 kill ${LAUNCH_PID} 2>/dev/null || true
 sleep 1
@@ -94,11 +99,8 @@ pkill -9 -f 'component_container' 2>/dev/null || true
 pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
 pkill -9 -f 'interference_timer' 2>/dev/null || true
 pkill -9 -f 'ros2' 2>/dev/null || true
+sleep 1
 
-sleep 2
-
-echo "[5/5] Stopping trace..."
-lttng stop
 lttng destroy test_interference
 
 # Verify trace
@@ -112,9 +114,9 @@ if [ -d "${test_trace}" ] && [ "$(ls -A ${test_trace})" ]; then
     echo "✓ Trace directory created: ${test_trace}"
     
     # Count events
-    total_events=$(babeltrace "${test_trace}" | grep -c "anytime:" || echo "0")
-    timer_events=$(babeltrace "${test_trace}" | grep -c "interference_timer_callback" || echo "0")
-    compute_events=$(babeltrace "${test_trace}" | grep -c "anytime_compute" || echo "0")
+    total_events=$(babeltrace "${test_trace}" | grep -c "anytime:" || true)
+    timer_events=$(babeltrace "${test_trace}" | grep -c "interference_timer_callback" || true)
+    compute_events=$(babeltrace "${test_trace}" | grep -c "anytime_compute" || true)
     
     echo "✓ Total events: ${total_events}"
     echo "✓ Timer callback events: ${timer_events}"

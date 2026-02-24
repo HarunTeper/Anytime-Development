@@ -225,6 +225,13 @@ public:
       // Get the OpenCV image
       cv::Mat img = cv_ptr->image;
 
+      if (img.empty()) {
+        RCLCPP_ERROR(this->node_->get_logger(),
+          "Received empty image (width=%d, height=%d, channels=%d)",
+          img.cols, img.rows, img.channels());
+        return;
+      }
+
       TRACE_YOLO_IMAGE_PROCESSED(this->node_, img.cols, img.rows);
 
       cv::Mat blob = cv::dnn::blobFromImage(

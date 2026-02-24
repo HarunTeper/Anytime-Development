@@ -10,11 +10,11 @@ set -e  # Exit on error
 cleanup() {
     echo ""
     echo "Interrupted — cleaning up..."
+    lttng stop 2>/dev/null || true
     pkill -9 -f 'component_container' 2>/dev/null || true
     pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
     pkill -9 -f 'ros2' 2>/dev/null || true
     sleep 1
-    lttng stop 2>/dev/null || true
     lttng destroy monte_carlo_exp 2>/dev/null || true
 }
 trap cleanup INT TERM
@@ -147,6 +147,11 @@ for batch_size in "${BATCH_SIZES[@]}"; do
                 # Wait for experiment duration
                 sleep ${RUN_DURATION}
 
+                # Stop tracing (before killing processes to flush trace buffers)
+                echo "  [5/5] Stopping trace and saving..."
+                lttng stop
+                sleep 1
+
                 # Kill the launch process
                 kill ${LAUNCH_PID} 2>/dev/null || true
                 sleep 1
@@ -156,13 +161,8 @@ for batch_size in "${BATCH_SIZES[@]}"; do
                 pkill -9 -f 'component_container' 2>/dev/null || true
                 pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
                 pkill -9 -f 'ros2' 2>/dev/null || true
+                sleep 1
 
-                # Give it a moment to flush
-                sleep 2
-
-                # Stop tracing
-                echo "  [5/5] Stopping trace and saving..."
-                lttng stop
                 lttng destroy monte_carlo_exp
 
                 # Verify trace was created
