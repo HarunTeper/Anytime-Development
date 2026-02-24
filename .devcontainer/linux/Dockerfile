@@ -97,6 +97,14 @@ RUN /bin/bash -c '. /opt/ros/humble/setup.bash && \
     cd /home/vscode/ros2_tracing_ws && \
     colcon build --symlink-install --allow-overriding tracetools'
 
+# --- Build cv_bridge from source (links against installed OpenCV instead of system 4.5) ---
+
+RUN /bin/bash -c '. /opt/ros/humble/setup.bash && \
+    mkdir -p /home/vscode/cv_bridge_ws/src && \
+    git clone --depth 1 -b humble https://github.com/ros-perception/vision_opencv.git /home/vscode/cv_bridge_ws/src/vision_opencv && \
+    cd /home/vscode/cv_bridge_ws && \
+    colcon build --symlink-install --packages-select cv_bridge --allow-overriding cv_bridge'
+
 # --- Set up tracing group ---
 
 RUN groupadd -f -r tracing && \
@@ -120,7 +128,8 @@ USER vscode
 
 # source ROS2 setup file and tracing workspace
 RUN echo '. /opt/ros/humble/setup.bash' >> /home/vscode/.bashrc && \
-    echo '. /home/vscode/ros2_tracing_ws/install/setup.sh' >> /home/vscode/.bashrc
+    echo '. /home/vscode/ros2_tracing_ws/install/setup.sh' >> /home/vscode/.bashrc && \
+    echo '. /home/vscode/cv_bridge_ws/install/setup.sh' >> /home/vscode/.bashrc
 
 # configure environment variables
 ARG DISPLAY

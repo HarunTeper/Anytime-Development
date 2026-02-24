@@ -72,6 +72,14 @@ RUN /bin/bash -c '. /opt/ros/humble/setup.bash && \
     cd /home/vscode/ros2_tracing_ws && \
     colcon build --symlink-install --allow-overriding tracetools'
 
+# --- Build cv_bridge from source (links against JetPack's OpenCV 4.8 instead of system 4.5) ---
+
+RUN /bin/bash -c '. /opt/ros/humble/setup.bash && \
+    mkdir -p /home/vscode/cv_bridge_ws/src && \
+    git clone --depth 1 -b humble https://github.com/ros-perception/vision_opencv.git /home/vscode/cv_bridge_ws/src/vision_opencv && \
+    cd /home/vscode/cv_bridge_ws && \
+    colcon build --symlink-install --packages-select cv_bridge --allow-overriding cv_bridge'
+
 # --- Python dependencies ---
 
 RUN pip install \
@@ -125,7 +133,8 @@ RUN sudo usermod -a -G video $USERNAME && \
 RUN echo "" >> /home/$USERNAME/.bashrc && \
     echo "# ROS2 Environment Setup" >> /home/$USERNAME/.bashrc && \
     echo ". /opt/ros/humble/setup.bash" >> /home/$USERNAME/.bashrc && \
-    echo ". /home/vscode/ros2_tracing_ws/install/setup.sh" >> /home/$USERNAME/.bashrc
+    echo ". /home/vscode/ros2_tracing_ws/install/setup.sh" >> /home/$USERNAME/.bashrc && \
+    echo ". /home/vscode/cv_bridge_ws/install/setup.sh" >> /home/$USERNAME/.bashrc
 
 # configure environment variables
 ARG DISPLAY
