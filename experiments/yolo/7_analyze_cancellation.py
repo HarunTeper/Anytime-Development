@@ -467,7 +467,7 @@ def plot_cancellation_delay_comparison(summary):
     print("  - Cancellation delay comparison")
 
     # Set plot style
-    plt.style.use('seaborn-v0_8-darkgrid')
+    plt.style.use('seaborn-darkgrid')
 
     # Group data by block size
     block_sizes = sorted(set(s['config']['block_size']

@@ -345,7 +345,7 @@ def generate_plots(aggregated_metrics):
     ])
 
     # Set plot style
-    plt.style.use('seaborn-v0_8-darkgrid')
+    plt.style.use('seaborn-darkgrid')
 
     # Plot 1: Timer Period vs Batch Size
     print("  - Timer period vs batch size")
