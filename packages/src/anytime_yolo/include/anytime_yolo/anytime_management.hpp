@@ -13,6 +13,8 @@
 
 #include <cv_bridge/cv_bridge.h>
 
+#include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <future>
 #include <memory>
@@ -52,36 +54,49 @@ public:
     RCLCPP_DEBUG(this->node_->get_logger(), "YOLO compute single iteration called");
     TRACE_YOLO_LAYER_START(this->node_, processed_layers_);
 
-    void (*callback)(void *) = nullptr;
     if constexpr (isSyncAsync) {
-      callback = forward_finished_callback;
-    }
+      // Async mode: only attach callback when actually submitting a GPU layer
+      bool is_layer_submission =
+        (yolo_state_->currentStage == InferenceState::LAYER_PROCESSING &&
+         yolo_state_->currentIndex < MAX_NETWORK_LAYERS);
 
-    RCLCPP_DEBUG(this->node_->get_logger(), "Callback function is null: %d", callback == nullptr);
-    RCLCPP_DEBUG(this->node_->get_logger(), "Calling inferStep");
+      void (*callback)(void *) = is_layer_submission ? forward_finished_callback : nullptr;
 
-    yolo_.inferStep(*yolo_state_, isSyncAsync, callback, this);
+      yolo_.inferStep(*yolo_state_, true, callback, this);
 
-    RCLCPP_DEBUG(this->node_->get_logger(), "Finished single iteration");
-
-    if constexpr (!isSyncAsync) {
-      // Increment processed layers counter for sync mode
+      if (is_layer_submission) {
+        submitted_layers_++;
+      }
+    } else {
+      // Sync mode: no callback, increment directly
+      yolo_.inferStep(*yolo_state_, false, nullptr, nullptr);
       processed_layers_++;
       TRACE_YOLO_LAYER_END(this->node_, processed_layers_);
       RCLCPP_DEBUG(this->node_->get_logger(), "Processed layers: %d", processed_layers_);
       this->send_feedback();
     }
-    // Async mode: callback handles layer counting and feedback
   }
 
   // Override to limit iterations by remaining layers
   int get_batch_iterations() const override
   {
-    constexpr int MAX_NETWORK_LAYERS = 25;
-    int max_layers = MAX_NETWORK_LAYERS;
-    int layers_left = max_layers - processed_layers_;
-    int iterations = std::min(this->batch_size_, layers_left);
-    return iterations;
+    if constexpr (isSyncAsync) {
+      // Async mode: handle stage-progress transitions
+      if (yolo_state_->isCompleted()) {
+        return 0;
+      }
+      int layers_left_to_submit = MAX_NETWORK_LAYERS - submitted_layers_;
+      if (layers_left_to_submit > 0) {
+        return std::min(this->batch_size_, layers_left_to_submit);
+      }
+      // All layers submitted but not completed — need EXIT/NMS transitions
+      // Return 1 to drive the state machine forward (avoids deadlock)
+      return 1;
+    } else {
+      // Sync mode: original behavior
+      int layers_left = MAX_NETWORK_LAYERS - processed_layers_;
+      return std::min(this->batch_size_, layers_left);
+    }
   }
 
   void populate_feedback(std::shared_ptr<Anytime::Feedback> feedback) override
@@ -241,66 +256,45 @@ public:
       }
     }
 
+    // Synchronize CUDA stream to drain all in-flight callbacks
+    yolo_.synchronize();
+
     // Reset YOLO state
     yolo_state_->restart(input_cuda_buffer_);
 
     processed_layers_ = 0;
+    submitted_layers_ = 0;
+    completion_signals_.store(0, std::memory_order_relaxed);
     result_processed_layers_ = 0;
   }
 
   bool should_finish() const override { return yolo_state_->isCompleted(); }
 
-  // Return GPU callback for async mode, nullptr for sync mode
-  void * get_iteration_callback() override
-  {
-    if constexpr (isSyncAsync) {
-      return reinterpret_cast<void *>(&forward_finished_callback);
-    } else {
-      return nullptr;
-    }
-  }
-
   // ---------------- CUDA Callback Function -----------------
-
+  // Minimal signal-only callback — runs on CUDA host thread.
+  // NO goal_handle_ access, NO logging, NO state mutation except atomic signal.
   static void CUDART_CB forward_finished_callback(void * userData)
   {
     auto this_ptr = static_cast<AnytimeManagement *>(userData);
+    this_ptr->completion_signals_.fetch_add(1, std::memory_order_release);
+    this_ptr->notify_waitable();
+  }
 
-    std::string goal_id_str = this_ptr->goal_handle_
-                                ? rclcpp_action::to_string(this_ptr->goal_handle_->get_goal_id())
-                                : "null";
+  // Drain GPU completion signals (runs on executor thread — safe for ROS 2 access)
+  void process_gpu_completions() override
+  {
+    int signals = completion_signals_.exchange(0, std::memory_order_acq_rel);
+    if (signals > 0) {
+      // Clamp to outstanding submissions to prevent overcounting
+      int outstanding = submitted_layers_ - processed_layers_;
+      int newly_completed = std::clamp(signals, 0, outstanding);
+      processed_layers_ += newly_completed;
 
-    RCLCPP_DEBUG(
-      this_ptr->node_->get_logger(), "[Goal ID: %s] Forward finished callback",
-      goal_id_str.c_str());
-
-    // Check if we should stop processing
-    if (
-      this_ptr->goal_handle_->is_canceling() || !this_ptr->goal_handle_->is_executing() ||
-      !this_ptr->is_running()) {
+      TRACE_YOLO_CUDA_CALLBACK(this->node_, processed_layers_);
       RCLCPP_DEBUG(
-        this_ptr->node_->get_logger(),
-        "[Goal ID: %s] Goal handle is canceling, stopping computation", goal_id_str.c_str());
-      return;
-    }
-
-    // Increment processed layers counter for async mode
-    this_ptr->processed_layers_++;
-    TRACE_YOLO_CUDA_CALLBACK(this_ptr->node_, this_ptr->processed_layers_);
-    RCLCPP_DEBUG(
-      this_ptr->node_->get_logger(), "[Goal ID: %s] Processed layers: %d", goal_id_str.c_str(),
-      this_ptr->processed_layers_);
-
-    // Trigger the waitable when batch is complete or when reaching/exceeding max layers
-    // This allows the main anytime function to continue with the next iteration
-    if (
-      (this_ptr->processed_layers_ % this_ptr->batch_size_ == 0) ||
-      (this_ptr->processed_layers_ >= MAX_NETWORK_LAYERS)) {
-      RCLCPP_DEBUG(
-        this_ptr->node_->get_logger(),
-        "[Goal ID: %s] Batch complete (%d layers processed), triggering waitable",
-        goal_id_str.c_str(), this_ptr->processed_layers_);
-      this_ptr->notify_waitable();
+        this->node_->get_logger(),
+        "GPU completions: %d signals, %d accepted, %d total layers",
+        signals, newly_completed, processed_layers_);
     }
   }
 
@@ -312,8 +306,10 @@ protected:
   bool halfPrecision = false;                   // Flag for half precision
   CudaHostBuffer input_cuda_buffer_;            // Input image buffer
 
-  int processed_layers_ = 0;         // Counter for processed network layers
-  int result_processed_layers_ = 0;  // Counter for processed network layers in result
+  int processed_layers_ = 0;         // Completed GPU layers (executor-thread owned)
+  int submitted_layers_ = 0;         // Layers submitted to GPU
+  int result_processed_layers_ = 0;  // Processed layers snapshot for result
+  std::atomic<int> completion_signals_{0};  // Incremented by CUDA callback, drained by executor
 };
 
 #endif  // ANYTIME_MANAGEMENT_HPP

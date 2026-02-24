@@ -1063,8 +1063,9 @@ public:
       cudaStreamSynchronize(stream);
     }
 
-    auto stream = this->stream;
-    cudaLaunchHostFunc(stream, callback, userData);
+    if (callback != nullptr) {
+      cudaLaunchHostFunc(this->stream, callback, userData);
+    }
 
     return state.isCompleted();
   }

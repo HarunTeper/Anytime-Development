@@ -27,15 +27,13 @@ public:
   virtual void reset_domain_state() = 0;   // Reset domain-specific state
   virtual bool should_finish() const = 0;  // Check if computation should finish
 
-  // Optional: callback to be invoked after each iteration (for async GPU operations)
-  // Return nullptr for synchronous operations (default behavior for Monte Carlo)
-  // Requirements for get_iteration_callback, sends feedback and calls notify_waitable
-  // when batch is complete
-  virtual void * get_iteration_callback() { return nullptr; }
-
   // Optional: override to customize the number of batch iterations
   // Default is batch_size_, but YOLO needs to limit by remaining layers
   virtual int get_batch_iterations() const { return batch_size_; }
+
+  // Optional: process completed GPU operations (called on executor thread)
+  // Override in GPU-accelerated domains to drain async completion signals
+  virtual void process_gpu_completions() {}
 
   // Combined unified anytime function that handles compute, result, and finish checks
   // This replaces the previous three-function pattern with a single state machine
@@ -53,10 +51,12 @@ public:
       return;
     }
 
-    // Step 1: Compute iteration
+    // Drain GPU completions from previous batch, compute, drain again
+    process_gpu_completions();
     compute();
+    process_gpu_completions();
 
-    // Step 3: Check if we should finish
+    // Check if we should finish
     bool should_finish_now = should_finish();
     bool should_cancel = goal_handle_->is_canceling();
 
@@ -99,10 +99,12 @@ public:
       return;
     }
 
-    // Step 1: Compute iteration
+    // Drain GPU completions from previous batch, compute, drain again
+    process_gpu_completions();
     compute();
+    process_gpu_completions();
 
-    // Step 2: Check if we should finish
+    // Check if we should finish
     bool should_finish_now = should_finish();
     bool should_cancel = goal_handle_->is_canceling();
 

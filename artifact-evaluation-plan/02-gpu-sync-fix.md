@@ -1,4 +1,4 @@
-# Step 2: GPU Sync Fix
+# Step 2: Minimal-Safe GPU Sync Fix
 
 **Status:** Pending
 **Day:** 1 (Tue Feb 24)
@@ -8,64 +8,57 @@
 
 ## Why
 
-The async GPU mode has race conditions that can cause crashes or incorrect results during YOLO experiments.
+The async GPU mode has race conditions that cause crashes or incorrect results during YOLO experiments.
 
-**AE Impact:** Criterion 1 (Repeatability) - YOLO experiments may fail without this.
+**AE Impact:** Criterion 1 (Repeatability) — YOLO experiments may fail without this.
+
+## Three Gaps Being Fixed
+
+1. **Stage-progress deadlock**: All 25 layers submitted → `get_batch_iterations()` returns 0 → executor hangs. EXIT/NMS/COMPLETED stages never run.
+2. **Stale callback contamination**: Cancel mid-goal + new goal → in-flight CUDA callbacks from old goal corrupt new goal's count.
+3. **Callback overcounting**: `cudaLaunchHostFunc` fires for EXIT/NMS/COMPLETED stages, producing fake completion signals.
 
 ## Approach
 
-Use the simpler counter-only approach (not the full event-queue architecture from the old plan). This is sufficient for correctness and saves time.
+Minimal-safe counter design (no event queue). `processed_layers_` stays as plain `int` (executor-thread owned). Only `completion_signals_` is atomic (cross-thread). Callbacks are only attached for actual layer submissions.
 
 ## Changes
 
+### File: `packages/src/anytime_core/include/anytime_core/anytime_base.hpp`
+
+1. **Add virtual `process_gpu_completions()` hook** (default no-op)
+2. **Call it TWICE** in both `reactive_anytime_function()` and `proactive_anytime_function()`:
+   - Once before `compute()` (drain previous batch)
+   - Once after `compute()` and before finish/cancel checks (drain current batch)
+3. **Remove `get_iteration_callback()` virtual** (unused, strict aliasing violation in override)
+
 ### File: `packages/src/anytime_yolo/include/anytime_yolo/anytime_management.hpp`
 
-1. **Make `processed_layers_` atomic:**
-
-   ```cpp
-   std::atomic<int> processed_layers_{0};
-   ```
-
-2. **Add completion signal counter:**
-
-   ```cpp
-   std::atomic<int> completion_signals_{0};
-   ```
-
-3. **Rewrite `forward_finished_callback()` to be minimal and thread-safe:**
-
-   ```cpp
-   static void CUDART_CB forward_finished_callback(void* userData) {
-     auto* self = static_cast<AnytimeManagement*>(userData);
-     self->completion_signals_.fetch_add(1, std::memory_order_release);
-     self->notify_waitable();
-     // NO other state access - no goal_handle_, no logging
-   }
-   ```
-
-4. **Add `process_gpu_completions()` override** - runs on executor thread only, drains completion signals and updates state safely.
-
-5. **Update `reset_domain_state()`** - reset atomic counters.
+4. **Add members**: `int submitted_layers_ = 0;` and `std::atomic<int> completion_signals_{0};`
+5. **Rewrite `forward_finished_callback()`** to 3 lines: atomic increment + notify_waitable, nothing else
+6. **Add `process_gpu_completions()` override**: drain signals, clamp to `outstanding = submitted - processed`, update `processed_layers_`
+7. **Rewrite `compute_single_iteration()`**: only attach callback for `LAYER_PROCESSING` stage, increment `submitted_layers_` only then
+8. **Rewrite `get_batch_iterations()`**: in async mode, return 1 when all layers submitted but not completed (drives EXIT/NMS)
+9. **Update `reset_domain_state()`**: call `yolo_.synchronize()` before reset to drain stale callbacks, then reset all counters
+10. **Remove `get_iteration_callback()` override** and duplicate `MAX_NETWORK_LAYERS`
 
 ### File: `packages/src/anytime_yolo/include/anytime_yolo/yolo.hpp`
 
-6. **Guard `cudaLaunchHostFunc` with null check** (~line 1067):
+11. **Guard `cudaLaunchHostFunc`** with null check, remove variable shadowing
+12. **`cudaMemset` safety** — moved to Step 3
 
-   ```cpp
-   if (callback != nullptr) {
-     cudaLaunchHostFunc(this->stream, callback, userData);
-   }
-   ```
+## Test Scenarios
 
-### File: `packages/src/anytime_core/include/anytime_core/anytime_base.hpp`
-
-7. **Add virtual `process_gpu_completions()` hook** (default no-op).
-8. **Call it in `reactive_anytime_function()` and `proactive_anytime_function()`** before compute.
+- Async, batch_size=1: no crash/hang, `processed_layers_ == 25`
+- Async, batch_size=25: no deadlock, result returns normally
+- Cancel mid-goal + new goal: no stale-layer carryover
+- Sync regression: behavior unchanged
+- No `get_iteration_callback` references remain
 
 ## Verification
 
 ```bash
-colcon build --packages-select anytime_yolo
-# Test sync mode (regression)
-# Test async mode - verify no crashes, correct layer counts
+colcon build --packages-select anytime_core anytime_yolo
+grep -rn "get_iteration_callback" packages/src/
+colcon test --packages-select anytime_core
 ```
