@@ -10,6 +10,7 @@ cleanup() {
     echo "Interrupted — cleaning up..."
     lttng stop 2>/dev/null || true
     lttng destroy monte_carlo_exp 2>/dev/null || true
+    pkill -9 -f 'component_container' 2>/dev/null || true
     pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
     pkill -9 -f 'ros2' 2>/dev/null || true
 }
@@ -20,6 +21,13 @@ if ! command -v lttng &>/dev/null; then
     echo "ERROR: lttng not found. Install lttng-tools."
     exit 1
 fi
+
+# Restart lttng-sessiond to ensure clean tracing state
+# (stale sessions from crashed processes can prevent event capture)
+pkill lttng-sessiond 2>/dev/null || true
+sleep 2
+lttng-sessiond --daemonize 2>/dev/null || true
+sleep 1
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -140,8 +148,7 @@ for batch_size in "${BATCH_SIZES[@]}"; do
                     server_config:="${server_config}" \
                     client_config:="${client_config}" \
                     use_multi_threaded:=${use_multi_threaded} \
-                    log_level:=info \
-                    > /dev/null 2>&1 &
+                    log_level:=info &
                 
                 LAUNCH_PID=$!
                 
@@ -154,6 +161,7 @@ for batch_size in "${BATCH_SIZES[@]}"; do
                 kill -9 ${LAUNCH_PID} 2>/dev/null || true
                 
                 # Kill any remaining Monte Carlo processes
+                pkill -9 -f 'component_container' 2>/dev/null || true
                 pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
                 pkill -9 -f 'ros2' 2>/dev/null || true
                 

@@ -90,6 +90,7 @@ sleep 1
 kill -9 ${LAUNCH_PID} 2>/dev/null || true
 
 # Kill any remaining interference processes
+pkill -9 -f 'component_container' 2>/dev/null || true
 pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
 pkill -9 -f 'interference_timer' 2>/dev/null || true
 pkill -9 -f 'ros2' 2>/dev/null || true

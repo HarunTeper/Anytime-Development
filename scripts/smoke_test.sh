@@ -11,6 +11,7 @@ cleanup() {
     echo "Interrupted — cleaning up..."
     lttng stop 2>/dev/null || true
     lttng destroy smoke_test 2>/dev/null || true
+    pkill -9 -f 'component_container' 2>/dev/null || true
     pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
     pkill -9 -f 'ros2' 2>/dev/null || true
 }
@@ -128,6 +129,12 @@ mkdir -p "${test_trace}"
 cd "${PACKAGES_DIR}"
 source install/setup.bash
 
+# Restart lttng-sessiond to ensure clean tracing state
+pkill lttng-sessiond 2>/dev/null || true
+sleep 2
+lttng-sessiond --daemonize 2>/dev/null || true
+sleep 1
+
 # Setup LTTng
 lttng destroy smoke_test 2>/dev/null || true
 lttng create smoke_test --output="${test_trace}"
@@ -145,8 +152,7 @@ ros2 launch experiments monte_carlo.launch.py \
     server_config:="${server_config}" \
     client_config:="${client_config}" \
     use_multi_threaded:=false \
-    log_level:=info \
-    > /dev/null 2>&1 &
+    log_level:=info &
 
 LAUNCH_PID=$!
 
@@ -157,6 +163,7 @@ sleep ${RUN_DURATION}
 kill ${LAUNCH_PID} 2>/dev/null || true
 sleep 1
 kill -9 ${LAUNCH_PID} 2>/dev/null || true
+pkill -9 -f 'component_container' 2>/dev/null || true
 pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
 pkill -9 -f 'ros2' 2>/dev/null || true
 sleep 2

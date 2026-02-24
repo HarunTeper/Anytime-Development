@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(grep:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(ldd /home/vscode/workspace/packages/install/anytime_monte_carlo/lib/libanytime_mc_server_lib.so)",
+      "Bash(ldd /home/vscode/workspace/packages/install/interference/lib/libinterference_timer_lib.so)",
+      "Bash(echo $LD_LIBRARY_PATH)",
+      "Bash(source /home/vscode/workspace/packages/install/setup.bash)",
+      "Bash(lttng list -u)",
+      "Bash(nm -D /home/vscode/workspace/packages/install/anytime_tracing/lib/libanytime_tracing.so)"
     ]
   }
 }

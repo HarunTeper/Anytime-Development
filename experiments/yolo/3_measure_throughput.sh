@@ -180,6 +180,7 @@ for config in "${CONFIGS[@]}"; do
         kill -9 ${YOLO_PID} 2>/dev/null || true
         
         # Kill any remaining YOLO processes
+        pkill -9 -f 'component_container' 2>/dev/null || true
         pkill -9 -f 'anytime_yolo' 2>/dev/null || true
         pkill -9 -f 'video_publisher' 2>/dev/null || true
         pkill -9 -f 'ros2' 2>/dev/null || true
