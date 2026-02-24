@@ -14,24 +14,33 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86
     dpkg -i cuda-keyring_1.1-1_all.deb && \
     rm cuda-keyring_1.1-1_all.deb
 
-# --- Install CUDA Toolkit 12.5 ---
+# --- Install CUDA Toolkit 12.5 and TensorRT 10.3 (pinned to cuda12.5) ---
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends cuda-toolkit-12-5 && \
+    apt-get install -y --no-install-recommends \
+        cuda-toolkit-12-5 \
+        tensorrt-dev=10.3.0.26-1+cuda12.5 \
+        tensorrt-libs=10.3.0.26-1+cuda12.5 \
+        libnvinfer-dev=10.3.0.26-1+cuda12.5 \
+        libnvinfer-dispatch-dev=10.3.0.26-1+cuda12.5 \
+        libnvinfer-dispatch10=10.3.0.26-1+cuda12.5 \
+        libnvinfer-headers-dev=10.3.0.26-1+cuda12.5 \
+        libnvinfer-headers-plugin-dev=10.3.0.26-1+cuda12.5 \
+        libnvinfer-lean-dev=10.3.0.26-1+cuda12.5 \
+        libnvinfer-lean10=10.3.0.26-1+cuda12.5 \
+        libnvinfer-plugin-dev=10.3.0.26-1+cuda12.5 \
+        libnvinfer-plugin10=10.3.0.26-1+cuda12.5 \
+        libnvinfer-vc-plugin-dev=10.3.0.26-1+cuda12.5 \
+        libnvinfer-vc-plugin10=10.3.0.26-1+cuda12.5 \
+        libnvinfer10=10.3.0.26-1+cuda12.5 \
+        libnvonnxparsers-dev=10.3.0.26-1+cuda12.5 \
+        libnvonnxparsers10=10.3.0.26-1+cuda12.5 && \
     rm -rf /var/lib/apt/lists/*
 
 # --- Configure CUDA paths ---
 
 ENV PATH="/usr/local/cuda-12.5/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda-12.5/lib64:${LD_LIBRARY_PATH}"
-
-# --- Install TensorRT (only the dev libraries needed for building) ---
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        tensorrt-dev \
-        tensorrt-libs && \
-    rm -rf /var/lib/apt/lists/*
 
 # --- Install locales and add ROS2 repository ---
 

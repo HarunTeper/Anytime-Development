@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -40,10 +41,26 @@ public:
   void log(Severity severity, const char * /*msg*/) noexcept override
   {
     if (severity <= Severity::kWARNING) {
-      // std::cout << msg << std::endl;
+      std::cerr << "[TensorRT] " << msg << std::endl;
     }
   }
 } logger;
+
+/// Returns a string identifying the current GPU + TensorRT combination.
+/// Engine files are only valid when this string matches.
+std::string getGpuFingerprint()
+{
+  cudaDeviceProp props;
+  int device = 0;
+  cudaGetDevice(&device);
+  cudaGetDeviceProperties(&props, device);
+
+  std::string fingerprint = std::string(props.name) + "_sm" +
+    std::to_string(props.major) + std::to_string(props.minor) + "_trt" +
+    std::to_string(getInferLibVersion());
+
+  return fingerprint;
+}
 
 class CudaHostBuffer
 {
@@ -452,6 +469,9 @@ bool loadEngine(
   engine =
     std::unique_ptr<ICudaEngine>(runtime->deserializeCudaEngine(engineData.get(), engineSize));
   if (!engine) {
+    std::cerr << "Failed to deserialize engine from: " << enginePath
+              << " (engine may have been built for a different GPU or TensorRT version)"
+              << std::endl;
     return false;
   }
 
@@ -570,10 +590,48 @@ public:
   AnytimeYOLO(const std::string & folderPath, bool halfPrecision = false)
   {
     this->runtime = std::unique_ptr<IRuntime>(createInferRuntime(logger));
+    if (!this->runtime) {
+      throw std::runtime_error("Failed to create TensorRT inference runtime. "
+        "Check CUDA and TensorRT installation.");
+    }
     // Create CUDA stream
-    cudaStreamCreate(&stream);
+    CHECK_CUDA(cudaStreamCreate(&stream));
 
     this->halfPrecision = halfPrecision;
+
+    // Check GPU fingerprint — purge stale engines if GPU/TensorRT changed
+    const std::string fpPath = folderPath + "/.gpu_fingerprint";
+    const std::string currentFp = getGpuFingerprint();
+    bool needsFingerprintWrite = false;
+    {
+      bool fingerprintMatch = false;
+      std::ifstream fpFile(fpPath);
+      if (fpFile.is_open()) {
+        std::string storedFp;
+        std::getline(fpFile, storedFp);
+        fpFile.close();
+        if (storedFp == currentFp) {
+          fingerprintMatch = true;
+        } else {
+          std::cout << "GPU/TensorRT changed (was: " << storedFp
+                    << ", now: " << currentFp
+                    << "). Purging cached .engine files..." << std::endl;
+        }
+      } else {
+        std::cout << "No GPU fingerprint found. Will build engines for: "
+                  << currentFp << std::endl;
+      }
+
+      if (!fingerprintMatch) {
+        for (const auto & entry : std::filesystem::directory_iterator(folderPath)) {
+          if (entry.path().extension() == ".engine") {
+            std::filesystem::remove(entry.path());
+            std::cout << "  Removed stale engine: " << entry.path().filename() << std::endl;
+          }
+        }
+        needsFingerprintWrite = true;
+      }
+    }
 
     std::ifstream configFile(folderPath + "/model.json");
     json config;
@@ -606,6 +664,16 @@ public:
     if (!loadNMS(config["nms"], folderPath, false)) {
       std::cerr << "Failed to load NMS engine" << std::endl;
       throw std::runtime_error("Failed to load NMS engine");
+    }
+
+    // Write GPU fingerprint after all engines are successfully built/loaded
+    if (needsFingerprintWrite) {
+      std::ofstream fpOut(fpPath);
+      if (fpOut.is_open()) {
+        fpOut << currentFp;
+        fpOut.close();
+        std::cout << "GPU fingerprint saved: " << currentFp << std::endl;
+      }
     }
 
     // report lengths of layers and exits
@@ -1239,7 +1307,9 @@ private:
       // std::cout << "Successfully loaded cached NMS engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached NMS engine, falling back to build" << std::endl;
-      buildOnnxEngine(weightsPath, enginePath, halfPrecision);
+      if (!buildOnnxEngine(weightsPath, enginePath, halfPrecision)) {
+        throw std::runtime_error("Failed to build NMS engine from ONNX: " + weightsPath);
+      }
 
       std::cout << "Successfully built NMS engine" << std::endl;
       if (!loadEngine(enginePath, runtime, nmsEngine)) {
@@ -1247,6 +1317,10 @@ private:
       }
     }
     nmsContext = std::unique_ptr<nvinfer1::IExecutionContext>(nmsEngine->createExecutionContext());
+    if (!nmsContext) {
+      std::cerr << "Failed to create execution context for NMS engine" << std::endl;
+      return false;
+    }
 
     return true;
   }
@@ -1277,7 +1351,9 @@ private:
       // std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
-      buildOnnxEngine(weightsPath, enginePath, halfPrecision);
+      if (!buildOnnxEngine(weightsPath, enginePath, halfPrecision)) {
+        throw std::runtime_error("Failed to build engine from ONNX: " + weightsPath);
+      }
 
       std::cout << "Successfully built layer" << std::endl;
 
@@ -1287,6 +1363,9 @@ private:
     }
 
     auto context = std::unique_ptr<nvinfer1::IExecutionContext>(engine->createExecutionContext());
+    if (!context) {
+      throw std::runtime_error("Failed to create execution context for layer " + std::to_string(index));
+    }
 
     // std::cout << "Loaded engine for layer: " << index << std::endl;
 
@@ -1316,7 +1395,9 @@ private:
       // std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
-      buildOnnxEngine(weightsPath, enginePath, halfPrecision);
+      if (!buildOnnxEngine(weightsPath, enginePath, halfPrecision)) {
+        throw std::runtime_error("Failed to build engine from ONNX: " + weightsPath);
+      }
 
       std::cout << "Successfully built exit" << std::endl;
 
@@ -1326,6 +1407,9 @@ private:
     }
 
     auto context = std::unique_ptr<nvinfer1::IExecutionContext>(engine->createExecutionContext());
+    if (!context) {
+      throw std::runtime_error("Failed to create execution context for subexit " + std::to_string(index));
+    }
 
     auto subexit = std::make_unique<Subexit>(
       std::make_unique<AnytimeYOLOChunk>(
@@ -1355,7 +1439,9 @@ public:
       // std::cout << "Successfully loaded cached engine from: " << enginePath << std::endl;
     } else {
       std::cerr << "Failed to load cached engine, falling back to build" << std::endl;
-      buildOnnxEngine(weightsPath, enginePath, halfPrecision);
+      if (!buildOnnxEngine(weightsPath, enginePath, halfPrecision)) {
+        throw std::runtime_error("Failed to build engine from ONNX: " + weightsPath);
+      }
 
       std::cout << "Successfully built subexit combiner" << std::endl;
 
@@ -1365,6 +1451,9 @@ public:
     }
 
     auto context = std::unique_ptr<nvinfer1::IExecutionContext>(engine->createExecutionContext());
+    if (!context) {
+      throw std::runtime_error("Failed to create execution context for subexit combiner");
+    }
 
     heads.push_back(SubexitCombiner(std::move(engine), std::move(context), layerConfig["exit"]));
 

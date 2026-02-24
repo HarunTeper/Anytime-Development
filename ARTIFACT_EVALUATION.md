@@ -101,6 +101,7 @@ scp -P <JETSON_PORT> -r <JETSON_USERNAME>@<JETSON_IP>:~/Anytime-Development/expe
 | Disk | 20 GB | 40 GB |
 | Docker | Docker Engine 24+ with Compose V2 | Docker Engine 24+ with Compose V2 |
 | GPU | NVIDIA GPU with CUDA 12.5 support | NVIDIA GPU with 8+ GB VRAM |
+| GPU driver | NVIDIA driver 535+ | NVIDIA driver 535+ |
 | GPU toolkit | [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) | nvidia-container-toolkit |
 
 ### Build and enter the container
@@ -410,6 +411,28 @@ docker ps
 ```
 
 If a container is running, wait for the other reviewer to finish, or coordinate access. Do not run experiments concurrently, as this affects timing results.
+
+**CUDA initialization failure (error 35) during YOLO warmup:**
+
+This error means the TensorRT version inside the container is incompatible with the installed CUDA toolkit or your host GPU driver. The container pins TensorRT 10.3.0 for CUDA 12.5, which requires NVIDIA driver 535 or newer. Check your host driver version:
+
+```bash
+nvidia-smi   # Look for "Driver Version" — must be 535+
+```
+
+If your driver is older, update it. If the container was built before the TensorRT version was pinned, rebuild it:
+
+```bash
+docker compose build --no-cache anytime-gpu
+```
+
+**TensorRT engines rebuilding on first run or after switching GPUs:**
+
+TensorRT `.engine` files are compiled for a specific GPU architecture. When you run experiments on a different GPU than the one that previously built the engines, the system automatically detects the mismatch via a GPU fingerprint, removes the stale engines, and rebuilds them from the source ONNX models. This one-time rebuild adds 10–20 minutes. To force a manual rebuild:
+
+```bash
+./scripts/warmup_yolo_engines.sh --force-rebuild
+```
 
 ## Project Structure
 
