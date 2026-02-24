@@ -17,6 +17,9 @@ EXPERIMENT_DIR="${SCRIPT_DIR}"
 TRACE_BASE_DIR="${EXPERIMENT_DIR}/traces"
 NUM_TRIALS=1
 
+# Check prerequisites
+"${WORKSPACE_DIR}/scripts/check_yolo_prerequisites.sh"
+
 # Test parameters
 BLOCK_SIZES=(1 8 16 25)
 MODES=("proactive")

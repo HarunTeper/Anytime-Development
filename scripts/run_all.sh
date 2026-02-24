@@ -224,6 +224,12 @@ if [ "${RUN_YOLO}" = true ]; then
         echo "Phase: YOLO experiments (full pipeline)"
         echo "-----------------------------------------"
 
+        # Check YOLO prerequisites (weights + images)
+        if ! "${SCRIPT_DIR}/check_yolo_prerequisites.sh"; then
+            echo "  FAILED: YOLO experiments (missing prerequisites)"
+            failed=$((failed + 1))
+        else
+
         cd "${PACKAGES_DIR}"
         source install/setup.bash
 
@@ -279,6 +285,8 @@ if [ "${RUN_YOLO}" = true ]; then
             echo "  FAILED: YOLO experiments"
             failed=$((failed + 1))
         fi
+
+        fi  # end prerequisite check
     fi
 else
     skip_phase "YOLO experiments" "not selected"

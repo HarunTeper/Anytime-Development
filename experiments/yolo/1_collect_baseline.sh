@@ -16,6 +16,9 @@ EXPERIMENT_DIR="${SCRIPT_DIR}"
 TRACE_DIR="${EXPERIMENT_DIR}/traces/phase1_baseline"
 NUM_TRIALS=3
 
+# Check prerequisites
+"${WORKSPACE_DIR}/scripts/check_yolo_prerequisites.sh"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'

@@ -143,6 +143,9 @@ run_yolo_quality() {
         exit 1
     fi
 
+    # Check prerequisites (weights + images)
+    "${SCRIPT_DIR}/check_yolo_prerequisites.sh"
+
     echo "Step 0: Generating baseline configs..."
     python3 "${YOLO_DIR}/0_generate_baseline_configs.py"
 
@@ -174,6 +177,9 @@ run_yolo_throughput() {
         echo "ERROR: GPU required for YOLO experiments but nvidia-smi not available"
         exit 1
     fi
+
+    # Check prerequisites (weights + images)
+    "${SCRIPT_DIR}/check_yolo_prerequisites.sh"
 
     echo "Step 0: Generating baseline configs..."
     python3 "${YOLO_DIR}/0_generate_baseline_configs.py"
@@ -209,6 +215,9 @@ run_yolo_all() {
         echo "ERROR: GPU required for YOLO experiments but nvidia-smi not available"
         exit 1
     fi
+
+    # Check prerequisites (weights + images)
+    "${SCRIPT_DIR}/check_yolo_prerequisites.sh"
 
     echo "Step 0: Generating baseline configs..."
     python3 "${YOLO_DIR}/0_generate_baseline_configs.py"

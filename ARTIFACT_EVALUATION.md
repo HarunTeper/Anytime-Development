@@ -264,7 +264,7 @@ Before running YOLO experiments on Path B (or to re-download on Path A), downloa
 ```bash
 # Download YOLO weights
 cd packages/src/anytime_yolo
-wget https://tu-dortmund.sciebo.de/s/W86QE9hUscsUPeM/download -O weights.zip
+wget https://tu-dortmund.sciebo.de/s/gmGSJEsFgwKb6MY/download -O weights.zip
 unzip -o weights.zip -d .
 rm weights.zip
 cd ../../..
@@ -272,25 +272,34 @@ cd ../../..
 # Download test images
 mkdir -p packages/src/video_publisher/images
 cd packages/src/video_publisher/images
-wget https://tu-dortmund.sciebo.de/s/aA9MDhgN2lBmeZk/download -O images.zip
+wget https://tu-dortmund.sciebo.de/s/BQRaiztJkmx33tt/download -O images.zip
 unzip -o images.zip -d .
 rm images.zip
 cd ../../../..
 ```
 
-## Experiment Parameters
+## Experiment Details
 
 ### Monte Carlo (Figures 5a, 5b)
+
+**What it does:** Launches a ROS 2 anytime action server that computes Monte Carlo batches and a client that periodically sends goals and cancels them after 200 ms. Each configuration runs for a fixed duration while LTTng traces record batch computation times, cancellation delays, and throughput. The evaluation script parses the traces and plots segment counts and cancellation delays across batch sizes and modes.
+
+**Why it takes this long:** Each of the 28 (full) or 12 (quick) configurations runs sequentially for the configured duration, plus ~10 s overhead per config for LTTng session setup/teardown and node startup/cleanup. Trace parsing and plot generation add a few more minutes at the end.
 
 | Parameter | Full | Quick |
 | --------- | ---- | ----- |
 | Batch sizes | 1024, 2048, 4096, 8192, 16384, 32768, 65536 | 1024, 16384, 65536 |
 | Modes | reactive, proactive | reactive, proactive |
 | Threading | single, multi | single, multi |
-| Run duration | 10 seconds | 5 seconds |
+| Run duration | 10 seconds per config | 5 seconds per config |
 | Total configs | 28 | 12 |
+| **Estimated time** | **~40 min** | **~5 min** |
 
 ### Interference (Figure 6, Table I)
+
+**What it does:** Runs the same Monte Carlo action server alongside a periodic interference timer node that performs a 10 ms busy-wait every 100 ms, both in a single-threaded ROS 2 executor. This creates CPU contention: larger batch sizes block the executor longer, causing the timer to miss its 100 ms period. LTTng traces record timer callback timestamps and compute batch durations. The evaluation script measures timer jitter (deviation from the expected 100 ms period), missed-period rates, and compute times per batch size.
+
+**Why it takes this long:** 14 (full) or 6 (quick) configurations run sequentially. Each config has the same per-config overhead as Monte Carlo (~10 s for LTTng and node lifecycle), plus the run duration itself.
 
 | Parameter | Full | Quick |
 | --------- | ---- | ----- |
@@ -299,14 +308,25 @@ cd ../../../..
 | Threading | single | single |
 | Timer period | 100 ms | 100 ms |
 | Timer execution time | 10 ms | 10 ms |
-| Run duration | 10 seconds | 5 seconds |
+| Run duration | 10 seconds per config | 5 seconds per config |
 | Total configs | 14 | 6 |
+| **Estimated time** | **~40 min** | **~3 min** |
 
 ### YOLO (Figures 7a, 7b)
+
+**What it does:** Runs a YOLOv3 object detection pipeline split into 25 individually-executable neural network layers on the GPU using TensorRT. The experiment proceeds in phases:
+
+1. **Baseline collection (Step 1):** Processes 192 test images through all 25 layers one at a time (batch size 1) over 3 trials, recording per-layer computation times and detection quality via LTTng.
+2. **Quality analysis (Step 2a):** Parses baseline traces to determine how detection quality progresses as more layers execute — showing at which layer the model reaches 50 %, 70 %, 90 % of final quality. Produces Figure 7a.
+3. **Throughput measurement (Step 3):** Processes all 192 images with batch size 25 (all layers at once) across 4 configurations (sync/async × single/multi-threaded), measuring end-to-end throughput.
+4. **Throughput analysis (Step 4):** Parses throughput traces and produces Figure 7b comparing images/second across configurations.
+
+**Why it takes this long:** The baseline collection (3 trials × 192 images × 25 layers of GPU inference) dominates the time for Figure 7a. The throughput measurement (4 configurations × 192 images) adds another pass for Figure 7b. Trace parsing for thousands of layer-level events takes additional minutes per phase.
 
 | Parameter | Value |
 | --------- | ----- |
 | Network | YOLOv3 with 25 layers |
+| Test images | 192 |
 | Block sizes | 1, 8, 16, 25 |
 | Sync modes | sync, async |
 | Threading | single, multi |
@@ -314,6 +334,9 @@ cd ../../../..
 | Baseline trials | 3 |
 | Cancellation: cancel_after_layers | 25 |
 | Cancellation: score_threshold | 0.7 |
+| **Estimated time (Figure 7a)** | **~30 min** |
+| **Estimated time (Figure 7b)** | **~1 hr** |
+| **Estimated time (both)** | **~1.5 hrs** |
 
 ## Environment Details
 
