@@ -79,10 +79,11 @@ for batch_size in "${BATCH_SIZES[@]}"; do
                 echo "Running ${current_config}/${total_configs}: ${run_name}"
                 echo "========================================="
                 
-                # Create trace directory for this run
+                # Create trace directory for this run (remove old traces first)
                 trace_output="${TRACE_DIR}/${run_name}"
+                rm -rf "${trace_output}"
                 mkdir -p "${trace_output}"
-                
+
                 # Cleanup any existing LTTng session
                 lttng destroy monte_carlo_exp 2>/dev/null || true
                 

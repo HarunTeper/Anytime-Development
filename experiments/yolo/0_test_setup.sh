@@ -30,9 +30,10 @@ echo ""
 echo -e "${BLUE}Sourcing ROS2 environment...${NC}"
 source "${WORKSPACE_DIR}/packages/install/setup.bash"
 
-# Clean up old trace session if exists
+# Clean up old trace session and old trace data if exists
 echo -e "${BLUE}Cleaning up old LTTng session...${NC}"
 lttng destroy yolo_test 2>/dev/null || true
+rm -rf "${TRACE_DIR}"
 
 # Create LTTng session
 echo -e "${BLUE}Creating LTTng session...${NC}"

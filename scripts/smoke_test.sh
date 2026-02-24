@@ -20,6 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 MC_EXPERIMENT_DIR="${WORKSPACE_DIR}/experiments/monte_carlo"
+INTERFERENCE_EXPERIMENT_DIR="${WORKSPACE_DIR}/experiments/interference"
 
 echo "========================================="
 echo "Anytime ROS 2 — Smoke Test"
@@ -45,7 +46,7 @@ fail_phase() {
 # Phase 1: Build workspace
 # ─────────────────────────────────────────────
 echo "-----------------------------------------"
-echo "Phase 1/5: Building workspace"
+echo "Phase 1/6: Building workspace"
 echo "-----------------------------------------"
 
 cd "${PACKAGES_DIR}"
@@ -62,7 +63,7 @@ source install/setup.bash
 # ─────────────────────────────────────────────
 echo ""
 echo "-----------------------------------------"
-echo "Phase 2/5: Running unit tests"
+echo "Phase 2/6: Running unit tests"
 echo "-----------------------------------------"
 
 if colcon test --packages-select anytime_core anytime_monte_carlo 2>&1; then
@@ -81,7 +82,7 @@ fi
 # ─────────────────────────────────────────────
 echo ""
 echo "-----------------------------------------"
-echo "Phase 3/5: Generating Monte Carlo configs"
+echo "Phase 3/6: Generating Monte Carlo configs"
 echo "-----------------------------------------"
 
 cd "${MC_EXPERIMENT_DIR}"
@@ -92,11 +93,26 @@ else
 fi
 
 # ─────────────────────────────────────────────
-# Phase 4: Run 5-second Monte Carlo experiment
+# Phase 4: Generate Interference configs
 # ─────────────────────────────────────────────
 echo ""
 echo "-----------------------------------------"
-echo "Phase 4/5: Running 5-second Monte Carlo experiment"
+echo "Phase 4/6: Generating Interference configs"
+echo "-----------------------------------------"
+
+cd "${INTERFERENCE_EXPERIMENT_DIR}"
+if python3 generate_configs.py 2>&1; then
+    pass_phase
+else
+    fail_phase "interference config generation failed"
+fi
+
+# ─────────────────────────────────────────────
+# Phase 5: Run 5-second Monte Carlo experiment
+# ─────────────────────────────────────────────
+echo ""
+echo "-----------------------------------------"
+echo "Phase 5/6: Running 5-second Monte Carlo experiment"
 echo "-----------------------------------------"
 
 CONFIG_DIR="${MC_EXPERIMENT_DIR}/configs"
@@ -156,11 +172,11 @@ else
 fi
 
 # ─────────────────────────────────────────────
-# Phase 5: Verify traces
+# Phase 6: Verify traces
 # ─────────────────────────────────────────────
 echo ""
 echo "-----------------------------------------"
-echo "Phase 5/5: Verifying traces"
+echo "Phase 6/6: Verifying traces"
 echo "-----------------------------------------"
 
 event_count=$(babeltrace "${test_trace}" | grep -c "anytime:" || echo "0")
@@ -181,8 +197,8 @@ echo ""
 echo "========================================="
 echo "Smoke Test Summary"
 echo "========================================="
-echo "  Passed: ${passed}/5"
-echo "  Failed: ${failed}/5"
+echo "  Passed: ${passed}/6"
+echo "  Failed: ${failed}/6"
 echo ""
 
 if [ ${failed} -eq 0 ]; then

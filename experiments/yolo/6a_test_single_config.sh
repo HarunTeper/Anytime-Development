@@ -66,9 +66,10 @@ echo ""
 echo -e "${BLUE}Trace output: ${TRACE_DIR}${NC}"
 echo ""
 
-# Clean up old trace session if exists
+# Clean up old trace session and old trace data if exists
 echo -e "${BLUE}Cleaning up old LTTng session...${NC}"
 lttng destroy yolo_phase4_test 2>/dev/null || true
+rm -rf "${TRACE_DIR}"
 
 # Create LTTng session
 echo -e "${BLUE}Creating LTTng session...${NC}"

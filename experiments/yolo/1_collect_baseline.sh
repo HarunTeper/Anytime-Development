@@ -48,11 +48,12 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     echo -e "${YELLOW}========================================${NC}"
     
     TRIAL_TRACE_DIR="${TRACE_DIR}_trial${trial}"
-    
-    # Clean up old trace session if exists
+
+    # Clean up old trace session and old trace data if exists
     echo -e "${BLUE}Cleaning up old LTTng session...${NC}"
     lttng destroy yolo_phase1_baseline 2>/dev/null || true
-    
+    rm -rf "${TRIAL_TRACE_DIR}"
+
     # Create LTTng session
     echo -e "${BLUE}Creating LTTng session...${NC}"
     lttng create yolo_phase1_baseline --output="${TRIAL_TRACE_DIR}"
