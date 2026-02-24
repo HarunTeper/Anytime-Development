@@ -156,7 +156,7 @@ run_yolo_quality() {
     echo "========================================="
     echo "Output files:"
     echo "========================================="
-    echo "  Figure 7a: ${YOLO_DIR}/results/quality_analysis/quality_ratio_progression.png"
+    echo "  Figure 7a: ${YOLO_DIR}/results/quality_analysis/quality_ratio_progression.pdf"
     echo "  All plots: ${YOLO_DIR}/results/quality_analysis/"
 }
 
@@ -232,7 +232,7 @@ run_yolo_all() {
     echo "========================================="
     echo "Output files:"
     echo "========================================="
-    echo "  Figure 7a: ${YOLO_DIR}/results/quality_analysis/quality_ratio_progression.png"
+    echo "  Figure 7a: ${YOLO_DIR}/results/quality_analysis/quality_ratio_progression.pdf"
     echo "  Figure 7b: ${YOLO_DIR}/results/runtime_analysis/throughput_comparison.png"
     echo "  Quality:   ${YOLO_DIR}/results/quality_analysis/"
     echo "  Blocks:    ${YOLO_DIR}/results/block_analysis/"
