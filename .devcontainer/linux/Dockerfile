@@ -8,32 +8,30 @@ ENV DEBIAN_FRONTEND=noninteractive
 # set up work directory
 WORKDIR /home/vscode/workspace
 
-# --- Install CUDA ---
+# --- Add NVIDIA network repository ---
 
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin && \
-    mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
-    wget https://developer.download.nvidia.com/compute/cuda/12.5.1/local_installers/cuda-repo-ubuntu2204-12-5-local_12.5.1-555.42.06-1_amd64.deb && \
-    dpkg -i cuda-repo-ubuntu2204-12-5-local_12.5.1-555.42.06-1_amd64.deb && \
-    cp /var/cuda-repo-ubuntu2204-12-5-local/cuda-*-keyring.gpg /usr/share/keyrings/ && \
-    apt-get update && \
-    apt-get -y install cuda-toolkit-12-5 && \
-    rm -f cuda-repo-ubuntu2204-12-5-local_12.5.1-555.42.06-1_amd64.deb && \
-    rm -rf /var/cuda-repo-ubuntu2204-12-5-local /var/lib/apt/lists/*
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i cuda-keyring_1.1-1_all.deb && \
+    rm cuda-keyring_1.1-1_all.deb
+
+# --- Install CUDA Toolkit 12.5 ---
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends cuda-toolkit-12-5 && \
+    rm -rf /var/lib/apt/lists/*
 
 # --- Configure CUDA paths ---
 
 ENV PATH="/usr/local/cuda-12.5/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda-12.5/lib64:${LD_LIBRARY_PATH}"
 
-# --- Install TensorRT ---
+# --- Install TensorRT (only the dev libraries needed for building) ---
 
-RUN wget https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/local_repo/nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5_1.0-1_amd64.deb && \
-    dpkg -i nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5_1.0-1_amd64.deb && \
-    cp /var/nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5/*-keyring.gpg /usr/share/keyrings/ && \
-    apt-get update && \
-    apt-get install -y tensorrt && \
-    rm -f nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5_1.0-1_amd64.deb && \
-    rm -rf /var/nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5 /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        tensorrt-dev \
+        tensorrt-libs && \
+    rm -rf /var/lib/apt/lists/*
 
 # --- Install locales and add ROS2 repository ---
 

@@ -8,15 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # set up work directory
 WORKDIR /home/vscode/workspace
 
-# --- Install TensorRT ---
-
-RUN wget https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/local_repo/nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5_1.0-1_arm64.deb && \
-    dpkg -i nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5_1.0-1_arm64.deb && \
-    cp /var/nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5/*-keyring.gpg /usr/share/keyrings/ && \
-    apt-get update && \
-    apt-get install -y tensorrt && \
-    rm -f nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5_1.0-1_arm64.deb && \
-    rm -rf /var/nv-tensorrt-local-repo-ubuntu2204-10.3.0-cuda-12.5 /var/lib/apt/lists/*
+# --- TensorRT 10.3.0 is pre-installed in l4t-jetpack:r36.4.0 (with dev headers) ---
 
 # --- Install locales and add ROS2 repository ---
 
