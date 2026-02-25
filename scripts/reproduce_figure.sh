@@ -6,8 +6,8 @@
 # Usage: ./scripts/reproduce_figure.sh <figure> [--quick]
 #
 # Figures:
-#   5a    Fig 5a: Monte Carlo segment count vs batch size     (CPU, ~40m / ~5m quick)
-#   5b    Fig 5b: Monte Carlo cancellation delay              (CPU, ~40m / ~5m quick)
+#   5a    Fig 5a: Monte Carlo cancel-to-finish latency        (CPU, ~40m / ~5m quick)
+#   5b    Fig 5b: Monte Carlo total iterations                (CPU, ~40m / ~5m quick)
 #   5     Both Fig 5a + 5b                                    (CPU, ~40m / ~5m quick)
 #   6     Fig 6a+6b + Table I: Interference results           (CPU, ~40m / ~3m quick)
 #   7a    Fig 7a: YOLO quality progression                    (GPU, ~30m)
@@ -41,8 +41,8 @@ print_usage() {
     echo "Usage: $0 <figure> [--quick]"
     echo ""
     echo "Figures:"
-    echo "  5a    Fig 5a: Monte Carlo segment count          (CPU)"
-    echo "  5b    Fig 5b: Monte Carlo cancellation delay     (CPU)"
+    echo "  5a    Fig 5a: Monte Carlo cancel-to-finish latency (CPU)"
+    echo "  5b    Fig 5b: Monte Carlo total iterations        (CPU)"
     echo "  5     Both Fig 5a + 5b                           (CPU)"
     echo "  6     Fig 6a+6b + Table I: Interference          (CPU)"
     echo "  7a    Fig 7a: YOLO quality progression           (GPU)"
@@ -86,14 +86,14 @@ run_monte_carlo() {
     MC_PLOTS="${MC_DIR}/results/plots"
     case "${FIGURE}" in
         5a)
-            echo "  Figure 5a: ${MC_PLOTS}/batch_size_vs_iterations.pdf"
+            echo "  Figure 5a: ${MC_PLOTS}/cancel_to_finish_latency.pdf"
             ;;
         5b)
-            echo "  Figure 5b: ${MC_PLOTS}/cancellation_delay.pdf"
+            echo "  Figure 5b: ${MC_PLOTS}/total_iterations.pdf"
             ;;
         5)
-            echo "  Figure 5a: ${MC_PLOTS}/batch_size_vs_iterations.pdf"
-            echo "  Figure 5b: ${MC_PLOTS}/cancellation_delay.pdf"
+            echo "  Figure 5a: ${MC_PLOTS}/cancel_to_finish_latency.pdf"
+            echo "  Figure 5b: ${MC_PLOTS}/total_iterations.pdf"
             ;;
     esac
     echo "  All plots: ${MC_PLOTS}/"
@@ -122,8 +122,8 @@ run_interference() {
     echo "Output files:"
     echo "========================================="
     IF_PLOTS="${IF_DIR}/results/plots"
-    echo "  Figure 6a: ${IF_PLOTS}/jitter_vs_batch_size.pdf"
-    echo "  Figure 6b: ${IF_PLOTS}/compute_time_vs_batch_size.pdf"
+    echo "  Figure 6a: ${IF_PLOTS}/compute_time_vs_batch_size.pdf"
+    echo "  Figure 6b: ${IF_PLOTS}/timer_period_vs_batch_size.pdf"
     echo "  Table I:   ${IF_DIR}/results/aggregated_results.csv"
     echo "  All plots: ${IF_PLOTS}/"
 }

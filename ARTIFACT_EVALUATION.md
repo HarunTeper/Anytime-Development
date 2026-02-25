@@ -203,8 +203,8 @@ Each figure can be reproduced with a single command. The `--quick` flag uses few
 
 | Paper Element | Command | Full Duration | Quick Mode | Platforms |
 | ------------- | ------- | ------------- | ---------- | --------- |
-| Figure 5a (segment count vs batch size) | `./scripts/reproduce_figure.sh 5a` | ~40 min | `--quick` ~5 min | A, B, C |
-| Figure 5b (cancellation delay) | `./scripts/reproduce_figure.sh 5b` | ~40 min | `--quick` ~5 min | A, B, C |
+| Figure 5a (cancel-to-finish latency) | `./scripts/reproduce_figure.sh 5a` | ~40 min | `--quick` ~5 min | A, B, C |
+| Figure 5b (total iterations) | `./scripts/reproduce_figure.sh 5b` | ~40 min | `--quick` ~5 min | A, B, C |
 | Figures 5a + 5b (both) | `./scripts/reproduce_figure.sh 5` | ~40 min | `--quick` ~5 min | A, B, C |
 | Figures 6a + 6b + Table I (interference) | `./scripts/reproduce_figure.sh 6` | ~40 min | `--quick` ~3 min | A, B, C |
 | Figure 7a (YOLO quality progression) | `./scripts/reproduce_figure.sh 7a` | ~30 min | N/A | A, B |
@@ -217,10 +217,10 @@ After experiments complete, all paper figures and Table I are automatically coll
 
 ```
 paper_figures/
-├── figure_5a_batch_size_vs_iterations.pdf
-├── figure_5b_cancellation_delay.pdf
-├── figure_6a_jitter_vs_batch_size.pdf
-├── figure_6b_compute_time_vs_batch_size.pdf
+├── figure_5a_cancel_to_finish_latency.pdf
+├── figure_5b_total_iterations.pdf
+├── figure_6a_compute_time_vs_batch_size.pdf
+├── figure_6b_timer_period_vs_batch_size.pdf
 ├── figure_7a_quality_ratio_progression.pdf
 ├── figure_7b_total_runtime_comparison.pdf
 └── table_1_interference_metrics.csv
@@ -238,10 +238,10 @@ The full experiment results (including additional diagnostic plots and raw data)
 
 | Figure / Data | Output File |
 | ------------- | ----------- |
-| Figure 5a | `experiments/monte_carlo/results/plots/batch_size_vs_iterations.pdf` |
-| Figure 5b | `experiments/monte_carlo/results/plots/cancellation_delay.pdf` |
-| Figure 6a | `experiments/interference/results/plots/jitter_vs_batch_size.pdf` |
-| Figure 6b | `experiments/interference/results/plots/compute_time_vs_batch_size.pdf` |
+| Figure 5a | `experiments/monte_carlo/results/plots/cancel_to_finish_latency.pdf` |
+| Figure 5b | `experiments/monte_carlo/results/plots/total_iterations.pdf` |
+| Figure 6a | `experiments/interference/results/plots/compute_time_vs_batch_size.pdf` |
+| Figure 6b | `experiments/interference/results/plots/timer_period_vs_batch_size.pdf` |
 | Figure 7a | `experiments/yolo/results/quality_analysis/quality_ratio_progression.pdf` |
 | Figure 7b | `experiments/yolo/results/phase4_analysis/total_runtime_comparison.pdf` |
 | Table I (CSV) | `experiments/interference/results/aggregated_results.csv` |
