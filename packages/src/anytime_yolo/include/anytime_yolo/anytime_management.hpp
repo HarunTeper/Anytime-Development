@@ -52,13 +52,18 @@ public:
   void compute_single_iteration() override
   {
     RCLCPP_DEBUG(this->node_->get_logger(), "YOLO compute single iteration called");
-    TRACE_YOLO_LAYER_START(this->node_, processed_layers_);
 
     if constexpr (isSyncAsync) {
       // Async mode: only attach callback when actually submitting a GPU layer
       bool is_layer_submission =
         (yolo_state_->currentStage == InferenceState::LAYER_PROCESSING &&
          yolo_state_->currentIndex < MAX_NETWORK_LAYERS);
+
+      // Trace layer start only for actual layer submissions, using submitted_layers_
+      // which is the correct sequential index (0..24) before increment
+      if (is_layer_submission) {
+        TRACE_YOLO_LAYER_START(this->node_, submitted_layers_);
+      }
 
       void (*callback)(void *) = is_layer_submission ? forward_finished_callback : nullptr;
 
@@ -68,7 +73,8 @@ public:
         submitted_layers_++;
       }
     } else {
-      // Sync mode: no callback, increment directly
+      // Sync mode: trace with processed_layers_ before increment (0..24)
+      TRACE_YOLO_LAYER_START(this->node_, processed_layers_);
       yolo_.inferStep(*yolo_state_, false, nullptr, nullptr);
       processed_layers_++;
       TRACE_YOLO_LAYER_END(this->node_, processed_layers_);
@@ -297,7 +303,14 @@ public:
       // Clamp to outstanding submissions to prevent overcounting
       int outstanding = submitted_layers_ - processed_layers_;
       int newly_completed = std::clamp(signals, 0, outstanding);
-      processed_layers_ += newly_completed;
+
+      // Emit individual layer_end events for each completed layer
+      // This produces the same event pattern as sync mode:
+      //   layer_start(N) ... layer_end(N+1) for each layer
+      for (int i = 0; i < newly_completed; i++) {
+        processed_layers_++;
+        TRACE_YOLO_LAYER_END(this->node_, processed_layers_);
+      }
 
       TRACE_YOLO_CUDA_CALLBACK(this->node_, processed_layers_);
       RCLCPP_DEBUG(

@@ -835,13 +835,11 @@ def plot_combined_stacked_comparison(summary):
 
     fig, ax = plt.subplots(figsize=(16, 8))
 
-    # Get all unique layers across all configs
+    # Get all unique layers across all configs (use computation layers as primary source)
     all_layers = set()
     for config in configs:
         data = summary[config]
-        comp_layers = set(data['layer_comp_stats'].keys())
-        exit_layers = set(data['layer_exit_stats'].keys())
-        all_layers.update(comp_layers & exit_layers)
+        all_layers.update(data['layer_comp_stats'].keys())
 
     layers = sorted(all_layers)
     if not layers:
@@ -872,11 +870,14 @@ def plot_combined_stacked_comparison(summary):
 
         # Plot stacked bars
         ax.bar(x + offset, comp_means, width,
-               label=f'{label} (Comp)' if idx == 0 else '_nolegend_',
-               alpha=0.8, color=colors_comp[idx])
-        ax.bar(x + offset, exit_means, width, bottom=comp_means,
-               label=f'{label} (Exit)' if idx == 0 else '_nolegend_',
-               alpha=0.6, color=colors_exit[idx])
+               label=f'{label} (Comp)',
+               alpha=0.8, color=colors_comp[idx % len(colors_comp)])
+
+        # Only plot exit bars if there's any exit data
+        if any(e > 0 for e in exit_means):
+            ax.bar(x + offset, exit_means, width, bottom=comp_means,
+                   label=f'{label} (Exit)',
+                   alpha=0.6, color=colors_exit[idx % len(colors_exit)])
 
     ax.set_xlabel('Layer Number', fontsize=12)
     ax.set_ylabel('Time (ms)', fontsize=12)
@@ -947,17 +948,11 @@ def plot_cumulative_runtime_by_config(summary):
         config = configs[0]
         data = summary[config]
 
-        if data['layer_comp_stats'] and data['layer_exit_stats']:
-            # Get common layers
-            comp_layers = set(data['layer_comp_stats'].keys())
-            exit_layers = set(data['layer_exit_stats'].keys())
-            common_layers = sorted(comp_layers & exit_layers)
-
-            if common_layers:
-                comp_means = [data['layer_comp_stats'][l]['mean']
-                              for l in common_layers]
-                exit_means = [data['layer_exit_stats'][l]['mean']
-                              for l in common_layers]
+        if data['layer_comp_stats']:
+            comp_layers = sorted(data['layer_comp_stats'].keys())
+            if comp_layers:
+                comp_means = [data['layer_comp_stats'][l]['mean'] for l in comp_layers]
+                exit_means = [data['layer_exit_stats'].get(l, {}).get('mean', 0) for l in comp_layers]
 
                 cumulative_comp = np.cumsum(comp_means)
                 cumulative_exit = np.cumsum(exit_means)
@@ -966,11 +961,12 @@ def plot_cumulative_runtime_by_config(summary):
                 label = config.replace('_', '+').replace('sync', 'Sync').replace(
                     'async', 'Async').replace('single', 'Single').replace('multi', 'Multi')
 
-                ax2.fill_between(common_layers, 0, cumulative_comp,
+                ax2.fill_between(comp_layers, 0, cumulative_comp,
                                  alpha=0.7, label='Layer Computation', color='#1f77b4')
-                ax2.fill_between(common_layers, cumulative_comp, cumulative_total,
-                                 alpha=0.7, label='Exit Calculation', color='#ff7f0e')
-                ax2.plot(common_layers, cumulative_total, marker='o',
+                if any(e > 0 for e in exit_means):
+                    ax2.fill_between(comp_layers, cumulative_comp, cumulative_total,
+                                     alpha=0.7, label='Exit Calculation', color='#ff7f0e')
+                ax2.plot(comp_layers, cumulative_total, marker='o',
                          linewidth=2, markersize=6, color='red', label='Total Runtime')
 
                 ax2.set_xlabel('Layer Number', fontsize=12)
@@ -983,7 +979,7 @@ def plot_cumulative_runtime_by_config(summary):
                 ax2.text(0.5, 0.5, 'Insufficient data for breakdown',
                          ha='center', va='center', transform=ax2.transAxes)
         else:
-            ax2.text(0.5, 0.5, 'No exit calculation data for breakdown',
+            ax2.text(0.5, 0.5, 'No computation data for breakdown',
                      ha='center', va='center', transform=ax2.transAxes)
 
     plt.tight_layout()
