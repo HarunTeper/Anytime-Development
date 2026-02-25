@@ -191,7 +191,7 @@ if [ "${DO_CLEAN}" = true ] || [ "${DO_CLEAN_ALL}" = true ]; then
         echo "  YOLO weights and video frames:"
         weights_dir="${PACKAGES_DIR}/src/anytime_yolo/weights_32"
         if ls "${weights_dir}"/*.onnx 2>/dev/null | head -1 >/dev/null 2>&1 || [ -f "${weights_dir}/model.json" ]; then
-            echo "    ${weights_dir}/*.onnx, model.json"
+            echo "    ${weights_dir}/*.onnx, *.engine, model.json, .gpu_fingerprint"
         fi
         images_dir="${PACKAGES_DIR}/src/video_publisher/images"
         if ls "${images_dir}"/image_*.jpg 2>/dev/null | head -1 >/dev/null 2>&1; then
@@ -246,8 +246,11 @@ if [ "${DO_CLEAN}" = true ] || [ "${DO_CLEAN_ALL}" = true ]; then
         weights_dir="${PACKAGES_DIR}/src/anytime_yolo/weights_32"
         rm -f "${weights_dir}"/layer_*.onnx "${weights_dir}"/exit_*.onnx \
               "${weights_dir}"/nms.onnx "${weights_dir}"/model.json \
-              "${weights_dir}"/combine_subheads_*.onnx "${weights_dir}"/subexit_*.onnx
-        echo "  Removed YOLO weight files"
+              "${weights_dir}"/combine_subheads_*.onnx "${weights_dir}"/subexit_*.onnx \
+              "${weights_dir}"/layer_*.engine "${weights_dir}"/subexit_*.engine \
+              "${weights_dir}"/combine_subheads_*.engine "${weights_dir}"/nms.engine \
+              "${weights_dir}"/.gpu_fingerprint
+        echo "  Removed YOLO weight and engine files"
 
         images_dir="${PACKAGES_DIR}/src/video_publisher/images"
         rm -f "${images_dir}"/image_*.jpg
@@ -354,6 +357,29 @@ echo "GPU detected:  ${HAS_GPU}"
 echo "Workspace:     ${WORKSPACE_DIR}"
 echo "Output dir:    ${OUTPUT_DIR}"
 echo ""
+
+# ─────────────────────────────────────────────
+# Capture hardware metadata
+# ─────────────────────────────────────────────
+{
+    echo "Hardware metadata captured at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+    echo ""
+    echo "--- OS / Kernel ---"
+    uname -a
+    echo ""
+    echo "--- CPU ---"
+    lscpu 2>/dev/null | head -20 || echo "(lscpu not available)"
+    echo ""
+    echo "--- Memory ---"
+    head -3 /proc/meminfo 2>/dev/null || echo "(meminfo not available)"
+    echo ""
+    echo "--- GPU ---"
+    if command -v nvidia-smi &>/dev/null; then
+        nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv 2>/dev/null || echo "(nvidia-smi query failed)"
+    else
+        echo "(no NVIDIA GPU detected)"
+    fi
+} > "${OUTPUT_DIR}/hardware.txt" 2>&1
 
 passed=0
 failed=0
@@ -552,6 +578,12 @@ if [ "${RUN_YOLO}" = true ]; then
         cd "${PACKAGES_DIR}"
         source install/setup.bash
 
+        # Pre-build TensorRT engines so warmup time is tracked separately
+        run_yolo_step "engine_warmup" "Engine warmup (TensorRT compilation)" \
+            "'${SCRIPT_DIR}/warmup_yolo_engines.sh'" || {
+            echo "  WARNING: Engine warmup failed, experiments may still work"
+        }
+
         yolo_failed=false
 
         run_yolo_step "step0_generate_baseline_configs" "Step 0: Generating baseline configs" \
@@ -603,9 +635,11 @@ if [ "${RUN_YOLO}" = true ]; then
         if [ "${yolo_failed}" = false ]; then
             echo "  PASSED: YOLO experiments ($(format_duration ${yolo_duration}))"
             passed=$((passed + 1))
+            record_timing "04" "YOLO experiments (total)" "PASSED" "${yolo_phase_start}" "${yolo_phase_end}"
         else
             echo "  FAILED: YOLO experiments ($(format_duration ${yolo_duration}))"
             failed=$((failed + 1))
+            record_timing "04" "YOLO experiments (total)" "FAILED" "${yolo_phase_start}" "${yolo_phase_end}"
         fi
 
         fi  # end prerequisite/proceed check
@@ -638,10 +672,10 @@ total=$((passed + failed + skipped))
     echo "  Passed:  ${passed}"
     echo "  Failed:  ${failed}"
     echo "  Skipped: ${skipped}"
-    echo "  Total:   ${total}"
+    echo "  Total:   ${total}  (top-level phases)"
     echo ""
     echo "-----------------------------------------"
-    echo "Timing Breakdown"
+    echo "Timing Breakdown  (${#PHASE_NAMES[@]} steps)"
     echo "-----------------------------------------"
     printf "  %-45s %-10s %s\n" "Phase" "Status" "Duration"
     printf "  %-45s %-10s %s\n" "-----" "------" "--------"
@@ -656,20 +690,21 @@ total=$((passed + failed + skipped))
     echo ""
     printf "  %-45s %-10s %s\n" "TOTAL" "" "$(format_duration ${OVERALL_DURATION})"
     echo ""
-    echo "Result locations:"
+    echo "Result locations (relative to workspace root):"
     if [ "${RUN_MC}" = true ]; then
-        echo "  Monte Carlo:    ${WORKSPACE_DIR}/experiments/monte_carlo/results/"
+        echo "  Monte Carlo:    experiments/monte_carlo/results/"
     fi
     if [ "${RUN_IF}" = true ]; then
-        echo "  Interference:   ${WORKSPACE_DIR}/experiments/interference/results/"
+        echo "  Interference:   experiments/interference/results/"
     fi
     if [ "${RUN_YOLO}" = true ] && [ "${HAS_GPU}" = true ] && [ "${MODE}" = "full" ]; then
-        echo "  YOLO:           ${WORKSPACE_DIR}/experiments/yolo/results/"
+        echo "  YOLO:           experiments/yolo/results/"
     fi
     echo ""
-    echo "  Paper figures:  ${WORKSPACE_DIR}/paper_figures/"
-    echo "  Run logs:       ${OUTPUT_DIR}/"
-    echo "  Timing CSV:     ${TIMING_CSV}"
+    echo "  Paper figures:  paper_figures/"
+    echo "  Run logs:       eval_output/run_${RUN_TIMESTAMP}/"
+    echo "  Timing CSV:     eval_output/run_${RUN_TIMESTAMP}/timing.csv"
+    echo "  Hardware info:  eval_output/run_${RUN_TIMESTAMP}/hardware.txt"
     echo ""
 
     if [ ${failed} -eq 0 ]; then
