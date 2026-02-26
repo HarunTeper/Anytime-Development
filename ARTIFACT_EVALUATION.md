@@ -331,6 +331,8 @@ cd ../../../
 
 **What it does:** Runs the same Monte Carlo action server alongside a periodic interference timer node that performs a 10 ms busy-wait every 100 ms, both in a single-threaded ROS 2 executor. This creates CPU contention: larger batch sizes block the executor longer, causing the timer to miss its 100 ms period. LTTng traces record timer callback timestamps and compute batch durations. The evaluation script measures timer jitter (deviation from the expected 100 ms period), missed-period rates, and compute times per batch size.
 
+**Note on batch sizes:** The paper uses batch sizes up to 65,536 for the interference experiment. The artifact extends the range to 262,144 because software and firmware updates to the Jetson Orin NX board have improved its performance since the paper experiments were conducted, and larger batch sizes are needed to observe the same interference effects. The additional data points (131,072 and 262,144) reinforce the same trend shown in the paper.
+
 **Why it takes this long:** 18 (full) or 8 (quick) configurations run sequentially. Each config has the same per-config overhead as Monte Carlo (~10 s for LTTng and node lifecycle), plus the run duration itself.
 
 | Parameter | Full | Quick |
