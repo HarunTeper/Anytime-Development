@@ -46,3 +46,7 @@ REVIEWER_CREDENTIALS.md
 # Paper PDF (kept locally, not committed)
 main.pdf
 
+# Generated reviewer PDF (contains credentials, never commit)
+artifact_evaluation_reviewer.html
+artifact_evaluation_reviewer.pdf
+

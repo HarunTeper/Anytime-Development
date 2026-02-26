@@ -5,8 +5,11 @@
 **Contact:** harun.teper (at) tu-dortmund.de
 **Venue:** RTAS 2026
 **Paper PDF:** The accepted paper is provided as a separate PDF alongside this artifact submission.
+**Repository:** <https://github.com/tu-dortmund-ls12-rt/Anytime-Development/>
 
 ## Overview
+
+The complete source code for this artifact is publicly available at <https://github.com/tu-dortmund-ls12-rt/Anytime-Development/>. Paths B and C below clone from this repository. The repository contains all experiment scripts, evaluation code, and Docker configurations needed to reproduce the paper results.
 
 This artifact can be evaluated through three paths depending on available hardware. **Path A (Jetson via SSH) is recommended** — the board is pre-configured and ready to use.
 

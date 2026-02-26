@@ -1,6 +1,6 @@
-# Anytime ROS 2
+# Anytime ROS 2: Timely Task Completion in Non-Preemptive Robotic Systems
 
-ROS 2 implementation of anytime algorithms for timely task completion in non-preemptive robotic systems.
+This repository contains the artifact for the paper *"Anytime ROS 2: Timely Task Completion in Non-Preemptive Robotic Systems"*, accepted at **IEEE RTAS 2026**. It provides a ROS 2 implementation of anytime algorithms along with all experiment scripts and evaluation code needed to reproduce the paper results.
 
 **Authors:** Harun Teper, Daniel Kuhse, Yun-Chih Chen, Georg von der Brüggen, Zhishan Guo, Jian-Jia Chen
 **Contact:** harun.teper (at) tu-dortmund.de
