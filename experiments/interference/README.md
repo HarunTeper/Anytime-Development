@@ -11,7 +11,7 @@ Measure timing interference between Monte Carlo batch processing and a periodic 
 # Generate configs
 python3 generate_configs.py
 
-# Run full experiments (~40 min)
+# Run full experiments (~5 min)
 ./run_interference_experiments.sh
 
 # View results
@@ -82,7 +82,7 @@ chmod +x run_interference_experiments.sh
 This will:
 - Run all 72 experiments (24 configs × 3 runs)
 - Each run lasts 30 seconds
-- Total time: ~40 minutes (including setup/teardown)
+- Total time: ~5 minutes (including setup/teardown)
 - Automatically call the evaluation script when done
 
 ### 4. Run Only Evaluation (if traces already exist)

@@ -36,13 +36,13 @@ Inside the container:
 cd packages && colcon build --symlink-install && source install/setup.bash
 cd ..
 
-# Run smoke test (< 2 minutes)
+# Run smoke test (~2 minutes)
 ./scripts/smoke_test.sh
 
-# Run all CPU experiments with quick settings (~10 minutes)
+# Run all CPU experiments with quick settings (~5 minutes)
 ./scripts/run_all.sh --quick --cpu-only
 
-# Full reproduction including YOLO (~5+ hours)
+# Full reproduction including YOLO (~1.5 hours)
 ./scripts/run_all.sh --full
 
 # Run specific experiment groups
@@ -71,9 +71,9 @@ Three experimental evaluations reproduce the paper results:
 Evaluates batch size scaling, mode comparison (reactive vs proactive), and threading impact on anytime Monte Carlo pi estimation.
 
 ```bash
-./scripts/reproduce_figure.sh 5a        # Full run (~40 min)
-./scripts/reproduce_figure.sh 5a --quick # Quick run (~5 min)
-./scripts/reproduce_figure.sh 5 --quick  # Both 5a + 5b (~5 min)
+./scripts/reproduce_figure.sh 5a        # Full run (~10 min)
+./scripts/reproduce_figure.sh 5a --quick # Quick run (~3 min)
+./scripts/reproduce_figure.sh 5 --quick  # Both 5a + 5b (~3 min)
 ```
 
 ### Interference (Figures 6a, 6b, Table I)
@@ -81,8 +81,8 @@ Evaluates batch size scaling, mode comparison (reactive vs proactive), and threa
 Measures timing interference between anytime batch processing and periodic timer tasks.
 
 ```bash
-./scripts/reproduce_figure.sh 6          # Full run (~40 min)
-./scripts/reproduce_figure.sh 6 --quick  # Quick run (~3 min)
+./scripts/reproduce_figure.sh 6          # Full run (~5 min)
+./scripts/reproduce_figure.sh 6 --quick  # Quick run (~2 min)
 ```
 
 ### YOLO (Figures 7a, 7b) — GPU Required
@@ -90,9 +90,9 @@ Measures timing interference between anytime batch processing and periodic timer
 Evaluates anytime YOLO object detection with layer-wise cancellation on GPU.
 
 ```bash
-./scripts/reproduce_figure.sh 7a  # Quality progression (~30 min)
-./scripts/reproduce_figure.sh 7b  # Runtime comparison (~1 hr)
-./scripts/reproduce_figure.sh 7   # Both 7a + 7b (~1.5 hrs)
+./scripts/reproduce_figure.sh 7a  # Quality progression (~15 min)
+./scripts/reproduce_figure.sh 7b  # Runtime comparison (~25 min)
+./scripts/reproduce_figure.sh 7   # Both 7a + 7b (~35 min)
 ```
 
 See [`ARTIFACT_EVALUATION.md`](ARTIFACT_EVALUATION.md) for YOLO prerequisites (weights and test images).

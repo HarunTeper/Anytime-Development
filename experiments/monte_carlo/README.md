@@ -11,7 +11,7 @@ Evaluate Monte Carlo batch size scaling and threading impact.
 # Generate configs
 python3 generate_configs.py
 
-# Run full experiments (~40 min)
+# Run full experiments (~10 min)
 ./run_monte_carlo_experiments.sh
 
 # View results
@@ -42,7 +42,7 @@ ls results/plots/
 This will:
 - Run all 72 experiments (24 configs × 3 runs)
 - Each run lasts 30 seconds
-- Total time: ~40 minutes (including setup/teardown)
+- Total time: ~10 minutes (including setup/teardown)
 - Automatically call the evaluation script when done
 
 ### 4. Run Only Evaluation (if traces already exist)

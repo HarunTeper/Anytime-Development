@@ -34,11 +34,11 @@
 # If none of --monte-carlo, --interference, --yolo, --cpu-only, --gpu-only
 # are specified, all experiments are run.
 #
-# Duration estimates:
-#   --quick --cpu-only     ~10 minutes
-#   --full  --cpu-only     ~1.5 hours
-#   --full  --gpu-only     ~3 hours
-#   --full                 ~5+ hours (all experiments)
+# Duration estimates (on Jetson Orin NX):
+#   --quick --cpu-only     ~5 minutes
+#   --full  --cpu-only     ~15 minutes
+#   --full  --gpu-only     ~1 hour
+#   --full                 ~1.5 hours (all experiments)
 
 set -e
 export PYTHONUNBUFFERED=1
@@ -137,11 +137,11 @@ for arg in "$@"; do
             echo "If no experiment flags are given, all experiments are run."
             echo "Flags can be combined: --monte-carlo --interference"
             echo ""
-            echo "Duration estimates:"
-            echo "  --quick --cpu-only     ~10 minutes"
-            echo "  --full  --cpu-only     ~1.5 hours"
-            echo "  --full  --gpu-only     ~3 hours"
-            echo "  --full                 ~5+ hours"
+            echo "Duration estimates (on Jetson Orin NX):"
+            echo "  --quick --cpu-only     ~5 minutes"
+            echo "  --full  --cpu-only     ~15 minutes"
+            echo "  --full  --gpu-only     ~1 hour"
+            echo "  --full                 ~1.5 hours"
             exit 0
             ;;
         *)

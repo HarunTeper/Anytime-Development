@@ -50,16 +50,16 @@ Inside the container:
 cd packages && colcon build --symlink-install && source install/setup.bash
 cd ..
 
-# Run smoke test (< 2 minutes)
+# Run smoke test (~2 minutes)
 ./scripts/smoke_test.sh
 
-# Quick CPU experiments (~10 minutes)
+# Quick CPU experiments (~5 minutes)
 ./scripts/run_all.sh --quick --cpu-only
 
-# Full reproduction including YOLO (~5+ hours)
+# Full reproduction including YOLO (~1.5 hours)
 ./scripts/run_all.sh --full
 
-# Run only GPU experiments (~3 hours)
+# Run only GPU experiments (~1 hour)
 ./scripts/run_all.sh --full --gpu-only
 
 # Run specific experiment groups
@@ -108,7 +108,7 @@ scp -P <JETSON_PORT> -r <JETSON_USERNAME>@<JETSON_IP>:~/Anytime-Development/expe
 ### Build and enter the container
 
 ```bash
-git clone https://github.com/HarunTeper/Anytime-Development.git
+git clone https://github.com/tu-dortmund-ls12-rt/Anytime-Development.git
 cd Anytime-Development
 
 docker compose build anytime-gpu
@@ -123,7 +123,7 @@ Inside the container:
 cd packages && colcon build --symlink-install && source install/setup.bash
 cd ..
 
-# Run smoke test (< 2 minutes)
+# Run smoke test (~2 minutes)
 ./scripts/smoke_test.sh
 ```
 
@@ -132,13 +132,13 @@ Before running YOLO experiments, download the model weights and test images — 
 Then run experiments:
 
 ```bash
-# Quick CPU experiments (~10 minutes)
+# Quick CPU experiments (~5 minutes)
 ./scripts/run_all.sh --quick --cpu-only
 
-# Full reproduction including YOLO (~5+ hours)
+# Full reproduction including YOLO (~1.5 hours)
 ./scripts/run_all.sh --full
 
-# Run only GPU experiments (~3 hours)
+# Run only GPU experiments (~1 hour)
 ./scripts/run_all.sh --full --gpu-only
 
 # Run specific experiment groups
@@ -168,7 +168,7 @@ This path reproduces Figures 5a, 5b, 6, and Table I. Figures 7a and 7b (YOLO) re
 ### Build and enter the container
 
 ```bash
-git clone https://github.com/HarunTeper/Anytime-Development.git
+git clone https://github.com/tu-dortmund-ls12-rt/Anytime-Development.git
 cd Anytime-Development
 
 docker compose build anytime-cpu
@@ -183,13 +183,13 @@ Inside the container:
 cd packages && colcon build --symlink-install && source install/setup.bash
 cd ..
 
-# Run smoke test (< 2 minutes)
+# Run smoke test (~2 minutes)
 ./scripts/smoke_test.sh
 
-# Quick CPU experiments (~10 minutes)
+# Quick CPU experiments (~5 minutes)
 ./scripts/run_all.sh --quick --cpu-only
 
-# Full CPU experiments (~1.5 hours)
+# Full CPU experiments (~15 minutes)
 ./scripts/run_all.sh --full --cpu-only
 
 # Or reproduce individual figures (see table below)
@@ -204,13 +204,13 @@ Each figure can be reproduced with a single command. The `--quick` flag uses few
 
 | Paper Element | Command | Full Duration | Quick Mode | Platforms |
 | ------------- | ------- | ------------- | ---------- | --------- |
-| Figure 5a (cancel-to-finish latency) | `./scripts/reproduce_figure.sh 5a` | ~40 min | `--quick` ~5 min | A, B, C |
-| Figure 5b (total iterations) | `./scripts/reproduce_figure.sh 5b` | ~40 min | `--quick` ~5 min | A, B, C |
-| Figures 5a + 5b (both) | `./scripts/reproduce_figure.sh 5` | ~40 min | `--quick` ~5 min | A, B, C |
-| Figures 6a + 6b + Table I (interference) | `./scripts/reproduce_figure.sh 6` | ~40 min | `--quick` ~3 min | A, B, C |
-| Figure 7a (YOLO quality progression) | `./scripts/reproduce_figure.sh 7a` | ~30 min | N/A | A, B |
-| Figure 7b (YOLO runtime comparison) | `./scripts/reproduce_figure.sh 7b` | ~1 hr | N/A | A, B |
-| Figures 7a + 7b (both) | `./scripts/reproduce_figure.sh 7` | ~1.5 hrs | N/A | A, B |
+| Figure 5a (cancel-to-finish latency) | `./scripts/reproduce_figure.sh 5a` | ~10 min | `--quick` ~3 min | A, B, C |
+| Figure 5b (total iterations) | `./scripts/reproduce_figure.sh 5b` | ~10 min | `--quick` ~3 min | A, B, C |
+| Figures 5a + 5b (both) | `./scripts/reproduce_figure.sh 5` | ~10 min | `--quick` ~3 min | A, B, C |
+| Figures 6a + 6b + Table I (interference) | `./scripts/reproduce_figure.sh 6` | ~5 min | `--quick` ~2 min | A, B, C |
+| Figure 7a (YOLO quality progression) | `./scripts/reproduce_figure.sh 7a` | ~15 min | N/A | A, B |
+| Figure 7b (YOLO runtime comparison) | `./scripts/reproduce_figure.sh 7b` | ~25 min | N/A | A, B |
+| Figures 7a + 7b (both) | `./scripts/reproduce_figure.sh 7` | ~35 min | N/A | A, B |
 
 ## Output Locations
 
@@ -293,7 +293,7 @@ rm images.zip
 cd ../../../
 ```
 
-> **First run after downloading weights:** The YOLO weights are distributed as ONNX models. On first use, TensorRT compiles each ONNX model into an optimized `.engine` file for your specific GPU. This one-time compilation adds **10–20 minutes** to the first YOLO experiment run. Subsequent runs reuse the cached `.engine` files and start immediately.
+> **First run after downloading weights:** The YOLO weights are distributed as ONNX models. On first use, TensorRT compiles each ONNX model into an optimized `.engine` file for your specific GPU. This one-time compilation adds **~20 minutes** to the first YOLO experiment run. Subsequent runs reuse the cached `.engine` files and start immediately.
 
 ## Experiment Details
 
@@ -310,7 +310,7 @@ cd ../../../
 | Threading | single, multi | single, multi |
 | Run duration | 10 seconds per config | 5 seconds per config |
 | Total configs | 28 | 12 |
-| **Estimated time** | **~40 min** | **~5 min** |
+| **Estimated time** | **~10 min** | **~3 min** |
 
 ### Interference (Figure 6, Table I)
 
@@ -327,7 +327,7 @@ cd ../../../
 | Timer execution time | 10 ms | 10 ms |
 | Run duration | 10 seconds per config | 5 seconds per config |
 | Total configs | 14 | 6 |
-| **Estimated time** | **~40 min** | **~3 min** |
+| **Estimated time** | **~5 min** | **~2 min** |
 
 ### YOLO (Figures 7a, 7b)
 
@@ -351,9 +351,9 @@ cd ../../../
 | Baseline trials | 3 |
 | Cancellation: cancel_after_layers | 25 |
 | Cancellation: score_threshold | 0.7 |
-| **Estimated time (Figure 7a)** | **~30 min** |
-| **Estimated time (Figure 7b)** | **~1 hr** |
-| **Estimated time (both)** | **~1.5 hrs** |
+| **Estimated time (Figure 7a)** | **~15 min** |
+| **Estimated time (Figure 7b)** | **~25 min** |
+| **Estimated time (both)** | **~35 min** |
 
 ## Environment Details
 
@@ -443,7 +443,7 @@ docker compose build --no-cache anytime-gpu
 
 **TensorRT engines rebuilding on first run or after switching GPUs:**
 
-TensorRT `.engine` files are compiled for a specific GPU architecture. When you run experiments on a different GPU than the one that previously built the engines, the system automatically detects the mismatch via a GPU fingerprint, removes the stale engines, and rebuilds them from the source ONNX models. This one-time rebuild adds 10–20 minutes. To force a manual rebuild:
+TensorRT `.engine` files are compiled for a specific GPU architecture. When you run experiments on a different GPU than the one that previously built the engines, the system automatically detects the mismatch via a GPU fingerprint, removes the stale engines, and rebuilds them from the source ONNX models. This one-time rebuild adds ~20 minutes. To force a manual rebuild:
 
 ```bash
 ./scripts/warmup_yolo_engines.sh --force-rebuild
