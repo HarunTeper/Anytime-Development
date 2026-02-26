@@ -47,6 +47,18 @@ docker compose run --rm anytime-jetson bash
 
 ### Build the workspace and run experiments
 
+> **Note:** Experiments may have already been run on the Jetson board by a previous reviewer. Before running your own experiments, it is recommended to clean the previous results to ensure a fresh state:
+> ```bash
+> # Remove previous experiment outputs (traces, results, configs, paper figures, evaluation logs)
+> ./scripts/run_all.sh --clean
+>
+> # Or remove everything above plus build artifacts, YOLO weights, and video frames
+> ./scripts/run_all.sh --clean-all
+> ```
+> Both commands show what will be removed and ask for confirmation before proceeding.
+>
+> **Warning:** Using `--clean-all` does not affect the correctness of results, but it removes the pre-compiled YOLO TensorRT `.engine` files and the pre-downloaded weights and images. These will need to be re-downloaded and TensorRT will need to recompile each ONNX model from scratch on first use, adding approximately **20 extra minutes** to the first YOLO experiment run. Use `--clean` (without `--all`) to avoid this overhead.
+
 Inside the container:
 
 ```bash
