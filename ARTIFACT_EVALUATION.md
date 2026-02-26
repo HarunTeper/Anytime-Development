@@ -207,7 +207,7 @@ Each figure can be reproduced with a single command. The `--quick` flag uses few
 | Figure 5a (total iterations) | `./scripts/reproduce_figure.sh 5a` | ~10 min | `--quick` ~3 min | A, B, C |
 | Figure 5b (cancel-to-finish latency) | `./scripts/reproduce_figure.sh 5b` | ~10 min | `--quick` ~3 min | A, B, C |
 | Figures 5a + 5b (both) | `./scripts/reproduce_figure.sh 5` | ~10 min | `--quick` ~3 min | A, B, C |
-| Figures 6a + 6b + Table I (interference) | `./scripts/reproduce_figure.sh 6` | ~5 min | `--quick` ~2 min | A, B, C |
+| Figures 6a + 6b + Table I (interference) | `./scripts/reproduce_figure.sh 6` | ~7 min | `--quick` ~3 min | A, B, C |
 | Figure 7a (YOLO quality progression) | `./scripts/reproduce_figure.sh 7a` | ~15 min | N/A | A, B |
 | Figure 7b (YOLO runtime comparison) | `./scripts/reproduce_figure.sh 7b` | ~25 min | N/A | A, B |
 | Figures 7a + 7b (both) | `./scripts/reproduce_figure.sh 7` | ~35 min | N/A | A, B |
@@ -316,18 +316,18 @@ cd ../../../
 
 **What it does:** Runs the same Monte Carlo action server alongside a periodic interference timer node that performs a 10 ms busy-wait every 100 ms, both in a single-threaded ROS 2 executor. This creates CPU contention: larger batch sizes block the executor longer, causing the timer to miss its 100 ms period. LTTng traces record timer callback timestamps and compute batch durations. The evaluation script measures timer jitter (deviation from the expected 100 ms period), missed-period rates, and compute times per batch size.
 
-**Why it takes this long:** 14 (full) or 6 (quick) configurations run sequentially. Each config has the same per-config overhead as Monte Carlo (~10 s for LTTng and node lifecycle), plus the run duration itself.
+**Why it takes this long:** 18 (full) or 8 (quick) configurations run sequentially. Each config has the same per-config overhead as Monte Carlo (~10 s for LTTng and node lifecycle), plus the run duration itself.
 
 | Parameter | Full | Quick |
 | --------- | ---- | ----- |
-| Batch sizes | 1024, 2048, 4096, 8192, 16384, 32768, 65536 | 1024, 16384, 65536 |
+| Batch sizes | 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144 | 1024, 16384, 65536, 262144 |
 | Modes | reactive, proactive | reactive, proactive |
 | Threading | single | single |
 | Timer period | 100 ms | 100 ms |
 | Timer execution time | 10 ms | 10 ms |
 | Run duration | 10 seconds per config | 5 seconds per config |
-| Total configs | 14 | 6 |
-| **Estimated time** | **~5 min** | **~2 min** |
+| Total configs | 18 | 8 |
+| **Estimated time** | **~7 min** | **~3 min** |
 
 ### YOLO (Figures 7a, 7b)
 

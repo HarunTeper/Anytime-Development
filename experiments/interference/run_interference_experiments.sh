@@ -41,7 +41,7 @@ RESULTS_DIR="${EXPERIMENT_DIR}/results"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 
 # Experiment parameters
-BATCH_SIZES=(1024 2048 4096 8192 16384 32768 65536)
+BATCH_SIZES=(1024 2048 4096 8192 16384 32768 65536 131072 262144)
 MODES=("reactive" "proactive")
 THREADING=("single")
 NUM_RUNS=1  # Number of trials per configuration

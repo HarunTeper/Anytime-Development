@@ -688,7 +688,7 @@ def main():
     print(f"  Saved: {RESULTS_DIR / 'aggregated_results.json'}")
 
     # Save condensed Table I: missed periods % by mode and batch size
-    table_batch_sizes = [1024, 2048, 4096, 16384, 32768, 65536]
+    table_batch_sizes = [1024, 2048, 4096, 16384, 32768, 65536, 131072, 262144]
     table_rows = {}
     for config, metrics in aggregated.items():
         parsed = parse_config_name(config)

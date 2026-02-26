@@ -11,7 +11,7 @@ Measure timing interference between Monte Carlo batch processing and a periodic 
 # Generate configs
 python3 generate_configs.py
 
-# Run full experiments (~5 min)
+# Run full experiments (~7 min)
 ./run_interference_experiments.sh
 
 # View results
@@ -22,15 +22,15 @@ ls results/plots/
 ## Configuration
 
 **Monte Carlo:**
-- Batch sizes: 1, 64, 4096, 16384, 65536, 262144
+- Batch sizes: 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144
 - Modes: reactive, proactive
-- Threading: single, multi
+- Threading: single
 
 **Timer (Fixed):**
 - Period: 100ms (10 Hz)
 - Execution: 10ms busy-wait
 
-**Total**: 24 configs × 3 runs = 72 experiments
+**Total**: 18 configs × 1 run = 18 experiments
 
 ## Metrics
 
@@ -38,17 +38,6 @@ ls results/plots/
 - Missed timer periods (>150% expected)
 - Compute batch timing
 - Interference severity
-│       ├── timer_period_vs_batch_size.png
-│       ├── jitter_vs_batch_size.png
-│       ├── missed_periods_percentage.png
-│       ├── compute_time_vs_batch_size.png
-│       └── timer_period_distribution.png
-├── generate_configs.py         # Script to generate configuration files
-├── run_interference_experiments.sh  # Main experiment execution script
-├── evaluate_interference.py    # Analysis and plotting script
-├── test_single_config.sh       # Quick test with one configuration
-└── README.md                   # This file
-```
 
 ## Quick Start
 
@@ -59,7 +48,7 @@ cd experiments/interference
 python3 generate_configs.py
 ```
 
-This creates 72 YAML files (24 server + 24 client + 24 interference configs) in the `configs/` directory.
+This creates 54 YAML files (18 server + 18 client + 18 interference configs) in the `configs/` directory.
 
 ### 2. Test with a Single Configuration
 
@@ -80,9 +69,9 @@ chmod +x run_interference_experiments.sh
 ```
 
 This will:
-- Run all 72 experiments (24 configs × 3 runs)
-- Each run lasts 30 seconds
-- Total time: ~5 minutes (including setup/teardown)
+- Run all 18 experiments (9 batch sizes × 2 modes × 1 run)
+- Each run lasts 10 seconds
+- Total time: ~7 minutes (including setup/teardown)
 - Automatically call the evaluation script when done
 
 ### 4. Run Only Evaluation (if traces already exist)
@@ -98,8 +87,8 @@ python3 evaluate_interference.py
 anytime_server:
   ros__parameters:
     is_reactive_proactive: "reactive"  # or "proactive"
-    multi_threading: true              # or false
-    batch_size: 1                      # 1, 64, 4096, 16384, 65536, 262144
+    multi_threading: false             # single-threaded for interference measurement
+    batch_size: 1024                   # 1024 to 262144
     log_level: "info"
 ```
 
@@ -145,36 +134,36 @@ interference_timer:
 5. **Compute Batch Time**: Duration of each Monte Carlo compute batch
    - Shows how long each batch takes
 
-6. **Total Compute Batches**: Number of batches completed in 30s
+6. **Total Compute Batches**: Number of batches completed in 10s
 
 ### Aggregation
 
-- Metrics are averaged across the 3 runs for each configuration
+- Metrics are averaged across runs for each configuration
 - Standard deviations are computed for variability analysis
 
 ## Generated Plots
 
-1. **timer_period_vs_batch_size.png**: 
+1. **timer_period_vs_batch_size.pdf**:
    - Shows average timer period vs. batch size
-   - Compares all configurations (reactive/proactive, single/multi-threaded)
+   - Compares reactive/proactive modes (single-threaded)
    - Includes expected 100ms reference line
    - **Key plot**: Shows interference effect clearly
 
-2. **jitter_vs_batch_size.png**: 
+2. **jitter_vs_batch_size.pdf**:
    - Shows maximum absolute jitter vs. batch size
    - Log-log scale to show growth trends
    - Higher values = more interference
 
-3. **missed_periods_percentage.png**: 
+3. **missed_periods_percentage.pdf**:
    - Bar chart showing percentage of missed periods
    - Periods > 150% of expected (>150ms)
    - Direct measure of severe interference
 
-4. **compute_time_vs_batch_size.png**: 
+4. **compute_time_vs_batch_size.pdf**:
    - Shows Monte Carlo compute batch timing
    - Explains why larger batches cause more interference
 
-5. **timer_period_distribution.png**: 
+5. **timer_period_distribution.pdf**:
    - Box plots showing timer period distributions
    - Separate subplots for each configuration type
    - Shows variability and outliers
@@ -182,8 +171,8 @@ interference_timer:
 ## Output Files
 
 ### CSV Files
-- `individual_runs.csv`: Raw metrics from all 72 runs
-- `aggregated_results.csv`: Averaged metrics for each of 24 configurations
+- `individual_runs.csv`: Raw metrics from all 18 runs
+- `aggregated_results.csv`: Averaged metrics for each of 18 configurations
 
 ### JSON File
 - `aggregated_results.json`: Complete results in JSON format for further processing
@@ -205,27 +194,23 @@ The experiments rely on these LTTng tracepoints:
 
 ## Expected Results
 
-### Small Batch Sizes (1, 64)
+### Small Batch Sizes (1024, 2048)
 - Timer period ≈ 100ms
 - Low jitter (<5ms)
 - No missed periods (0%)
 - Minimal interference
 
-### Medium Batch Sizes (4096, 16384)
+### Medium Batch Sizes (4096, 8192, 16384)
 - Timer period starts deviating (100-120ms)
 - Moderate jitter (5-20ms)
 - Few missed periods (<10%)
 - Noticeable interference
 
-### Large Batch Sizes (65536, 262144)
+### Large Batch Sizes (32768, 65536, 131072, 262144)
 - Timer period significantly delayed (>150ms)
 - High jitter (>50ms)
 - Many missed periods (>30%)
 - Severe interference
-
-### Threading Comparison
-- **Single-threaded**: More interference (timer and compute compete)
-- **Multi-threaded**: Less interference (timer can run concurrently)
 
 ### Mode Comparison
 - **Reactive**: May show different patterns due to cancellation handling
@@ -236,19 +221,19 @@ The experiments rely on these LTTng tracepoints:
 ### Modify Experiment Duration
 Edit `run_interference_experiments.sh`:
 ```bash
-RUN_DURATION=30  # Change to desired duration in seconds
+RUN_DURATION=10  # Change to desired duration in seconds
 ```
 
 ### Modify Number of Runs
 Edit `run_interference_experiments.sh`:
 ```bash
-NUM_RUNS=3  # Change to desired number of runs per config
+NUM_RUNS=1  # Change to desired number of runs per config
 ```
 
 ### Modify Batch Sizes
 Edit `generate_configs.py`:
 ```python
-batch_sizes = [1, 64, 4096, 16384, 65536, 262144]  # Add or remove values
+batch_sizes = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
 ```
 Then regenerate configs:
 ```bash
@@ -302,8 +287,9 @@ pip3 install pandas numpy matplotlib
 ## Expected Runtime
 
 - Single configuration test: ~15 seconds
-- Full experiment suite (72 runs × 30s): ~40-45 minutes
-- Evaluation script: ~1-2 minutes
+- Full experiment suite (18 configs × 10s): ~7 minutes
+- Quick experiment suite (8 configs × 5s): ~3 minutes
+- Evaluation script: ~1 minute
 
 ## Analysis Tips
 
@@ -311,11 +297,7 @@ pip3 install pandas numpy matplotlib
    - Does period increase linearly? Exponentially?
    - At what batch size does interference become significant?
 
-2. **Compare single vs multi-threaded**
-   - Multi-threaded should show less interference
-   - Quantify the benefit of multi-threading
-
-3. **Compare reactive vs proactive**
+2. **Compare reactive vs proactive**
    - Does mode affect interference patterns?
    - Consider cancellation vs continued computation effects
 

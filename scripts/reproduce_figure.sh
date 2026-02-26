@@ -6,13 +6,13 @@
 # Usage: ./scripts/reproduce_figure.sh <figure> [--quick]
 #
 # Figures:
-#   5a    Fig 5a: Monte Carlo total iterations                (CPU, ~40m / ~5m quick)
-#   5b    Fig 5b: Monte Carlo cancel-to-finish latency        (CPU, ~40m / ~5m quick)
-#   5     Both Fig 5a + 5b                                    (CPU, ~40m / ~5m quick)
-#   6     Fig 6a+6b + Table I: Interference results           (CPU, ~40m / ~3m quick)
-#   7a    Fig 7a: YOLO quality progression                    (GPU, ~30m)
-#   7b    Fig 7b: YOLO runtime comparison                     (GPU, ~1h)
-#   7     Both Fig 7a + 7b                                    (GPU, ~1.5h)
+#   5a    Fig 5a: Monte Carlo total iterations                (CPU, ~10m / ~3m quick)
+#   5b    Fig 5b: Monte Carlo cancel-to-finish latency        (CPU, ~10m / ~3m quick)
+#   5     Both Fig 5a + 5b                                    (CPU, ~10m / ~3m quick)
+#   6     Fig 6a+6b + Table I: Interference results           (CPU, ~7m / ~3m quick)
+#   7a    Fig 7a: YOLO quality progression                    (GPU, ~15m)
+#   7b    Fig 7b: YOLO runtime comparison                     (GPU, ~25m)
+#   7     Both Fig 7a + 7b                                    (GPU, ~35m)
 #
 # Options:
 #   --quick   Use quick experiments for CPU figures (fewer batch sizes, shorter runs)

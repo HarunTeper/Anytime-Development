@@ -6,7 +6,7 @@ Generate all Interference experiment configuration files
 import os
 
 # Configuration parameters
-batch_sizes = [1024, 2048, 4096, 8192, 16384, 32768, 65536]
+batch_sizes = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
 modes = ["reactive", "proactive"]
 threading = ["single"]
 

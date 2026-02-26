@@ -81,8 +81,8 @@ Evaluates batch size scaling, mode comparison (reactive vs proactive), and threa
 Measures timing interference between anytime batch processing and periodic timer tasks.
 
 ```bash
-./scripts/reproduce_figure.sh 6          # Full run (~5 min)
-./scripts/reproduce_figure.sh 6 --quick  # Quick run (~2 min)
+./scripts/reproduce_figure.sh 6          # Full run (~7 min)
+./scripts/reproduce_figure.sh 6 --quick  # Quick run (~3 min)
 ```
 
 ### YOLO (Figures 7a, 7b) — GPU Required
