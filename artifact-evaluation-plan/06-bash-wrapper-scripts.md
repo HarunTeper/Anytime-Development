@@ -39,8 +39,8 @@ Steps:
 # Reproduce a specific paper figure
 # Usage: ./scripts/reproduce_figure.sh <figure_number>
 # Examples:
-#   ./scripts/reproduce_figure.sh 5a    # Monte Carlo segment count
-#   ./scripts/reproduce_figure.sh 5b    # Monte Carlo cancellation delay
+#   ./scripts/reproduce_figure.sh 5a    # Monte Carlo total iterations
+#   ./scripts/reproduce_figure.sh 5b    # Monte Carlo cancel-to-finish latency
 #   ./scripts/reproduce_figure.sh 6     # Interference (Fig 6a+6b+Table I)
 #   ./scripts/reproduce_figure.sh 7a    # YOLO quality progression
 #   ./scripts/reproduce_figure.sh 7b    # YOLO runtime comparison

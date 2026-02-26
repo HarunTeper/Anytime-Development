@@ -32,13 +32,13 @@ copy_if_exists() {
 echo "Collecting paper figures into ${OUTPUT_DIR}/ ..."
 echo ""
 
-# Figure 5a: Monte Carlo — cancel-to-finish latency
-copy_if_exists "${MC_DIR}/results/plots/cancel_to_finish_latency.pdf" \
-               "${OUTPUT_DIR}/figure_5a_cancel_to_finish_latency.pdf"
-
-# Figure 5b: Monte Carlo — total iterations
+# Figure 5a: Monte Carlo — total iterations
 copy_if_exists "${MC_DIR}/results/plots/total_iterations.pdf" \
-               "${OUTPUT_DIR}/figure_5b_total_iterations.pdf"
+               "${OUTPUT_DIR}/figure_5a_total_iterations.pdf"
+
+# Figure 5b: Monte Carlo — cancel-to-finish latency
+copy_if_exists "${MC_DIR}/results/plots/cancel_to_finish_latency.pdf" \
+               "${OUTPUT_DIR}/figure_5b_cancel_to_finish_latency.pdf"
 
 # Figure 6a: Interference — compute time vs batch size
 copy_if_exists "${IF_DIR}/results/plots/compute_time_vs_batch_size.pdf" \

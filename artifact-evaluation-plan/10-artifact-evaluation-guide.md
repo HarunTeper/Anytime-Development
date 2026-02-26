@@ -32,8 +32,8 @@ This is the first document evaluators read. It must map paper claims to concrete
 
    | Paper Element | Command | Duration | Hardware |
    | ------------- | ------- | -------- | -------- |
-   | Figure 5a (segment count) | `./scripts/reproduce_figure.sh 5a` | ~40 min | CPU |
-   | Figure 5b (cancel delay) | `./scripts/reproduce_figure.sh 5b` | ~40 min | CPU |
+   | Figure 5a (total iterations) | `./scripts/reproduce_figure.sh 5a` | ~40 min | CPU |
+   | Figure 5b (cancel-to-finish latency) | `./scripts/reproduce_figure.sh 5b` | ~40 min | CPU |
    | Figure 6a+6b + Table I | `./scripts/reproduce_figure.sh 6` | ~40 min | CPU |
    | Figure 7a (quality progression) | `./scripts/reproduce_figure.sh 7a` | ~30 min | GPU |
    | Figure 7b (runtime comparison) | `./scripts/reproduce_figure.sh 7b` | ~3 hrs | GPU |
