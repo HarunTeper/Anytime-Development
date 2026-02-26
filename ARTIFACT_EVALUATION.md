@@ -4,7 +4,7 @@
 **Authors:** Harun Teper, Daniel Kuhse, Yun-Chih Chen, Georg von der Brüggen, Zhishan Guo, Jian-Jia Chen
 **Contact:** harun.teper (at) tu-dortmund.de
 **Venue:** RTAS 2026
-**Paper PDF:** [`main.pdf`](main.pdf) (included in repository root)
+**Paper PDF:** The accepted paper is provided as a separate PDF alongside this artifact submission.
 
 ## Overview
 
@@ -454,7 +454,6 @@ TensorRT `.engine` files are compiled for a specific GPU architecture. When you 
 ```
 Anytime-Development/
 ├── ARTIFACT_EVALUATION.md      # This guide
-├── main.pdf                    # Accepted paper
 ├── docker-compose.yml          # Container management
 ├── paper_figures/              # Collected paper figures (generated)
 ├── packages/src/

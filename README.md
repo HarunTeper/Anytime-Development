@@ -5,7 +5,7 @@ ROS 2 implementation of anytime algorithms for timely task completion in non-pre
 **Authors:** Harun Teper, Daniel Kuhse, Yun-Chih Chen, Georg von der Brüggen, Zhishan Guo, Jian-Jia Chen
 **Contact:** harun.teper (at) tu-dortmund.de
 
-> **Artifact Evaluation:** See [`ARTIFACT_EVALUATION.md`](ARTIFACT_EVALUATION.md) for step-by-step instructions to reproduce all paper figures and tables. The accepted paper is included as [`main.pdf`](main.pdf).
+> **Artifact Evaluation:** See [`ARTIFACT_EVALUATION.md`](ARTIFACT_EVALUATION.md) for step-by-step instructions to reproduce all paper figures and tables.
 
 ## Quick Start
 
@@ -136,7 +136,6 @@ babeltrace ~/.lttng-traces/session_name/
 ```text
 Anytime-Development/
 ├── ARTIFACT_EVALUATION.md      # Artifact evaluation guide
-├── main.pdf                    # Accepted paper
 ├── docker-compose.yml          # Container management (GPU + CPU + Jetson)
 ├── LICENSE                     # Apache 2.0
 ├── requirements.txt            # Python dependencies

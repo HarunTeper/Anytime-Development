@@ -43,3 +43,6 @@ eval_output/
 # Reviewer credentials (instantiated, not committed)
 REVIEWER_CREDENTIALS.md
 
+# Paper PDF (kept locally, not committed)
+main.pdf
+
