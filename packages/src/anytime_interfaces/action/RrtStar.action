@@ -1,0 +1,16 @@
+# Goal: number of RRT* iterations to perform
+int32 goal
+---
+# Result: best path cost found, iterations completed, and batch metrics
+float32 result
+int32 iterations
+int32 batch_size
+builtin_interfaces/Duration batch_time
+builtin_interfaces/Time action_server_receive
+builtin_interfaces/Time action_server_accept
+builtin_interfaces/Time action_server_start
+builtin_interfaces/Time action_server_cancel
+builtin_interfaces/Time action_server_send_result
+---
+# Feedback: current best path cost
+float32 feedback
