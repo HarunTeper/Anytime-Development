@@ -26,6 +26,18 @@ AnytimeRrtActionServer::AnytimeRrtActionServer(rclcpp::NodeOptions options)
   std::string reactive_proactive_str = this->declare_parameter("is_reactive_proactive", "reactive");
   int batch_size = this->declare_parameter("batch_size", 1);
 
+  // Declare RRT* algorithm parameters (read by AnytimeManagement constructor)
+  this->declare_parameter("map_yaml_path", "");
+  this->declare_parameter("start_x", 5.0);
+  this->declare_parameter("start_y", 5.0);
+  this->declare_parameter("goal_x", 25.0);
+  this->declare_parameter("goal_y", 10.0);
+  this->declare_parameter("step_size", 0.5);
+  this->declare_parameter("goal_threshold", 0.5);
+  this->declare_parameter("goal_bias", 0.05);
+  this->declare_parameter("gamma_rrt_star", 0.0);  // 0 = auto-compute from map
+  this->declare_parameter("prune_interval", 1000);
+
   bool is_reactive_proactive = (reactive_proactive_str == "proactive");
 
   RCLCPP_INFO(this->get_logger(), "RRT* Action Server initialized with parameters:");

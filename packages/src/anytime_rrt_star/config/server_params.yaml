@@ -15,12 +15,18 @@ anytime_server:
     # Logging configuration
     log_level: "debug"  # Options: "debug", "info", "warn", "error", "fatal"
 
-    # TODO: RRT* specific parameters (to be finalized - see plan.md)
-    # step_size: 0.05
-    # goal_threshold: 0.05
-    # rewire_radius: 0.1
-    # map_file: ""
-    # start_x: 0.0
-    # start_y: 0.0
-    # goal_x: 1.0
-    # goal_y: 1.0
+    # Map configuration (Nav2 YAML format)
+    map_yaml_path: ""  # Path to Nav2 YAML map file (e.g., "/path/to/depot.yaml")
+
+    # Start/goal positions (world coordinates in meters)
+    start_x: 5.0
+    start_y: 5.0
+    goal_x: 25.0
+    goal_y: 10.0
+
+    # RRT* algorithm parameters
+    step_size: 0.5         # Max extension distance per Steer call (meters)
+    goal_threshold: 0.5    # Distance to consider goal reached (meters)
+    goal_bias: 0.05        # Probability of sampling goal instead of random (0.0-1.0)
+    gamma_rrt_star: 0.0    # Near radius constant (0 = auto-compute from map free area)
+    prune_interval: 1000   # Branch-and-bound pruning every N iterations (0 = disabled)

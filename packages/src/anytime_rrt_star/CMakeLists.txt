@@ -83,6 +83,7 @@ install(DIRECTORY include/
 install(DIRECTORY
   launch
   config
+  maps
   DESTINATION share/${PROJECT_NAME}
 )
 
@@ -96,6 +97,8 @@ if(BUILD_TESTING)
   ament_target_dependencies(test_rrt_star_management
     rclcpp rclcpp_action anytime_interfaces anytime_core anytime_tracing)
   target_include_directories(test_rrt_star_management PRIVATE include)
+  target_compile_definitions(test_rrt_star_management PRIVATE
+    TEST_MAP_DIR="${CMAKE_CURRENT_SOURCE_DIR}/maps")
 endif()
 
 ament_export_include_directories(include)

@@ -91,6 +91,30 @@ def include_launch_description(context: LaunchContext):
             overrides['batch_size'] = int(batch_size_value)
             print(
                 f"  [Override] batch_size: {batch_size_value} (from command line)")
+
+        # RRT*-specific parameter overrides
+        rrt_str_params = ['map_yaml_path']
+        rrt_float_params = [
+            'start_x', 'start_y', 'goal_x', 'goal_y',
+            'step_size', 'goal_threshold', 'goal_bias', 'gamma_rrt_star']
+        rrt_int_params = ['prune_interval']
+
+        for param in rrt_str_params:
+            val = context.launch_configurations.get(param, '')
+            if val and val != '':
+                overrides[param] = val
+                print(f"  [Override] {param}: {val} (from command line)")
+        for param in rrt_float_params:
+            val = context.launch_configurations.get(param, '')
+            if val and val != '':
+                overrides[param] = float(val)
+                print(f"  [Override] {param}: {val} (from command line)")
+        for param in rrt_int_params:
+            val = context.launch_configurations.get(param, '')
+            if val and val != '':
+                overrides[param] = int(val)
+                print(f"  [Override] {param}: {val} (from command line)")
+
         overrides['is_single_multi'] = is_single_multi
         if overrides:
             parameters.append(overrides)
@@ -180,6 +204,38 @@ def generate_launch_description():
         description="Logging level (debug, info, warn, error, fatal)"
     )
 
+    # RRT*-specific launch arguments
+    map_yaml_path_arg = DeclareLaunchArgument(
+        "map_yaml_path", default_value="",
+        description="Path to Nav2 YAML map file (overrides config)")
+    start_x_arg = DeclareLaunchArgument(
+        "start_x", default_value="",
+        description="Start X position in meters (overrides config)")
+    start_y_arg = DeclareLaunchArgument(
+        "start_y", default_value="",
+        description="Start Y position in meters (overrides config)")
+    goal_x_arg = DeclareLaunchArgument(
+        "goal_x", default_value="",
+        description="Goal X position in meters (overrides config)")
+    goal_y_arg = DeclareLaunchArgument(
+        "goal_y", default_value="",
+        description="Goal Y position in meters (overrides config)")
+    step_size_arg = DeclareLaunchArgument(
+        "step_size", default_value="",
+        description="RRT* step size in meters (overrides config)")
+    goal_threshold_arg = DeclareLaunchArgument(
+        "goal_threshold", default_value="",
+        description="Distance to consider goal reached (overrides config)")
+    goal_bias_arg = DeclareLaunchArgument(
+        "goal_bias", default_value="",
+        description="Goal sampling bias probability (overrides config)")
+    gamma_rrt_star_arg = DeclareLaunchArgument(
+        "gamma_rrt_star", default_value="",
+        description="Near radius constant, 0=auto (overrides config)")
+    prune_interval_arg = DeclareLaunchArgument(
+        "prune_interval", default_value="",
+        description="Branch-and-bound prune interval (overrides config)")
+
     launch_description = LaunchDescription()
 
     launch_description.add_action(config_file_arg)
@@ -187,6 +243,16 @@ def generate_launch_description():
     launch_description.add_action(anytime_reactive_proactive_arg)
     launch_description.add_action(batch_size_arg)
     launch_description.add_action(log_level_arg)
+    launch_description.add_action(map_yaml_path_arg)
+    launch_description.add_action(start_x_arg)
+    launch_description.add_action(start_y_arg)
+    launch_description.add_action(goal_x_arg)
+    launch_description.add_action(goal_y_arg)
+    launch_description.add_action(step_size_arg)
+    launch_description.add_action(goal_threshold_arg)
+    launch_description.add_action(goal_bias_arg)
+    launch_description.add_action(gamma_rrt_star_arg)
+    launch_description.add_action(prune_interval_arg)
 
     launch_description.add_action(OpaqueFunction(
         function=include_launch_description))
