@@ -87,40 +87,31 @@ The current package contains a working skeleton that mirrors the Monte Carlo pac
 
 ## 4. Possible Directions
 
-### Direction A: Simple 2D Grid with Hardcoded Obstacles
-- Use a fixed 2D continuous space (e.g., [0,1]×[0,1] or [0,100]×[0,100])
-- Define rectangular/circular obstacles programmatically in C++
-- Pros: Self-contained, no external dependencies, fast to iterate, fully reproducible
-- Cons: Limited realism, hard to swap maps
+### Direction (chosen): Image-Based Occupancy Grid Maps from Nav2
+- Load 2D maps from PGM images with YAML metadata (standard Nav2/ROS2 format)
+- Use real-world Nav2 maps: **depot** and **warehouse**
+- Pros: Realistic environments, standard ROS2 format, easy to visualize, representative of actual robot deployments
+- Cons: Requires PGM loading (straightforward for grayscale)
 
-### Direction B: Image-Based Occupancy Grid Maps
-- Load 2D maps from monochrome PNG/PGM images (black=obstacle, white=free)
-- Use standard benchmark maps from literature (bug trap, narrow passage, random worlds, maze)
-- Pros: Easy to create/share maps, visual, matches literature conventions
-- Cons: Requires image loading library, discretization effects
+## 5. Selected Maps
 
-### Direction C: OMPL Integration
-- Use OMPL's state spaces, collision checking, and RRT* implementation as a reference or directly
-- Pros: Battle-tested, extensive benchmarking infrastructure, academically credible
-- Cons: Heavy dependency, may conflict with our custom anytime framework, OMPL manages its own iteration loop
+Two Nav2 maps are used, providing a contrast in size and complexity:
 
-### Direction D: Procedurally Generated Environments
-- Generate random obstacle configurations from seed parameters (obstacle count, size range, density)
-- Pros: Systematic parameter sweeps, statistically rigorous, matches "random worlds" from papers
-- Cons: May produce degenerate configurations, harder to reproduce specific scenarios
+### 5.1 Depot (`maps/depot.pgm`)
+- **Dimensions:** 604 × 307 pixels
+- **Resolution:** 0.05 m/pixel
+- **Real-world size:** 30.2 × 15.4 meters
+- **Origin:** (0.0, 0.0)
+- **Occupancy:** 3.2% occupied, 92.0% free, 4.8% unknown
+- **Character:** Small, mostly open layout with sparse obstacles. Good for short-to-medium path planning. Faster initial solutions, room for path optimization.
 
-## 5. Standard Benchmark Maps (from Literature)
-
-These are the most commonly used 2D test environments for RRT* evaluation:
-
-1. **Empty/Open Space**: Baseline for measuring raw algorithm overhead
-2. **Random Rectangles**: N randomly placed axis-aligned rectangles (Karaman & Frazzoli)
-3. **Narrow Passage**: Two large open areas connected by a thin corridor
-4. **Bug Trap**: A U-shaped or C-shaped obstacle that traps greedy planners
-5. **Maze**: Grid-like corridors requiring many turns
-6. **Cluttered**: High obstacle density (30-50% coverage)
-7. **Forest**: Many small circular obstacles scattered randomly
-8. **Room with Gap**: Single wall with a small gap
+### 5.2 Warehouse (`maps/warehouse.pgm`)
+- **Dimensions:** 1006 × 1674 pixels
+- **Resolution:** 0.03 m/pixel
+- **Real-world size:** 30.2 × 50.2 meters
+- **Origin:** (-15.1, -25.0)
+- **Occupancy:** 1.8% occupied, 84.5% free, 13.7% unknown
+- **Character:** Large structured environment with aisles and rows. Long paths requiring navigation through corridors. Demonstrates RRT* anytime convergence well due to the need to refine paths through structured obstacles.
 
 ## 6. Metrics (Matching Monte Carlo Framework)
 
@@ -145,21 +136,15 @@ These are the most commonly used 2D test environments for RRT* evaluation:
 
 ## 7. Design Decisions Required
 
-### Decision 1: Map Representation
-**Options:**
-- **(a) Hardcoded geometric obstacles** (rectangles/circles defined in C++ code or YAML config)
-- **(b) Image-based occupancy grid** (load from PNG/PGM, threshold to binary)
-- **(c) Hybrid** — hardcoded defaults + optional image override
+### Decision 1: Map Representation — **DECIDED: Image-based occupancy grid (PGM)**
+Load Nav2-format PGM maps with YAML metadata. Collision checking uses grid-based lookup: threshold pixel values using `occupied_thresh` / `free_thresh` from YAML. This is the standard ROS2 approach and avoids any custom obstacle definitions.
 
-**Recommendation:** Option (c) — start with hardcoded obstacles for simplicity, add image loading later. This lets us get the experiment running quickly while leaving the door open.
+### Decision 2: Map Selection — **DECIDED: Depot + Warehouse**
+Two Nav2 maps providing a contrast in complexity:
+- **Depot** (604×307, 0.05 m/px) — small, open, fast initial solutions
+- **Warehouse** (1006×1674, 0.03 m/px) — large, structured aisles, longer paths
 
-### Decision 2: Map Selection for Experiments
-**Options:**
-- **(a) Single canonical map** (e.g., "random rectangles" from Karaman & Frazzoli's original paper)
-- **(b) Suite of standard maps** (narrow passage, bug trap, maze, cluttered, open)
-- **(c) Procedurally generated with controlled parameters** (seed, density, obstacle count)
-
-**Recommendation:** For the paper, option (a) or (b) with 2-3 fixed maps. This keeps the experiment focused. The Monte Carlo experiment had one fixed workload (pi estimation); similarly, RRT* should use a small number of well-understood maps.
+This keeps the experiment focused (2 maps) while being representative of real robot environments.
 
 ### Decision 3: RRT* Variant
 **Options:**
@@ -169,13 +154,8 @@ These are the most commonly used 2D test environments for RRT* evaluation:
 
 **Recommendation:** Start with (a) standard RRT* since it is the most well-known and has the clearest anytime convergence property. The standard variant is simpler to implement correctly and is sufficient for demonstrating the anytime framework.
 
-### Decision 4: Collision Checking Approach
-**Options:**
-- **(a) Point-wise sampling along line segment** (discretize edge, check each point)
-- **(b) Analytical line-rectangle/line-circle intersection**
-- **(c) Grid-based lookup** (for occupancy grid maps)
-
-**Recommendation:** Option (b) for geometric obstacles (exact, fast) or option (c) for image-based maps.
+### Decision 4: Collision Checking Approach — **DECIDED: Grid-based lookup**
+Since we use PGM occupancy grids, collision checking converts world coordinates to pixel coordinates and checks pixel values against the `occupied_thresh` from the YAML. Edge collision checking samples points along the line segment and checks each against the grid.
 
 ### Decision 5: Iteration Complexity Tuning
 The Monte Carlo experiment uses batch sizes [1024..65536] because each iteration is trivially cheap (2 random numbers + comparison). RRT* iterations are more expensive (nearest-neighbor search is O(n), rewiring is O(k)).
@@ -214,10 +194,10 @@ If the algorithm hasn't found a path to the goal when cancelled:
 
 ## 8. Next Steps
 
-1. **Review this plan** and make design decisions above
-2. **Implement obstacle representation** based on Decision 1
-3. **Create/select benchmark maps** based on Decision 2
-4. **Wire up ROS parameters** for map config, start/goal, step size, rewire radius
+1. **Review this plan** and finalize remaining design decisions
+2. **Implement PGM map loader** — read PGM + YAML, build occupancy grid, expose collision checking
+3. ~~Create/select benchmark maps~~ — **DONE**: depot.pgm and warehouse.pgm in `maps/`
+4. **Wire up ROS parameters** for map file path, start/goal, step size, rewire radius
 5. **Add LTTng tracepoints** for RRT*-specific events
 6. **Create experiment runner scripts** (mirroring `experiments/monte_carlo/`)
 7. **Create evaluation scripts** with convergence curve plotting
