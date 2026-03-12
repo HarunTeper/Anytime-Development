@@ -15,8 +15,8 @@ maps = {
         "goal_x": 25.0, "goal_y": 10.0,
     },
     "warehouse": {
-        "start_x": -10.0, "start_y": -20.0,
-        "goal_x": 10.0, "goal_y": 20.0,
+        "start_x": -5.0, "start_y": -20.0,
+        "goal_x": 5.0, "goal_y": 20.0,
     },
 }
 

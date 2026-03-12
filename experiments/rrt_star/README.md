@@ -55,7 +55,7 @@ Two Nav2 occupancy grid maps are used:
 - **depot** — 604×307 px, 0.05 m/px (30.2×15.4 m). Small, mostly open layout with scattered obstacles.
   - Start: (5.0, 5.0), Goal: (25.0, 10.0)
 - **warehouse** — 1006×1674 px, 0.03 m/px (30.2×50.2 m). Large structured environment with aisles.
-  - Start: (−10.0, −20.0), Goal: (10.0, 20.0)
+  - Start: (−5.0, −20.0), Goal: (5.0, 20.0)
 
 ### Visualizing Maps
 
