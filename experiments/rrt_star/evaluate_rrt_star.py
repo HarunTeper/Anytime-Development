@@ -27,6 +27,10 @@ EXPERIMENT_DIR = SCRIPT_DIR
 TRACE_DIR = EXPERIMENT_DIR / "traces"
 RESULTS_DIR = EXPERIMENT_DIR / "results"
 PLOTS_DIR = RESULTS_DIR / "plots"
+FRAMEWORK_PLOTS_DIR = PLOTS_DIR / "framework"
+OVERHEAD_PLOTS_DIR = PLOTS_DIR / "overhead"
+RRT_STAR_PLOTS_DIR = PLOTS_DIR / "rrt_star"
+MAPS_PLOTS_DIR = PLOTS_DIR / "maps"
 CONVERGENCE_DIR = RESULTS_DIR / "convergence_data"
 
 # Plot configuration
@@ -46,6 +50,10 @@ for d in [PLOTS_DIR, CONVERGENCE_DIR]:
         shutil.rmtree(d)
 RESULTS_DIR.mkdir(exist_ok=True)
 PLOTS_DIR.mkdir(exist_ok=True)
+FRAMEWORK_PLOTS_DIR.mkdir(exist_ok=True)
+OVERHEAD_PLOTS_DIR.mkdir(exist_ok=True)
+RRT_STAR_PLOTS_DIR.mkdir(exist_ok=True)
+MAPS_PLOTS_DIR.mkdir(exist_ok=True)
 CONVERGENCE_DIR.mkdir(exist_ok=True)
 
 
@@ -371,7 +379,7 @@ def parse_config_name(config_name):
 
 
 def make_grouped_bar_chart(df, y_col, ylabel, filename, yerr_col=None,
-                           map_filter=None, title_suffix=""):
+                           map_filter=None, title_suffix="", output_dir=None):
     """Helper to create a grouped bar chart"""
     if map_filter:
         plot_df = df[df['map'] == map_filter]
@@ -424,7 +432,8 @@ def make_grouped_bar_chart(df, y_col, ylabel, filename, yerr_col=None,
     ax.grid(True, axis='y')
 
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / filename, dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
+    save_dir = output_dir if output_dir is not None else PLOTS_DIR
+    plt.savefig(save_dir / filename, dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
 
@@ -451,11 +460,13 @@ def generate_plots(aggregated_metrics, all_metrics):
                                'Average Time per Batch (ms)',
                                f'batch_size_vs_time_{map_name}.pdf',
                                yerr_col='std_time_per_batch',
-                               map_filter=map_name)
+                               map_filter=map_name,
+                               output_dir=FRAMEWORK_PLOTS_DIR)
     make_grouped_bar_chart(df, 'avg_time_per_batch',
                            'Average Time per Batch (ms)',
                            'batch_size_vs_time.pdf',
-                           yerr_col='std_time_per_batch')
+                           yerr_col='std_time_per_batch',
+                           output_dir=FRAMEWORK_PLOTS_DIR)
 
     # 2. Throughput
     print("  - Throughput")
@@ -465,10 +476,12 @@ def generate_plots(aggregated_metrics, all_metrics):
         make_grouped_bar_chart(df, 'throughput',
                                'Throughput (iterations/second)',
                                f'throughput_{map_name}.pdf',
-                               map_filter=map_name)
+                               map_filter=map_name,
+                               output_dir=FRAMEWORK_PLOTS_DIR)
     make_grouped_bar_chart(df, 'throughput',
                            'Throughput (iterations/second)',
-                           'throughput.pdf')
+                           'throughput.pdf',
+                           output_dir=FRAMEWORK_PLOTS_DIR)
 
     # 3. Cancellation delay
     print("  - Cancellation delay")
@@ -476,44 +489,51 @@ def generate_plots(aggregated_metrics, all_metrics):
         make_grouped_bar_chart(df, 'avg_cancellation_delay',
                                'Average Cancellation Delay (ms)',
                                f'cancellation_delay_{map_name}.pdf',
-                               map_filter=map_name)
+                               map_filter=map_name,
+                               output_dir=FRAMEWORK_PLOTS_DIR)
     make_grouped_bar_chart(df, 'avg_cancellation_delay',
                            'Average Cancellation Delay (ms)',
-                           'cancellation_delay.pdf')
+                           'cancellation_delay.pdf',
+                           output_dir=FRAMEWORK_PLOTS_DIR)
 
     # 4. Goal-to-finish latency
     print("  - Goal-to-finish latency")
     make_grouped_bar_chart(df, 'avg_goal_to_finish_latency',
                            'Average Goal-to-Finish Latency (ms)',
                            'goal_to_finish_latency.pdf',
-                           yerr_col='std_goal_to_finish_latency')
+                           yerr_col='std_goal_to_finish_latency',
+                           output_dir=FRAMEWORK_PLOTS_DIR)
 
     # 5. Goal-to-cancel latency
     print("  - Goal-to-cancel latency")
     make_grouped_bar_chart(df, 'avg_goal_to_cancel_latency',
                            'Average Goal-to-Cancel Latency (ms)',
                            'goal_to_cancel_latency.pdf',
-                           yerr_col='std_goal_to_cancel_latency')
+                           yerr_col='std_goal_to_cancel_latency',
+                           output_dir=FRAMEWORK_PLOTS_DIR)
 
     # 6. Cancel-to-finish latency
     print("  - Cancel-to-finish latency")
     make_grouped_bar_chart(df, 'avg_cancel_to_finish_latency',
                            'Average Cancel-to-Finish Latency (ms)',
                            'cancel_to_finish_latency.pdf',
-                           yerr_col='std_cancel_to_finish_latency')
+                           yerr_col='std_cancel_to_finish_latency',
+                           output_dir=FRAMEWORK_PLOTS_DIR)
 
     # 7. Total iterations
     print("  - Total iterations")
     make_grouped_bar_chart(df, 'total_iterations',
                            'Total Iterations Completed',
-                           'total_iterations.pdf')
+                           'total_iterations.pdf',
+                           output_dir=FRAMEWORK_PLOTS_DIR)
 
     # 8. Total cancellation time
     print("  - Total cancellation time")
     df['total_cancellation_time'] = df['avg_goal_to_cancel_latency'] + df['avg_cancellation_delay']
     make_grouped_bar_chart(df, 'total_cancellation_time',
                            'Total Cancellation Time (ms)',
-                           'total_cancellation_time.pdf')
+                           'total_cancellation_time.pdf',
+                           output_dir=FRAMEWORK_PLOTS_DIR)
 
     # ==================== Overhead Metrics ====================
 
@@ -524,11 +544,13 @@ def generate_plots(aggregated_metrics, all_metrics):
                                'Per-Batch Overhead (ms)',
                                f'per_batch_overhead_{map_name}.pdf',
                                yerr_col='std_per_batch_overhead',
-                               map_filter=map_name)
+                               map_filter=map_name,
+                               output_dir=OVERHEAD_PLOTS_DIR)
     make_grouped_bar_chart(df, 'avg_per_batch_overhead',
                            'Per-Batch Overhead (ms)',
                            'per_batch_overhead.pdf',
-                           yerr_col='std_per_batch_overhead')
+                           yerr_col='std_per_batch_overhead',
+                           output_dir=OVERHEAD_PLOTS_DIR)
 
     # 16. Overhead ratio
     print("  - Overhead ratio")
@@ -537,11 +559,13 @@ def generate_plots(aggregated_metrics, all_metrics):
                                'Overhead Ratio (%)',
                                f'overhead_ratio_{map_name}.pdf',
                                yerr_col='std_overhead_ratio',
-                               map_filter=map_name)
+                               map_filter=map_name,
+                               output_dir=OVERHEAD_PLOTS_DIR)
     make_grouped_bar_chart(df, 'avg_overhead_ratio',
                            'Overhead Ratio (%)',
                            'overhead_ratio.pdf',
-                           yerr_col='std_overhead_ratio')
+                           yerr_col='std_overhead_ratio',
+                           output_dir=OVERHEAD_PLOTS_DIR)
 
     # 17. Feedback send time
     print("  - Feedback send time")
@@ -550,11 +574,13 @@ def generate_plots(aggregated_metrics, all_metrics):
                                'Feedback Send Time (ms)',
                                f'feedback_send_time_{map_name}.pdf',
                                yerr_col='std_feedback_send_time',
-                               map_filter=map_name)
+                               map_filter=map_name,
+                               output_dir=OVERHEAD_PLOTS_DIR)
     make_grouped_bar_chart(df, 'avg_feedback_send_time',
                            'Feedback Send Time (ms)',
                            'feedback_send_time.pdf',
-                           yerr_col='std_feedback_send_time')
+                           yerr_col='std_feedback_send_time',
+                           output_dir=OVERHEAD_PLOTS_DIR)
 
     # 18. Result compute time
     print("  - Result compute time")
@@ -563,11 +589,13 @@ def generate_plots(aggregated_metrics, all_metrics):
                                'Result Compute Time (ms)',
                                f'result_compute_time_{map_name}.pdf',
                                yerr_col='std_result_compute_time',
-                               map_filter=map_name)
+                               map_filter=map_name,
+                               output_dir=OVERHEAD_PLOTS_DIR)
     make_grouped_bar_chart(df, 'avg_result_compute_time',
                            'Result Compute Time (ms)',
                            'result_compute_time.pdf',
-                           yerr_col='std_result_compute_time')
+                           yerr_col='std_result_compute_time',
+                           output_dir=OVERHEAD_PLOTS_DIR)
 
     # 19. Batch time percentiles
     print("  - Batch time percentiles")
@@ -600,7 +628,7 @@ def generate_plots(aggregated_metrics, all_metrics):
         ax.legend(fontsize=LEGEND_SIZE)
         ax.grid(True, axis='y')
         plt.tight_layout(pad=0)
-        plt.savefig(PLOTS_DIR / f'batch_time_percentiles_{map_name}.pdf',
+        plt.savefig(OVERHEAD_PLOTS_DIR / f'batch_time_percentiles_{map_name}.pdf',
                     dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
         plt.close()
 
@@ -628,7 +656,7 @@ def generate_plots(aggregated_metrics, all_metrics):
     ax.legend(fontsize=LEGEND_SIZE)
     ax.grid(True, axis='y')
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / 'batch_time_percentiles.pdf',
+    plt.savefig(OVERHEAD_PLOTS_DIR / 'batch_time_percentiles.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
@@ -653,7 +681,7 @@ def generate_plots(aggregated_metrics, all_metrics):
             ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
             ax.grid(True)
             plt.tight_layout(pad=0)
-            plt.savefig(PLOTS_DIR / f'batch_time_trend_{map_name}.pdf',
+            plt.savefig(OVERHEAD_PLOTS_DIR / f'batch_time_trend_{map_name}.pdf',
                         dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
         plt.close()
 
@@ -670,7 +698,7 @@ def generate_plots(aggregated_metrics, all_metrics):
     ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
     ax.grid(True)
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / 'batch_time_trend.pdf',
+    plt.savefig(OVERHEAD_PLOTS_DIR / 'batch_time_trend.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
@@ -704,7 +732,7 @@ def generate_plots(aggregated_metrics, all_metrics):
             ax.legend(fontsize=min(LEGEND_SIZE, 14), loc='best')
             ax.grid(True)
             plt.tight_layout(pad=0)
-            plt.savefig(PLOTS_DIR / f'convergence_curve_{map_name}.pdf',
+            plt.savefig(RRT_STAR_PLOTS_DIR / f'convergence_curve_{map_name}.pdf',
                         dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
         plt.close()
 
@@ -747,7 +775,7 @@ def generate_plots(aggregated_metrics, all_metrics):
         ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
         ax.grid(True)
         plt.tight_layout(pad=0)
-        plt.savefig(PLOTS_DIR / 'convergence_by_map.pdf',
+        plt.savefig(RRT_STAR_PLOTS_DIR / 'convergence_by_map.pdf',
                     dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
         plt.close()
 
@@ -805,7 +833,7 @@ def generate_plots(aggregated_metrics, all_metrics):
             ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
             ax.grid(True, axis='y')
             plt.tight_layout(pad=0)
-            plt.savefig(PLOTS_DIR / f'first_solution_iteration_{map_name}.pdf',
+            plt.savefig(RRT_STAR_PLOTS_DIR / f'first_solution_iteration_{map_name}.pdf',
                         dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
             plt.close()
 
@@ -813,12 +841,14 @@ def generate_plots(aggregated_metrics, all_metrics):
     print("  - Best cost vs batch size")
     make_grouped_bar_chart(df, 'avg_final_best_cost',
                            'Best Path Cost at Cancellation',
-                           'best_cost_vs_batch_size.pdf')
+                           'best_cost_vs_batch_size.pdf',
+                           output_dir=RRT_STAR_PLOTS_DIR)
     for map_name in all_maps:
         make_grouped_bar_chart(df, 'avg_final_best_cost',
                                'Best Path Cost at Cancellation',
                                f'best_cost_vs_batch_size_{map_name}.pdf',
-                               map_filter=map_name)
+                               map_filter=map_name,
+                               output_dir=RRT_STAR_PLOTS_DIR)
 
     # 14. Tree size vs iterations (from convergence data)
     print("  - Tree size vs iterations")
@@ -844,7 +874,7 @@ def generate_plots(aggregated_metrics, all_metrics):
             ax.legend(fontsize=min(LEGEND_SIZE, 14), loc='best')
             ax.grid(True)
             plt.tight_layout(pad=0)
-            plt.savefig(PLOTS_DIR / f'tree_size_vs_iterations_{map_name}.pdf',
+            plt.savefig(RRT_STAR_PLOTS_DIR / f'tree_size_vs_iterations_{map_name}.pdf',
                         dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
         plt.close()
 
@@ -950,8 +980,8 @@ def main():
         for map_name, config in MAP_CONFIGS.items():
             yaml_path = MAPS_DIR / f"{map_name}.yaml"
             if yaml_path.exists():
-                visualize_map(yaml_path, map_name, config, PLOTS_DIR, fmt='pdf')
-                visualize_map(yaml_path, map_name, config, PLOTS_DIR, fmt='png')
+                visualize_map(yaml_path, map_name, config, MAPS_PLOTS_DIR, fmt='pdf')
+                visualize_map(yaml_path, map_name, config, MAPS_PLOTS_DIR, fmt='png')
             else:
                 print(f"  WARNING: {yaml_path} not found, skipping {map_name}")
     except Exception as e:

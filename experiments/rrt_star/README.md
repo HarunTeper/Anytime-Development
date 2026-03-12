@@ -112,9 +112,9 @@ Map visualizations are also automatically generated as part of `evaluate_rrt_sta
 
 ## Generated Plots
 
-All plots are saved to `results/plots/` in PDF format.
+Plots are organized into subdirectories under `results/plots/`.
 
-### Framework Plots
+### Framework Plots (`results/plots/framework/`)
 - `batch_size_vs_time[_<map>].pdf` — Batch compute time by configuration
 - `throughput[_<map>].pdf` — Iterations per second
 - `cancellation_delay[_<map>].pdf` — Cancellation delay
@@ -122,7 +122,7 @@ All plots are saved to `results/plots/` in PDF format.
 - `total_cancellation_time.pdf` — Combined cancel latency
 - `total_iterations.pdf` — Iterations completed per run
 
-### Overhead Plots
+### Overhead Plots (`results/plots/overhead/`)
 - `per_batch_overhead[_<map>].pdf` — Inter-batch overhead
 - `overhead_ratio[_<map>].pdf` — Overhead percentage
 - `feedback_send_time[_<map>].pdf` — Feedback timing
@@ -130,14 +130,14 @@ All plots are saved to `results/plots/` in PDF format.
 - `batch_time_percentiles[_<map>].pdf` — p50/p95/p99 distributions
 - `batch_time_trend[_<map>].pdf` — Batch time over run duration
 
-### RRT*-Specific Plots
+### RRT*-Specific Plots (`results/plots/rrt_star/`)
 - `convergence_curve_<map>.pdf` — Cost convergence per map
 - `convergence_by_map.pdf` — Cross-map convergence comparison
 - `first_solution_iteration_<map>.pdf` — When first path is found
 - `best_cost_vs_batch_size[_<map>].pdf` — Final cost quality
 - `tree_size_vs_iterations_<map>.pdf` — Tree growth
 
-### Map Visualizations
+### Map Visualizations (`results/plots/maps/`)
 - `map_depot.{png,pdf}` — Depot map with start/goal markers
 - `map_warehouse.{png,pdf}` — Warehouse map with start/goal markers
 
@@ -159,10 +159,12 @@ experiments/rrt_star/
     ├── convergence_data/           # Per-map convergence CSVs
     │   ├── depot_convergence.csv
     │   └── warehouse_convergence.csv
-    └── plots/                      # All generated plots
-        ├── map_depot.png
-        ├── convergence_curve_depot.pdf
-        └── ...
+    └── plots/
+        ├── legend.pdf              # Shared legend
+        ├── framework/              # Framework metric plots
+        ├── overhead/               # Overhead metric plots
+        ├── rrt_star/               # RRT*-specific plots
+        └── maps/                   # Map visualizations
 ```
 
 ## Customization
