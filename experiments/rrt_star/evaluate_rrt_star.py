@@ -39,7 +39,11 @@ FONT_SIZE_OFFSET = 30
 LEGEND_SIZE = 30
 CAPSIZE = 5
 
-# Create output directories
+# Clean and recreate output directories
+import shutil
+for d in [PLOTS_DIR, CONVERGENCE_DIR]:
+    if d.exists():
+        shutil.rmtree(d)
 RESULTS_DIR.mkdir(exist_ok=True)
 PLOTS_DIR.mkdir(exist_ok=True)
 CONVERGENCE_DIR.mkdir(exist_ok=True)
@@ -866,6 +870,12 @@ def main():
     print("RRT* Experiment Evaluation")
     print("========================================")
     print()
+
+    # Clean old result files from previous runs
+    for old_file in RESULTS_DIR.glob('*.csv'):
+        old_file.unlink()
+    for old_file in RESULTS_DIR.glob('*.json'):
+        old_file.unlink()
 
     # Find all trace directories
     trace_dirs = sorted([

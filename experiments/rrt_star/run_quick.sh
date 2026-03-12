@@ -69,6 +69,11 @@ if [ -d "${CONFIG_DIR}" ]; then
     find "${CONFIG_DIR}" -name "*_server.yaml" -exec sed -i "s|MAPS_DIR|${MAPS_DIR}|g" {} \;
 fi
 
+# Clean old output from previous runs
+echo "Cleaning old traces and results..."
+rm -rf "${TRACE_DIR}"
+rm -rf "${RESULTS_DIR}"
+
 mkdir -p "${TRACE_DIR}"
 mkdir -p "${RESULTS_DIR}"
 
