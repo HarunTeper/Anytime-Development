@@ -933,6 +933,20 @@ def main():
     # Generate plots
     generate_plots(aggregated, all_metrics)
 
+    # Generate map visualizations with start/goal positions
+    print("\nGenerating map visualizations...")
+    try:
+        from visualize_maps import visualize_map, parse_yaml_flat, MAP_CONFIGS, MAPS_DIR
+        for map_name, config in MAP_CONFIGS.items():
+            yaml_path = MAPS_DIR / f"{map_name}.yaml"
+            if yaml_path.exists():
+                visualize_map(yaml_path, map_name, config, PLOTS_DIR, fmt='pdf')
+                visualize_map(yaml_path, map_name, config, PLOTS_DIR, fmt='png')
+            else:
+                print(f"  WARNING: {yaml_path} not found, skipping {map_name}")
+    except Exception as e:
+        print(f"  WARNING: Could not generate map visualizations: {e}")
+
     # Print summary
     print("\n========================================")
     print("Summary Statistics")
