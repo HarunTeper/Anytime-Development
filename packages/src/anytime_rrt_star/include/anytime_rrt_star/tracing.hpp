@@ -19,12 +19,25 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-// Placeholder tracing macros for anytime_rrt_star
-// TODO: Register domain-specific tracepoints in anytime_tracing once implementation is finalized
+// Helper macros for tracing in anytime_rrt_star
 
-#define TRACE_RRT_STAR_INIT(node, batch_size, is_reactive_proactive)
-#define TRACE_RRT_STAR_ITERATION(node, iteration_num, tree_size, best_cost)
-#define TRACE_RRT_STAR_RESULT(node, best_cost, total_iterations, tree_size)
-#define TRACE_RRT_STAR_RESET(node)
+#define TRACE_RRT_STAR_INIT(node, batch_size, is_reactive_proactive) \
+  ANYTIME_TRACEPOINT( \
+    rrt_star_init, static_cast<const void *>(node->get_node_base_interface().get()), \
+    batch_size, is_reactive_proactive)
+
+#define TRACE_RRT_STAR_ITERATION(node, iteration_num, tree_size, best_cost) \
+  ANYTIME_TRACEPOINT( \
+    rrt_star_iteration, static_cast<const void *>(node->get_node_base_interface().get()), \
+    iteration_num, tree_size, best_cost)
+
+#define TRACE_RRT_STAR_RESULT(node, best_cost, total_iterations, tree_size) \
+  ANYTIME_TRACEPOINT( \
+    rrt_star_result, static_cast<const void *>(node->get_node_base_interface().get()), \
+    best_cost, total_iterations, tree_size)
+
+#define TRACE_RRT_STAR_RESET(node) \
+  ANYTIME_TRACEPOINT( \
+    rrt_star_reset, static_cast<const void *>(node->get_node_base_interface().get()))
 
 #endif  // ANYTIME_RRT_STAR__TRACING_HPP_

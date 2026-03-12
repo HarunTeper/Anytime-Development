@@ -214,6 +214,26 @@ ANYTIME_DECLARE_TRACEPOINT(
 /// `monte_carlo_reset`
 ANYTIME_DECLARE_TRACEPOINT(monte_carlo_reset, const void * node_handle)
 
+// ==================== RRT* ====================
+
+/// `rrt_star_init`
+ANYTIME_DECLARE_TRACEPOINT(
+  rrt_star_init, const void * node_handle, const int batch_size,
+  const bool is_reactive_proactive)
+
+/// `rrt_star_iteration`
+ANYTIME_DECLARE_TRACEPOINT(
+  rrt_star_iteration, const void * node_handle, const int iteration_num,
+  const int tree_size, const double best_cost)
+
+/// `rrt_star_result`
+ANYTIME_DECLARE_TRACEPOINT(
+  rrt_star_result, const void * node_handle, const double best_cost,
+  const int total_iterations, const int tree_size)
+
+/// `rrt_star_reset`
+ANYTIME_DECLARE_TRACEPOINT(rrt_star_reset, const void * node_handle)
+
 // ==================== YOLO ====================
 
 /// `yolo_init`

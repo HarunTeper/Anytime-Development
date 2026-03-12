@@ -283,6 +283,42 @@ void ANYTIME_TRACEPOINT(monte_carlo_reset, const void * node_handle)
   CONDITIONAL_TP(monte_carlo_reset, node_handle);
 }
 
+// ==================== RRT* ====================
+
+void ANYTIME_TRACEPOINT(
+  rrt_star_init,
+  const void * node_handle,
+  const int batch_size,
+  const bool is_reactive_proactive)
+{
+  CONDITIONAL_TP(rrt_star_init, node_handle, batch_size, is_reactive_proactive);
+}
+
+void ANYTIME_TRACEPOINT(
+  rrt_star_iteration,
+  const void * node_handle,
+  const int iteration_num,
+  const int tree_size,
+  const double best_cost)
+{
+  CONDITIONAL_TP(rrt_star_iteration, node_handle, iteration_num, tree_size, best_cost);
+}
+
+void ANYTIME_TRACEPOINT(
+  rrt_star_result,
+  const void * node_handle,
+  const double best_cost,
+  const int total_iterations,
+  const int tree_size)
+{
+  CONDITIONAL_TP(rrt_star_result, node_handle, best_cost, total_iterations, tree_size);
+}
+
+void ANYTIME_TRACEPOINT(rrt_star_reset, const void * node_handle)
+{
+  CONDITIONAL_TP(rrt_star_reset, node_handle);
+}
+
 // ==================== YOLO ====================
 
 void ANYTIME_TRACEPOINT(

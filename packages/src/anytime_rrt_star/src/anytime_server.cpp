@@ -37,6 +37,7 @@ AnytimeRrtActionServer::AnytimeRrtActionServer(rclcpp::NodeOptions options)
   this->declare_parameter("goal_bias", 0.05);
   this->declare_parameter("gamma_rrt_star", 0.0);  // 0 = auto-compute from map
   this->declare_parameter("prune_interval", 1000);
+  this->declare_parameter("convergence_log_interval", 100);
 
   bool is_reactive_proactive = (reactive_proactive_str == "proactive");
 

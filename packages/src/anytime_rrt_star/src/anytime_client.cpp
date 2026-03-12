@@ -87,8 +87,9 @@ void AnytimeRrtActionClient::log_result(const AnytimeGoalHandle::WrappedResult &
     this->get_logger(), "[Goal ID: %s] Best path cost: %f",
     rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str(), result.result->result);
   RCLCPP_DEBUG(
-    this->get_logger(), "[Goal ID: %s] Iterations completed: %d",
-    rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str(), result.result->iterations);
+    this->get_logger(), "[Goal ID: %s] Iterations: %d, Tree size: %d, First solution iter: %d",
+    rclcpp_action::to_string(goal_handle_->get_goal_id()).c_str(),
+    result.result->iterations, result.result->tree_size, result.result->first_solution_iteration);
 }
 
 void AnytimeRrtActionClient::post_processing(const AnytimeGoalHandle::WrappedResult & result)

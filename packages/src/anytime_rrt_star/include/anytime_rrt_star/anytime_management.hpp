@@ -67,6 +67,7 @@ public:
     goal_bias_ = node->get_parameter("goal_bias").as_double();
     gamma_rrt_star_ = node->get_parameter("gamma_rrt_star").as_double();
     prune_interval_ = node->get_parameter("prune_interval").as_int();
+    convergence_log_interval_ = node->get_parameter("convergence_log_interval").as_int();
 
     // Load start/goal
     start_.x = node->get_parameter("start_x").as_double();
@@ -233,13 +234,17 @@ public:
       prune_tree();
     }
 
-    TRACE_RRT_STAR_ITERATION(
-      this->node_, loop_count_, static_cast<int>(tree_.size()), best_path_cost_);
+    // Subsampled tracepoint: only emit every convergence_log_interval_ iterations
+    if (convergence_log_interval_ > 0 && loop_count_ % convergence_log_interval_ == 0) {
+      TRACE_RRT_STAR_ITERATION(
+        this->node_, loop_count_, static_cast<int>(tree_.size()), best_path_cost_);
+    }
   }
 
   void populate_feedback(std::shared_ptr<Anytime::Feedback> feedback) override
   {
     feedback->feedback = static_cast<float>(best_path_cost_);
+    feedback->tree_size_feedback = static_cast<int32_t>(tree_.size());
     RCLCPP_DEBUG(
       this->node_->get_logger(), "RRT* feedback: best cost = %f, tree size = %zu",
       best_path_cost_, tree_.size());
@@ -253,6 +258,8 @@ public:
     result->iterations = loop_count_;
     result->batch_time = this->average_computation_time_;
     result->batch_size = this->batch_size_;
+    result->tree_size = static_cast<int32_t>(tree_.size());
+    result->first_solution_iteration = first_solution_iteration_;
 
     TRACE_RRT_STAR_RESULT(
       this->node_, best_path_cost_, loop_count_, static_cast<int>(tree_.size()));
@@ -301,6 +308,7 @@ protected:
   double goal_bias_ = 0.05;
   double gamma_rrt_star_ = 1.0;
   int prune_interval_ = 1000;
+  int convergence_log_interval_ = 100;
 
   // --- RNG ---
   std::mt19937 rng_;

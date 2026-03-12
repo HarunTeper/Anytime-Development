@@ -1,0 +1,33 @@
+anytime_server:
+  ros__parameters:
+    # Anytime algorithm mode
+    is_reactive_proactive: "reactive"  # Options: "reactive", "proactive"
+
+    # Threading configuration
+    multi_threading: false  # Enable/disable multi-threading
+
+    # Batch processing configuration
+    batch_size: 256  # Number of RRT* iterations to compute per batch
+
+    # RNG configuration
+    random_seed: 42  # Seed for reproducible experiments
+
+    # Logging configuration
+    log_level: "info"  # Options: "debug", "info", "warn", "error", "fatal"
+
+    # Map configuration (Nav2 YAML format)
+    map_yaml_path: ""  # Path to Nav2 YAML map file
+
+    # Start/goal positions (world coordinates in meters)
+    start_x: 5.0
+    start_y: 5.0
+    goal_x: 25.0
+    goal_y: 10.0
+
+    # RRT* algorithm parameters
+    step_size: 0.5
+    goal_threshold: 0.5
+    goal_bias: 0.05
+    gamma_rrt_star: 0.0    # 0 = auto-compute from map free area
+    prune_interval: 1000
+    convergence_log_interval: 100

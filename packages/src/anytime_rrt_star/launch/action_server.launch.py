@@ -97,7 +97,7 @@ def include_launch_description(context: LaunchContext):
         rrt_float_params = [
             'start_x', 'start_y', 'goal_x', 'goal_y',
             'step_size', 'goal_threshold', 'goal_bias', 'gamma_rrt_star']
-        rrt_int_params = ['prune_interval']
+        rrt_int_params = ['prune_interval', 'convergence_log_interval']
 
         for param in rrt_str_params:
             val = context.launch_configurations.get(param, '')
@@ -235,6 +235,9 @@ def generate_launch_description():
     prune_interval_arg = DeclareLaunchArgument(
         "prune_interval", default_value="",
         description="Branch-and-bound prune interval (overrides config)")
+    convergence_log_interval_arg = DeclareLaunchArgument(
+        "convergence_log_interval", default_value="",
+        description="Emit iteration tracepoint every N iterations (overrides config)")
 
     launch_description = LaunchDescription()
 
@@ -253,6 +256,7 @@ def generate_launch_description():
     launch_description.add_action(goal_bias_arg)
     launch_description.add_action(gamma_rrt_star_arg)
     launch_description.add_action(prune_interval_arg)
+    launch_description.add_action(convergence_log_interval_arg)
 
     launch_description.add_action(OpaqueFunction(
         function=include_launch_description))

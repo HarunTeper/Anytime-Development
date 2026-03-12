@@ -30,3 +30,4 @@ anytime_server:
     goal_bias: 0.05        # Probability of sampling goal instead of random (0.0-1.0)
     gamma_rrt_star: 0.0    # Near radius constant (0 = auto-compute from map free area)
     prune_interval: 1000   # Branch-and-bound pruning every N iterations (0 = disabled)
+    convergence_log_interval: 100  # Emit rrt_star_iteration tracepoint every N iterations (0 = disabled)
