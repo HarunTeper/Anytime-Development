@@ -24,12 +24,12 @@ import numpy as np
 # Default map configurations (matching evaluation_plan.md Section 4.1)
 MAP_CONFIGS = {
     "depot": {
-        "start": (5.0, 5.0),
-        "goal": (25.0, 10.0),
+        "start": (5.0, 12.0),
+        "goal": (25.0, 2.0),
     },
     "warehouse": {
-        "start": (-5.0, -20.0),
-        "goal": (5.0, 20.0),
+        "start": (-12.5, -20.0),
+        "goal": (12.5, 20.0),
     },
 }
 

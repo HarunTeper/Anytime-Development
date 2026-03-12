@@ -11,12 +11,12 @@ modes = ["reactive", "proactive"]
 threading = ["single", "multi"]
 maps = {
     "depot": {
-        "start_x": 5.0, "start_y": 5.0,
-        "goal_x": 25.0, "goal_y": 10.0,
+        "start_x": 5.0, "start_y": 12.0,
+        "goal_x": 25.0, "goal_y": 2.0,
     },
     "warehouse": {
-        "start_x": -5.0, "start_y": -20.0,
-        "goal_x": 5.0, "goal_y": 20.0,
+        "start_x": -12.5, "start_y": -20.0,
+        "goal_x": 12.5, "goal_y": 20.0,
     },
 }
 
