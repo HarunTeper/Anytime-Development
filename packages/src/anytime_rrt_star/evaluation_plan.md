@@ -204,7 +204,8 @@ Files to create (mirroring `experiments/monte_carlo/`):
    - Loop through all configs
    - For each config:
      - Create LTTng session
-     - Enable selective tracepoints (framework + optionally rrt_star_iteration)
+     - Enable tracepoints: framework core (`anytime_compute_entry/exit`, client/server lifecycle), overhead (`anytime_send_feedback_entry/exit`, `anytime_calculate_result_entry/exit`), and optionally `rrt_star_iteration`
+     - **Important:** Unlike the Monte Carlo runner, the `send_feedback` and `calculate_result` tracepoints must NOT be commented out — they are required for overhead metrics
      - Launch via `ros2 launch experiments rrt_star.launch.py`
      - Sleep for `RUN_DURATION` seconds
      - Stop tracing, kill processes, save traces
@@ -257,7 +258,42 @@ These use the **same tracepoints** as Monte Carlo (`anytime_compute_entry/exit`,
 
 **Per-map:** Generate the above plots **per map** (depot, warehouse) and also a comparison across maps.
 
-### 3.2 RRT*-Specific Metrics (from rrt_star_iteration tracepoint + action result)
+### 3.2 Overhead and Communication Metrics
+
+These metrics address the reviewer's concern about framework overhead — the time spent between computation batches on communication, feedback delivery, and result processing. Each metric gets its own plot to allow independent assessment of what is worth reporting.
+
+**Tracepoints required:** In addition to `anytime_compute_entry/exit`, these metrics require enabling:
+- `anytime:anytime_send_feedback_entry` / `anytime:anytime_send_feedback_exit`
+- `anytime:anytime_calculate_result_entry` / `anytime:anytime_calculate_result_exit`
+
+These tracepoints exist in the framework but are commented out in the Monte Carlo experiment runner. The RRT* experiment runner must enable them.
+
+| Metric | Source | Description |
+|---|---|---|
+| Per-batch overhead (ms) | `compute_exit[i]` → `compute_entry[i+1]` | Time gap between consecutive batches — includes feedback sending, scheduling, and any framework bookkeeping |
+| Overhead ratio (%) | `overhead / (overhead + compute_time) × 100` | Fraction of wall time spent on non-computation. Key metric for the reviewer: should be negligible (<5%) for large batches |
+| Feedback send time (ms) | `send_feedback_entry` → `send_feedback_exit` | Time to serialize and publish one feedback message |
+| Result compute time (ms) | `calculate_result_entry` → `calculate_result_exit` | Time to populate and send the final result after cancellation |
+| Batch time percentiles | Distribution of `compute_exit - compute_entry` | p50, p95, p99 of batch compute time — shows timing consistency |
+| Batch time trend | `compute_exit - compute_entry` vs batch index | Whether batch compute time changes over the course of a run (e.g., due to tree growth increasing Near() cost) |
+
+**Plots (one per metric, grouped bar charts with batch size on x-axis):**
+
+15. `per_batch_overhead.pdf` — Per-batch overhead (ms) vs batch size. Expect overhead to be roughly constant regardless of batch size, so it becomes proportionally smaller for larger batches.
+
+16. `overhead_ratio.pdf` — Overhead ratio (%) vs batch size. This is the key plot for the reviewer. Should show overhead ratio dropping from potentially significant (small batches) to negligible (large batches).
+
+17. `feedback_send_time.pdf` — Feedback send time (ms) vs batch size. Should be roughly constant since feedback message size doesn't change with batch size.
+
+18. `result_compute_time.pdf` — Result compute time (ms) vs batch size. May vary with tree size since result includes path extraction.
+
+19. `batch_time_percentiles.pdf` — Box plot or bar chart showing p50/p95/p99 batch compute times per configuration. Reveals timing jitter and outliers.
+
+20. `batch_time_trend.pdf` — Line plot: batch compute time (y-axis) vs batch number within a run (x-axis). One line per batch size. Shows whether RRT* tree growth causes increasing per-batch cost over time (expected, since Near() is O(n log n)).
+
+**Per-map:** Generate overhead plots per map, since tree growth characteristics differ between depot and warehouse.
+
+### 3.3 RRT*-Specific Metrics (from rrt_star_iteration tracepoint + action result)
 
 These require the `rrt_star_iteration` tracepoint to be enabled and/or the enhanced action result fields.
 
@@ -281,7 +317,7 @@ These require the `rrt_star_iteration` tracepoint to be enabled and/or the enhan
 
 14. `tree_size_vs_iterations.pdf` — Tree growth curve: tree size vs iterations. With pruning enabled, tree size should plateau. Without pruning, it grows linearly.
 
-### 3.3 Collecting Convergence Data
+### 3.4 Collecting Convergence Data
 
 **Challenge:** The `rrt_star_iteration` tracepoint fires once per iteration. At 100k+ iterations, this generates millions of trace events and impacts performance.
 
@@ -371,6 +407,8 @@ Same babeltrace parsing as `evaluate_monte_carlo.py`. Events of interest:
 - `anytime:anytime_compute_entry` / `anytime:anytime_compute_exit`
 - `anytime:anytime_client_goal_sent` / `anytime:anytime_client_cancel_sent` / `anytime:anytime_client_goal_finished`
 - `anytime:anytime_server_handle_cancel` / `anytime:anytime_base_deactivate`
+- `anytime:anytime_send_feedback_entry` / `anytime:anytime_send_feedback_exit` (for overhead metrics)
+- `anytime:anytime_calculate_result_entry` / `anytime:anytime_calculate_result_exit` (for overhead metrics)
 
 **RRT*-specific events** (optionally enabled):
 - `anytime:rrt_star_iteration` — carries `iteration_num`, `tree_size`, `best_cost`
@@ -383,11 +421,19 @@ Same structure as `extract_metrics_from_events()` in Monte Carlo evaluation, wit
 ```python
 metrics = {
     # ... same framework metrics as Monte Carlo ...
+
+    # Overhead metrics (from compute_entry/exit + send_feedback + calculate_result)
+    'per_batch_overheads': [],        # ms gaps: compute_exit[i] → compute_entry[i+1]
+    'overhead_ratios': [],            # per-batch: overhead / (overhead + compute_time) × 100
+    'feedback_send_times': [],        # ms: send_feedback_entry → send_feedback_exit
+    'result_compute_times': [],       # ms: calculate_result_entry → calculate_result_exit
+    'batch_times': [],                # ms: all individual batch compute times (for percentiles)
+
     # RRT*-specific (from rrt_star_iteration events)
-    'convergence_data': [],   # list of (iteration, best_cost, tree_size)
+    'convergence_data': [],           # list of (iteration, best_cost, tree_size)
     # RRT*-specific (from rrt_star_result events)
-    'final_best_costs': [],   # best cost at each goal cycle
-    'final_tree_sizes': [],   # tree size at each goal cycle
+    'final_best_costs': [],           # best cost at each goal cycle
+    'final_tree_sizes': [],           # tree size at each goal cycle
 }
 ```
 
@@ -418,6 +464,12 @@ experiments/rrt_star/
         ├── first_solution_iteration.pdf
         ├── best_cost_vs_batch_size.pdf
         ├── tree_size_vs_iterations.pdf
+        ├── per_batch_overhead.pdf
+        ├── overhead_ratio.pdf
+        ├── feedback_send_time.pdf
+        ├── result_compute_time.pdf
+        ├── batch_time_percentiles.pdf
+        ├── batch_time_trend.pdf
         └── legend.pdf
 ```
 
