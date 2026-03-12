@@ -111,6 +111,26 @@ Two Nav2 maps are included in `maps/`:
 
 Maps use the standard Nav2 PGM format with YAML metadata (resolution, origin, thresholds).
 
+### Visualizing maps
+
+A Python script is provided to render the maps with start/goal markers overlaid:
+
+```bash
+# Default: saves PNG images to experiments/rrt_star/results/plots/
+python3 experiments/rrt_star/visualize_maps.py
+
+# PDF output
+python3 experiments/rrt_star/visualize_maps.py --format pdf
+
+# Custom output directory
+python3 experiments/rrt_star/visualize_maps.py --output-dir /tmp/map_plots
+
+# Custom maps directory
+python3 experiments/rrt_star/visualize_maps.py --maps-dir /path/to/maps
+```
+
+Requires `matplotlib` and `numpy` (`pip install matplotlib numpy`).
+
 ### Suggested start/goal for depot
 
 ```
