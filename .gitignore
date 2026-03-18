@@ -49,4 +49,4 @@ main.pdf
 # Generated reviewer PDF (contains credentials, never commit)
 artifact_evaluation_reviewer.html
 artifact_evaluation_reviewer.pdf
-
+ARTIFACT_SUMMARY.md
