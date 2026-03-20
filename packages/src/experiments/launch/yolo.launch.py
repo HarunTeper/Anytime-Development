@@ -4,7 +4,6 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
-from launch.substitutions import LaunchConfiguration
 import os
 from ament_index_python.packages import get_package_share_directory
 
@@ -26,10 +25,6 @@ def launch_setup(context, *args, **kwargs):
     print(f"Container Name: {container_name}")
     print(f"Executor Type:  {executor_type}")
     print(f"Executable:     {executable_name}")
-    if use_multi_threaded == 'true':
-        print(f"Architecture:   Single container with both server and client")
-    else:
-        print(f"Architecture:   Two separate containers (one per component)")
     print("="*80 + "\n")
 
     # Get the experiments package directory
@@ -47,76 +42,35 @@ def launch_setup(context, *args, **kwargs):
         'server_config', default_server_config)
     log_level = context.launch_configurations.get('log_level', 'info')
 
-    nodes_to_launch = []
+    # Both client and server in the same container
+    print(f"Configuration: Client and Server in SAME container ({executor_type.lower()})")
+    print("="*80 + "\n")
 
-    if use_multi_threaded == 'true':
-        # Multi-threaded: Single container with both client and server
-        container = ComposableNodeContainer(
-            name=container_name,
-            namespace='',
-            package='rclcpp_components',
-            executable=executable_name,
-            composable_node_descriptions=[
-                ComposableNode(
-                    package='anytime_yolo',
-                    plugin='AnytimeActionServer',
-                    name='anytime_server',
-                    parameters=[server_config],
-                    extra_arguments=[{'use_intra_process_comms': True}]
-                ),
-                ComposableNode(
-                    package='anytime_yolo',
-                    plugin='AnytimeActionClient',
-                    name='anytime_client',
-                    parameters=[client_config],
-                    extra_arguments=[{'use_intra_process_comms': True}]
-                ),
-            ],
-            output='screen',
-            arguments=['--ros-args', '--log-level', log_level],
-        )
-        nodes_to_launch.append(container)
-    else:
-        # Single-threaded: Two separate containers
-        server_container = ComposableNodeContainer(
-            name=f'{container_name}_server',
-            namespace='',
-            package='rclcpp_components',
-            executable=executable_name,
-            composable_node_descriptions=[
-                ComposableNode(
-                    package='anytime_yolo',
-                    plugin='AnytimeActionServer',
-                    name='anytime_server',
-                    parameters=[server_config],
-                    extra_arguments=[{'use_intra_process_comms': True}]
-                ),
-            ],
-            output='screen',
-            arguments=['--ros-args', '--log-level', log_level],
-        )
-
-        client_container = ComposableNodeContainer(
-            name=f'{container_name}_client',
-            namespace='',
-            package='rclcpp_components',
-            executable=executable_name,
-            composable_node_descriptions=[
-                ComposableNode(
-                    package='anytime_yolo',
-                    plugin='AnytimeActionClient',
-                    name='anytime_client',
-                    parameters=[client_config],
-                    extra_arguments=[{'use_intra_process_comms': True}]
-                ),
-            ],
-            output='screen',
-            arguments=['--ros-args', '--log-level', log_level],
-        )
-
-        nodes_to_launch.extend([server_container, client_container])
-
-    return nodes_to_launch
+    container = ComposableNodeContainer(
+        name=container_name,
+        namespace='',
+        package='rclcpp_components',
+        executable=executable_name,
+        composable_node_descriptions=[
+            ComposableNode(
+                package='anytime_yolo',
+                plugin='AnytimeActionServer',
+                name='anytime_server',
+                parameters=[server_config],
+                extra_arguments=[{'use_intra_process_comms': True}]
+            ),
+            ComposableNode(
+                package='anytime_yolo',
+                plugin='AnytimeActionClient',
+                name='anytime_client',
+                parameters=[client_config],
+                extra_arguments=[{'use_intra_process_comms': True}]
+            ),
+        ],
+        output='screen',
+        arguments=['--ros-args', '--log-level', log_level],
+    )
+    return [container]
 
 
 def generate_launch_description():
