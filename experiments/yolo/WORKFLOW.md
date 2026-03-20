@@ -64,14 +64,14 @@ python3 4_analyze_throughput.py
 ```bash
 python3 5_generate_configs.py
 ```
-**Output:** `configs/phase4_*.yaml` (16 server + 1 client)
+**Output:** `configs/phase4_*.yaml` (24 server + 1 client)
 
 ### 6️⃣ Run Cancellation Experiments
 ```bash
 ./6_run_experiments.sh
 ```
-**Duration:** ~1.5-3 hours (16 configs × 3 trials = 48 experiments)  
-**Output:** `traces/phase4_bs{1,8,16,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/`
+**Duration:** ~1.5-3 hours (24 configs × 3 trials = 72 experiments)
+**Output:** `traces/phase4_bs{1,8,13,15,16,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/`
 
 **To test single config:**
 ```bash

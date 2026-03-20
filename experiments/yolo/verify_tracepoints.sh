@@ -96,10 +96,19 @@ echo ""
 echo -e "${YELLOW}Checking for required tracepoints:${NC}"
 echo ""
 
+# Detect babeltrace command
+if command -v babeltrace &>/dev/null; then
+    BABELTRACE_CMD="babeltrace"
+else
+    echo -e "${RED}Error: babeltrace not found. Please install lttng-tools.${NC}"
+    exit 1
+fi
+echo -e "${BLUE}Using: ${BABELTRACE_CMD}${NC}"
+
 # Function to check tracepoint
 check_tracepoint() {
     local name=$1
-    local count=$(babeltrace "${TRACE_DIR}" 2>/dev/null | grep "anytime:${name}" | wc -l)
+    local count=$("${BABELTRACE_CMD}" "${TRACE_DIR}" 2>/dev/null | grep "anytime:${name}" | wc -l)
     if [ "$count" -gt 0 ]; then
         echo -e "✅ ${name}: ${GREEN}${count} events${NC}"
         return 0
@@ -128,7 +137,7 @@ if [ "$all_good" = true ]; then
     echo -e "${GREEN}✅ All tracepoints verified successfully!${NC}"
     echo ""
     echo -e "${BLUE}Sample exit calculation events:${NC}"
-    babeltrace "${TRACE_DIR}" 2>/dev/null | grep "yolo_exit_calculation_end" | head -3
+    "${BABELTRACE_CMD}" "${TRACE_DIR}" 2>/dev/null | grep "yolo_exit_calculation_end" | head -3
     echo ""
     echo -e "${GREEN}Ready to run full Phase 1 experiments!${NC}"
 else

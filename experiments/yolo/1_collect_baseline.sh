@@ -127,7 +127,7 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     # Wait between trials
     if [ ${trial} -lt ${NUM_TRIALS} ]; then
         echo ""
-        echo -e "${YELLOW}Waiting 10 seconds before next trial...${NC}"
+        echo -e "${YELLOW}Waiting 5 seconds before next trial...${NC}"
         sleep 5
     fi
 done

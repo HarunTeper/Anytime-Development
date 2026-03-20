@@ -71,8 +71,8 @@ python3 4_analyze_throughput.py
 ```bash
 python3 5_generate_configs.py
 ```
-- Creates configs for 16 combinations:
-  - Block sizes: 1, 8, 16, 25
+- Creates configs for 24 combinations:
+  - Block sizes: 1, 8, 13, 15, 16, 25
   - Mode: proactive
   - Sync: sync, async
   - Threading: single, multi
@@ -82,9 +82,9 @@ python3 5_generate_configs.py
 ```bash
 ./6_run_experiments.sh
 ```
-- Runs all 16 configurations × 3 trials = 48 experiments
-- Client cancels after 16 layers OR score threshold 0.8
-- **Output:** `traces/phase4_bs{1,8,16,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/`
+- Runs all 24 configurations × 3 trials = 72 experiments
+- Client cancels after 25 layers OR score threshold 0.8
+- **Output:** `traces/phase4_bs{1,8,13,15,16,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/`
 - **Note:** To test a single config: `./6a_test_single_config.sh bs1_proactive_sync_single`
 
 ### Step 7: Analyze Cancellation Performance
@@ -171,12 +171,12 @@ python3 7_analyze_cancellation.py
 
 ### Config Generation (Step 5)
 - **Purpose:** Auto-generate all configuration files for cancellation experiments
-- **Output:** 16 YAML files + 1 client config
+- **Output:** 24 YAML files + 1 client config
 
 ### Cancellation Experiments (Step 6)
 - **Purpose:** Measure cancellation responsiveness
-- **Client behavior:** Cancel after 16 layers OR score ≥ 0.8 (whichever comes first)
-- **Duration:** ~1.5-3 hours for 16 configs × 3 trials
+- **Client behavior:** Cancel after 25 layers OR score ≥ 0.8 (whichever comes first)
+- **Duration:** ~1.5-3 hours for 24 configs × 3 trials
 - **Output:** Traces with cancellation timing data
 
 ### Cancellation Analysis (Step 7)
@@ -193,11 +193,11 @@ python3 7_analyze_cancellation.py
 
 ### Configuration Files (YAML)
 Located in `configs/`, these specify:
-- **batch_size**: Number of layers processed per block (1, 8, or 25)
+- **batch_size**: Number of layers processed per block (1, 8, 13, 15, 16, or 25)
 - **is_reactive_proactive**: Mode ("reactive" or "proactive")
 - **is_sync_async**: Executor type ("sync" or "async")
 - **multi_threading**: Threading mode (true/false)
-- **cancel_after_layers**: Client cancellation threshold (16 for Step 6)
+- **cancel_after_layers**: Client cancellation threshold (25 for Step 6)
 - **score_threshold**: Quality-based cancellation (0.8 for Step 6)
 
 ### Metrics Collected
@@ -243,7 +243,7 @@ pip3 install --upgrade pandas numpy matplotlib pyyaml
 ```
 
 ### Trace Parsing Errors
-- Check babeltrace is installed: `babeltrace2 --version`
+- Check babeltrace is installed: `babeltrace --version`
 - Verify trace directory contains data: `ls -la traces/*/`
 
 ---
