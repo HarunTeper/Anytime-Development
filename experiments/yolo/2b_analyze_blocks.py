@@ -15,7 +15,6 @@ Output: results/block_analysis/
 """
 
 import sys
-import subprocess
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -25,6 +24,8 @@ from collections import defaultdict
 import json
 from datetime import datetime
 
+from trace_utils import TraceEvent, parse_fields, parse_trace_directory
+
 # Configuration
 SCRIPT_DIR = Path(__file__).resolve().parent
 EXPERIMENT_DIR = SCRIPT_DIR
@@ -32,6 +33,9 @@ TRACE_DIR = EXPERIMENT_DIR / "traces"
 RESULTS_DIR = EXPERIMENT_DIR / "results"
 PLOTS_DIR = RESULTS_DIR / "plots"
 BLOCK_DIR = RESULTS_DIR / "block_analysis"
+
+# Number of warmup images to skip per trial (GPU JIT overhead)
+WARMUP_IMAGES = 5
 
 # Plot configuration
 PLOT_WIDTH = 14
@@ -52,150 +56,6 @@ PLOTS_DIR.mkdir(exist_ok=True)
 BLOCK_DIR.mkdir(exist_ok=True)
 
 MAX_LAYER = 25  # Maximum layer number (0-indexed, so 0-24 = 25 layers total)
-
-
-class TraceEvent:
-    """Represents a single trace event"""
-
-    def __init__(self, timestamp, event_name, fields):
-        self.timestamp = timestamp
-        self.event_name = event_name
-        self.fields = fields
-
-    def __repr__(self):
-        return f"TraceEvent({self.timestamp}, {self.event_name})"
-
-
-def parse_trace_directory(trace_dir):
-    """
-    Parse a single trace directory using babeltrace
-    """
-    print(f"  Parsing trace: {trace_dir.name}")
-
-    # Use babeltrace2 (without --names none to preserve all fields)
-    try:
-        result = subprocess.run(
-            ['babeltrace2', str(trace_dir)],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        try:
-            result = subprocess.run(
-                ['babeltrace', str(trace_dir)],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-        except subprocess.CalledProcessError as e:
-            print(f"    Error running babeltrace: {e}")
-            return []
-        except FileNotFoundError:
-            print("    Error: babeltrace not found. Please install lttng-tools.")
-            return []
-
-    # Pre-filter lines to only process anytime events
-    anytime_lines = [line for line in result.stdout.split(
-        '\n') if 'anytime:' in line]
-
-    events = []
-    for line in anytime_lines:
-        if not line.strip() or not 'anytime:' in line:
-            continue
-
-        try:
-            # Extract timestamp (in brackets)
-            ts_start = line.find('[')
-            ts_end = line.find(']')
-            if ts_start == -1 or ts_end == -1:
-                continue
-
-            timestamp_str = line[ts_start+1:ts_end]
-            # Convert HH:MM:SS.nanoseconds to nanoseconds
-            parts = timestamp_str.split(':')
-            try:
-                if len(parts) == 3:
-                    hh = int(parts[0])
-                    mm = int(parts[1])
-                    ss = float(parts[2])
-                    seconds_total = hh * 3600 + mm * 60 + ss
-                    timestamp = seconds_total * 1e9
-                else:
-                    timestamp = float(timestamp_str) * 1e9
-            except ValueError:
-                continue
-
-            # Extract event name
-            event_start = line.find('anytime:')
-            if event_start == -1:
-                continue
-
-            event_name_part = line[event_start:]
-            event_name_end = event_name_part.find(
-                ':', 8)  # Find colon after 'anytime:'
-            if event_name_end == -1:
-                continue
-
-            event_name = event_name_part[8:event_name_end]
-
-            # Extract fields (in braces)
-            fields_start = line.find('{', event_start)
-            fields_end = line.rfind('}')
-            if fields_start == -1 or fields_end == -1:
-                fields = {}
-            else:
-                fields_str = line[fields_start+1:fields_end]
-                fields = parse_fields(fields_str)
-
-            events.append(TraceEvent(timestamp, event_name, fields))
-
-        except Exception as e:
-            continue
-
-    print(f"    Parsed {len(events)} events")
-    return events
-
-
-def parse_fields(fields_str):
-    """Parse the fields string into a dictionary"""
-    fields = {}
-
-    parts = []
-    current = []
-    in_string = False
-
-    for char in fields_str + ',':
-        if char == '"':
-            in_string = not in_string
-        elif char == ',' and not in_string:
-            parts.append(''.join(current).strip())
-            current = []
-            continue
-        current.append(char)
-
-    for part in parts:
-        if not part or '=' not in part:
-            continue
-
-        key, value = part.split('=', 1)
-        key = key.strip()
-        value = value.strip()
-
-        if value.startswith('"') and value.endswith('"'):
-            value = value[1:-1]
-        else:
-            try:
-                if '.' in value:
-                    value = float(value)
-                else:
-                    value = int(value)
-            except ValueError:
-                pass
-
-        fields[key] = value
-
-    return fields
 
 
 def extract_timing_data(trace_dir):
@@ -222,7 +82,7 @@ def extract_timing_data(trace_dir):
     image_counter = 0
 
     for event in events:
-        if event.event_name == 'anytime_base_activate':
+        if event.event_name == 'anytime:anytime_base_activate':
             # New goal/image started
             if current_image['layer_computation_times']:
                 images.append(current_image)
@@ -236,11 +96,11 @@ def extract_timing_data(trace_dir):
                 'exit_calc_start_times': {},
             }
 
-        elif event.event_name == 'yolo_layer_start':
+        elif event.event_name == 'anytime:yolo_layer_start':
             layer_num = event.fields.get('layer_num', 0)
             current_image['layer_start_times'][layer_num] = event.timestamp
 
-        elif event.event_name == 'yolo_layer_end':
+        elif event.event_name == 'anytime:yolo_layer_end':
             layer_num = event.fields.get('layer_num', 0)
 
             # Calculate layer computation time
@@ -251,11 +111,11 @@ def extract_timing_data(trace_dir):
                     current_image['layer_start_times'][start_layer_num]
                 current_image['layer_computation_times'][layer_num] = comp_time
 
-        elif event.event_name == 'yolo_exit_calculation_start':
+        elif event.event_name == 'anytime:yolo_exit_calculation_start':
             layer_num = event.fields.get('layer_num', 0)
             current_image['exit_calc_start_times'][layer_num] = event.timestamp
 
-        elif event.event_name == 'yolo_exit_calculation_end':
+        elif event.event_name == 'anytime:yolo_exit_calculation_end':
             layer_num = event.fields.get('layer_num', 0)
             # Calculate exit calculation time
             if layer_num in current_image['exit_calc_start_times']:
@@ -367,6 +227,12 @@ def analyze_all_block_sizes(all_images):
         num_blocks = [len(img['blocks'])
                       for img in all_image_data if img['blocks']]
 
+        # Max per-block delay: worst-case time before system can respond to cancel
+        max_block_delays = [
+            max(b['total_delay'] for b in img['blocks'])
+            for img in all_image_data if img['blocks']
+        ]
+
         if total_delays:
             stats = {
                 # Convert ns to ms
@@ -375,6 +241,8 @@ def analyze_all_block_sizes(all_images):
                 'min_total_delay_ms': np.min(total_delays) / 1e6,
                 'max_total_delay_ms': np.max(total_delays) / 1e6,
                 'median_total_delay_ms': np.median(total_delays) / 1e6,
+                'mean_max_block_delay_ms': np.mean(max_block_delays) / 1e6 if max_block_delays else 0,
+                'std_max_block_delay_ms': np.std(max_block_delays) / 1e6 if max_block_delays else 0,
                 'mean_num_blocks': np.mean(num_blocks) if num_blocks else 0,
                 'all_image_data': all_image_data,
             }
@@ -385,6 +253,8 @@ def analyze_all_block_sizes(all_images):
                 'min_total_delay_ms': 0,
                 'max_total_delay_ms': 0,
                 'median_total_delay_ms': 0,
+                'mean_max_block_delay_ms': 0,
+                'std_max_block_delay_ms': 0,
                 'mean_num_blocks': 0,
                 'all_image_data': all_image_data,
             }
@@ -428,6 +298,35 @@ def plot_block_size_delays(block_size_stats):
     plt.savefig(BLOCK_DIR / 'block_size_delays.png', dpi=300)
     plt.close()
     print(f"    Saved: {BLOCK_DIR / 'block_size_delays.png'}")
+
+
+def plot_max_block_delay(block_size_stats):
+    """
+    Plot maximum per-block delay vs block size.
+    This shows worst-case cancellation responsiveness for each block size.
+    """
+    print("\n  Creating max block delay plot...")
+
+    block_sizes = sorted(block_size_stats.keys())
+    mean_max_delays = [block_size_stats[bs]['mean_max_block_delay_ms']
+                       for bs in block_sizes]
+    std_max_delays = [block_size_stats[bs]['std_max_block_delay_ms']
+                      for bs in block_sizes]
+
+    fig, ax = plt.subplots(figsize=(14, 7))
+
+    ax.errorbar(block_sizes, mean_max_delays, yerr=std_max_delays, marker='o',
+                capsize=5, linewidth=2, markersize=6, color='darkorange')
+    ax.set_xlabel('Block Size (layers per block)', fontsize=12)
+    ax.set_ylabel('Max Per-Block Delay (ms)', fontsize=12)
+    ax.set_title('Worst-Case Per-Block Delay vs Block Size',
+                 fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(BLOCK_DIR / 'max_block_delay.png', dpi=300)
+    plt.close()
+    print(f"    Saved: {BLOCK_DIR / 'max_block_delay.png'}")
 
 
 def plot_num_blocks_vs_block_size(block_size_stats):
@@ -600,6 +499,8 @@ def export_block_results(block_size_stats):
             'min_total_delay_ms': convert_numpy(stats['min_total_delay_ms']),
             'max_total_delay_ms': convert_numpy(stats['max_total_delay_ms']),
             'median_total_delay_ms': convert_numpy(stats['median_total_delay_ms']),
+            'mean_max_block_delay_ms': convert_numpy(stats['mean_max_block_delay_ms']),
+            'std_max_block_delay_ms': convert_numpy(stats['std_max_block_delay_ms']),
             'mean_num_blocks': convert_numpy(stats['mean_num_blocks']),
         }
 
@@ -623,14 +524,15 @@ def export_block_results(block_size_stats):
         f.write("BLOCK SIZE STATISTICS:\n")
         f.write("-" * 80 + "\n")
         f.write(
-            f"{'Block Size':>12} {'Mean Delay (ms)':>16} {'Std Dev (ms)':>14} {'Median (ms)':>13} {'Avg # Blocks':>14}\n")
-        f.write("-" * 80 + "\n")
+            f"{'Block Size':>12} {'Mean Delay (ms)':>16} {'Std Dev (ms)':>14} {'Median (ms)':>13} {'Max Block (ms)':>16} {'Avg # Blocks':>14}\n")
+        f.write("-" * 96 + "\n")
 
         for block_size in sorted(block_size_stats.keys()):
             stats = block_size_stats[block_size]
             f.write(f"{block_size:>12} {stats['mean_total_delay_ms']:>16.2f} "
                     f"{stats['std_total_delay_ms']:>14.2f} "
                     f"{stats['median_total_delay_ms']:>13.2f} "
+                    f"{stats['mean_max_block_delay_ms']:>16.2f} "
                     f"{stats['mean_num_blocks']:>14.1f}\n")
 
         f.write("\n" + "="*80 + "\n")
@@ -691,6 +593,9 @@ def main():
         print(f"\n  Processing: {trace_dir.name}")
         images = extract_timing_data(trace_dir)
         if images:
+            if WARMUP_IMAGES > 0 and len(images) > WARMUP_IMAGES:
+                images = images[WARMUP_IMAGES:]
+                print(f"    Skipped {WARMUP_IMAGES} warmup images")
             all_images.extend(images)
             print(f"    Extracted data for {len(images)} images")
 
@@ -706,6 +611,7 @@ def main():
     # Generate plots
     print("\nGenerating plots...")
     plot_block_size_delays(block_size_stats)
+    plot_max_block_delay(block_size_stats)
     plot_num_blocks_vs_block_size(block_size_stats)
     plot_per_block_delay_distribution(block_size_stats)
     plot_detailed_block_breakdown(block_size_stats)

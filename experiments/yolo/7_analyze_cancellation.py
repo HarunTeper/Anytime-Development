@@ -11,16 +11,15 @@ Key Metrics:
 3. Layers processed: How many layers were computed before cancellation
 
 Configurations analyzed:
-- Block sizes: 1, 8, 16, 25
+- Block sizes: 1, 8, 13, 15, 16, 25
 - Mode: proactive
 - Sync modes: sync, async
 - Threading: single, multi
 
-Input:  traces/phase4_bs{1,8,16,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/
+Input:  traces/phase4_bs{1,8,13,15,16,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/
 Output: results/phase4_analysis/
 """
 
-import subprocess
 import re
 import numpy as np
 import matplotlib
@@ -29,14 +28,21 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from collections import defaultdict
 import json
+import yaml
 from datetime import datetime
+
+from trace_utils import TraceEvent, parse_fields, parse_trace_directory
 
 # Configuration
 SCRIPT_DIR = Path(__file__).resolve().parent
 EXPERIMENT_DIR = SCRIPT_DIR
 TRACE_DIR = EXPERIMENT_DIR / "traces"
+CONFIG_DIR = EXPERIMENT_DIR / "configs"
 RESULTS_DIR = EXPERIMENT_DIR / "results"
 PHASE4_DIR = RESULTS_DIR / "phase4_analysis"
+
+# Number of warmup images to skip per trial (GPU JIT overhead)
+WARMUP_IMAGES = 5
 
 # Plot configuration
 PLOT_WIDTH = 12
@@ -55,152 +61,6 @@ LINE_WIDTH = 2
 # Create output directories
 RESULTS_DIR.mkdir(exist_ok=True)
 PHASE4_DIR.mkdir(exist_ok=True)
-
-
-class TraceEvent:
-    """Represents a single trace event"""
-
-    def __init__(self, timestamp, event_name, fields):
-        self.timestamp = timestamp
-        self.event_name = event_name
-        self.fields = fields
-
-    def __repr__(self):
-        return f"TraceEvent({self.timestamp}, {self.event_name}, {self.fields})"
-
-
-def parse_trace_directory(trace_dir):
-    """
-    Parse a single trace directory using babeltrace
-    """
-    print(f"  Parsing trace: {trace_dir.name}")
-
-    # Use babeltrace2 first (newer, faster)
-    try:
-        result = subprocess.run(
-            ['babeltrace2', str(trace_dir)],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        # Fall back to babeltrace (version 1)
-        try:
-            result = subprocess.run(
-                ['babeltrace', str(trace_dir)],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-        except FileNotFoundError:
-            print(f"    ERROR: babeltrace not found. Please install lttng-tools.")
-            return []
-
-    # Pre-filter lines to only process anytime events
-    anytime_lines = [line for line in result.stdout.split(
-        '\n') if 'anytime:' in line]
-
-    events = []
-    for line in anytime_lines:
-        if not line.strip() or not 'anytime:' in line:
-            continue
-
-        try:
-            # Extract timestamp (in brackets) - format: [HH:MM:SS.nanoseconds]
-            ts_start = line.find('[')
-            ts_end = line.find(']')
-            if ts_start == -1 or ts_end == -1:
-                continue
-
-            timestamp_str = line[ts_start+1:ts_end]
-            # Convert HH:MM:SS.nanoseconds to nanoseconds (int/float)
-            parts = timestamp_str.split(':')
-            try:
-                if len(parts) == 3:
-                    hh = int(parts[0])
-                    mm = int(parts[1])
-                    ss = float(parts[2])
-                    seconds_total = hh * 3600 + mm * 60 + ss
-                    timestamp = seconds_total * 1e9  # nanoseconds
-                else:
-                    timestamp = float(timestamp_str) * 1e9
-            except ValueError:
-                continue
-
-            # Extract event name - everything after "anytime:" until the next colon
-            event_start = line.find('anytime:')
-            if event_start == -1:
-                continue
-
-            event_name_part = line[event_start:]
-            event_name_end = event_name_part.find(
-                ':', 8)  # Find colon after 'anytime:'
-            if event_name_end == -1:
-                continue
-
-            event_name = 'anytime:' + event_name_part[8:event_name_end]
-
-            # Extract fields (everything after the event name)
-            fields_start = line.find('{')
-            fields_end = line.rfind('}')
-            if fields_start == -1 or fields_end == -1:
-                fields = {}
-            else:
-                fields_str = line[fields_start+1:fields_end].strip()
-                fields = parse_fields(fields_str)
-
-            events.append(TraceEvent(timestamp, event_name, fields))
-
-        except Exception as e:
-            # Skip lines that can't be parsed
-            continue
-
-    print(f"    Parsed {len(events)} events")
-    return events
-
-
-def parse_fields(fields_str):
-    """Parse the fields string into a dictionary"""
-    fields = {}
-
-    parts = []
-    current = []
-    in_string = False
-
-    for char in fields_str + ',':
-        if char == '"':
-            in_string = not in_string
-            current.append(char)
-        elif char == ',' and not in_string:
-            parts.append(''.join(current).strip())
-            current = []
-        else:
-            current.append(char)
-
-    for part in parts:
-        if '=' not in part:
-            continue
-
-        key, value = part.split('=', 1)
-        key = key.strip()
-        value = value.strip()
-
-        # Remove quotes from strings
-        if value.startswith('"') and value.endswith('"'):
-            value = value[1:-1]
-        # Try to convert to appropriate type
-        else:
-            try:
-                if '.' in value:
-                    value = float(value)
-                else:
-                    value = int(value)
-            except ValueError:
-                pass
-
-        fields[key] = value
-
-    return fields
 
 
 def parse_config_from_trace_name(trace_name):
@@ -271,6 +131,7 @@ def analyze_cancellation_trace(trace_dir):
         'layer_start_times': {},
         'layer_end_times': {},
         'exit_calc_times': {},
+        'layer_detections': {},  # layer_num -> num_detections
     }
 
     goal_counter = 0
@@ -294,6 +155,7 @@ def analyze_cancellation_trace(trace_dir):
                 'layer_start_times': {},
                 'layer_end_times': {},
                 'exit_calc_times': {},
+                'layer_detections': {},  # layer_num -> num_detections
             }
 
         elif event_type == 'anytime:anytime_client_cancel_sent':
@@ -309,24 +171,27 @@ def analyze_cancellation_trace(trace_dir):
             layer = event.fields.get('layer_num', -1)
             current_goal['layer_start_times'][layer] = event.timestamp
 
-        elif event_type == 'anytime:anytime_compute_exit':
-            # Layer computation ended (contains computation_time_ns)
-            # Need to track which layer this corresponds to
-            # We'll use the most recent layer_start
-            if current_goal['layer_start_times']:
-                layer = max(current_goal['layer_start_times'].keys())
-                current_goal['layer_end_times'][layer] = event.timestamp
-                current_goal['layers_processed'] = max(
-                    current_goal['layers_processed'], layer + 1)
+        elif event_type == 'anytime:yolo_layer_end':
+            # Layer computation completed (fires once per layer in both sync and async modes)
+            layer = event.fields.get('layer_num', -1)
+            current_goal['layer_end_times'][layer] = event.timestamp
+            current_goal['layers_processed'] = max(
+                current_goal['layers_processed'], layer)
 
         elif event_type == 'anytime:yolo_exit_calculation_end':
             # Exit calculation ended
             layer_num = event.fields.get('layer_num', -1)
+            num_detections = event.fields.get('num_detections', 0)
             current_goal['exit_calc_times'][layer_num] = event.timestamp
+            current_goal['layer_detections'][layer_num] = num_detections
 
     # Don't forget the last goal
     if current_goal['goal_start']:
         goals.append(current_goal)
+
+    # Skip warmup images (GPU JIT overhead in first few images)
+    if WARMUP_IMAGES > 0 and len(goals) > WARMUP_IMAGES:
+        goals = goals[WARMUP_IMAGES:]
 
     # Calculate metrics
     metrics = {
@@ -339,10 +204,11 @@ def analyze_cancellation_trace(trace_dir):
     return metrics
 
 
-def calculate_goal_metrics(goals):
+def calculate_goal_metrics(goals, cancel_after_layers=None):
     """
-    Calculate cancellation delay, total runtime, and layers processed for each goal
-    Returns list of metric dictionaries
+    Calculate cancellation delay, total runtime, layers processed, and detection
+    count for each goal. Also classifies each goal as score-cancelled vs
+    hard-deadline based on whether processing stopped before cancel_after_layers.
     """
     goal_metrics = []
 
@@ -352,6 +218,8 @@ def calculate_goal_metrics(goals):
             'cancellation_delay': None,  # Time from cancel to result
             'total_runtime': None,        # Time from goal start to result
             'layers_processed': goal['layers_processed'],
+            'score_cancelled': False,     # True if cancelled by score threshold
+            'detections_at_cancel': None, # Detection count at cancellation point
         }
 
         # Calculate cancellation delay
@@ -366,14 +234,26 @@ def calculate_goal_metrics(goals):
             metrics['total_runtime'] = (
                 goal['result_received'] - goal['goal_start']) / 1e6  # ms
 
+        # Classify: score-cancelled if cancel was sent AND processing stopped
+        # before the hard deadline layer count
+        if cancel_after_layers is not None and goal['cancel_sent'] is not None:
+            metrics['score_cancelled'] = (
+                goal['layers_processed'] < cancel_after_layers)
+
+        # Detection count at the highest processed layer
+        max_layer = goal['layers_processed']
+        metrics['detections_at_cancel'] = goal.get(
+            'layer_detections', {}).get(max_layer, None)
+
         goal_metrics.append(metrics)
 
     return goal_metrics
 
 
-def aggregate_metrics(all_metrics):
+def aggregate_metrics(all_metrics, cancel_after_layers=None):
     """
-    Aggregate metrics across all traces and group by configuration
+    Aggregate metrics across all traces and group by configuration.
+    Separates score-cancelled goals from hard-deadline goals.
     """
     print("\n  Aggregating metrics by configuration...")
 
@@ -383,7 +263,14 @@ def aggregate_metrics(all_metrics):
         'cancellation_delays': [],      # ms
         'total_runtimes': [],            # ms
         'layers_processed': [],          # count
+        'detections_at_cancel': [],      # detection count at cancellation point
         'config': None,
+        # Separated populations
+        'score_cancelled_delays': [],    # ms (score-cancelled only)
+        'score_cancelled_runtimes': [],  # ms (score-cancelled only)
+        'score_cancelled_layers': [],    # count (score-cancelled only)
+        'deadline_runtimes': [],         # ms (hard-deadline only)
+        'deadline_layers': [],           # count (hard-deadline only)
     })
 
     for metrics in all_metrics:
@@ -398,7 +285,8 @@ def aggregate_metrics(all_metrics):
             config_groups[key]['config'] = config
 
         # Extract goal metrics
-        goal_metrics = calculate_goal_metrics(metrics['goals'])
+        goal_metrics = calculate_goal_metrics(
+            metrics['goals'], cancel_after_layers=cancel_after_layers)
 
         for gm in goal_metrics:
             if gm['cancellation_delay'] is not None:
@@ -409,6 +297,26 @@ def aggregate_metrics(all_metrics):
                     gm['total_runtime'])
             config_groups[key]['layers_processed'].append(
                 gm['layers_processed'])
+            if gm['detections_at_cancel'] is not None:
+                config_groups[key]['detections_at_cancel'].append(
+                    gm['detections_at_cancel'])
+
+            # Separate populations
+            if gm['score_cancelled']:
+                if gm['cancellation_delay'] is not None:
+                    config_groups[key]['score_cancelled_delays'].append(
+                        gm['cancellation_delay'])
+                if gm['total_runtime'] is not None:
+                    config_groups[key]['score_cancelled_runtimes'].append(
+                        gm['total_runtime'])
+                config_groups[key]['score_cancelled_layers'].append(
+                    gm['layers_processed'])
+            else:
+                if gm['total_runtime'] is not None:
+                    config_groups[key]['deadline_runtimes'].append(
+                        gm['total_runtime'])
+                config_groups[key]['deadline_layers'].append(
+                    gm['layers_processed'])
 
     # Calculate statistics for each group
     summary = {}
@@ -442,6 +350,20 @@ def aggregate_metrics(all_metrics):
             'max_layers_processed': np.max(group['layers_processed']),
             'median_layers_processed': np.median(group['layers_processed']),
 
+            # Detection quality at cancellation point
+            'avg_detections_at_cancel': np.mean(group['detections_at_cancel']) if group['detections_at_cancel'] else None,
+            'std_detections_at_cancel': np.std(group['detections_at_cancel']) if group['detections_at_cancel'] else None,
+
+            # Population breakdown
+            'num_score_cancelled': len(group['score_cancelled_delays']),
+            'num_deadline': len(group['deadline_runtimes']),
+            'avg_score_cancelled_delay_ms': np.mean(group['score_cancelled_delays']) if group['score_cancelled_delays'] else None,
+            'std_score_cancelled_delay_ms': np.std(group['score_cancelled_delays']) if group['score_cancelled_delays'] else None,
+            'avg_score_cancelled_runtime_ms': np.mean(group['score_cancelled_runtimes']) if group['score_cancelled_runtimes'] else None,
+            'avg_score_cancelled_layers': np.mean(group['score_cancelled_layers']) if group['score_cancelled_layers'] else None,
+            'avg_deadline_runtime_ms': np.mean(group['deadline_runtimes']) if group['deadline_runtimes'] else None,
+            'avg_deadline_layers': np.mean(group['deadline_layers']) if group['deadline_layers'] else None,
+
             # Raw data
             'cancellation_delays': group['cancellation_delays'],
             'total_runtimes': group['total_runtimes'],
@@ -467,9 +389,6 @@ def plot_cancellation_delay_comparison(summary):
     Plot comparison of cancellation delays across configurations
     """
     print("  - Cancellation delay comparison")
-
-    # Set plot style
-    plt.style.use('seaborn-darkgrid')
 
     # Group data by block size
     block_sizes = sorted(set(s['config']['block_size']
@@ -586,7 +505,7 @@ def plot_total_runtime_comparison(summary):
     plt.close()
 
 
-def plot_layers_processed_comparison(summary):
+def plot_layers_processed_comparison(summary, cancel_after_layers=None):
     """
     Plot comparison of layers processed across configurations
     """
@@ -635,8 +554,9 @@ def plot_layers_processed_comparison(summary):
     ax.set_xticklabels(block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.grid(True, axis='y', alpha=0.3)
-    ax.axhline(y=16, color='r', linestyle='--',
-               linewidth=LINE_WIDTH, label='Cancellation Threshold (16 layers)')
+    if cancel_after_layers is not None:
+        ax.axhline(y=cancel_after_layers, color='r', linestyle='--',
+                   linewidth=LINE_WIDTH, label=f'Cancellation Threshold ({cancel_after_layers} layers)')
 
     plt.tight_layout(pad=0)
     plt.savefig(PHASE4_DIR / 'layers_processed_comparison.pdf',
@@ -681,7 +601,9 @@ def plot_metrics_by_block_size(summary):
     fig, axes = plt.subplots(1, 3, figsize=(18, PLOT_HEIGHT))
 
     block_sizes = sorted(block_size_data.keys())
-    colors_bs = {1: '#1f77b4', 8: '#ff7f0e', 16: '#d62728', 25: '#2ca02c'}
+    cmap = plt.cm.tab10
+    colors_bs = {bs: cmap(i / max(len(block_sizes) - 1, 1))
+                 for i, bs in enumerate(block_sizes)}
 
     for idx, (ax, metric, title, ylabel) in enumerate([
         (axes[0], 'cancellation_delays',
@@ -710,7 +632,7 @@ def plot_metrics_by_block_size(summary):
     plt.close()
 
 
-def plot_distribution_boxplots(summary):
+def plot_distribution_boxplots(summary, cancel_after_layers=None):
     """
     Create boxplots showing distribution of metrics
     """
@@ -762,8 +684,9 @@ def plot_distribution_boxplots(summary):
     axes[2].tick_params(axis='x', rotation=45, labelsize=FONT_SIZE_TICK_LABELS)
     axes[2].tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     axes[2].grid(True, alpha=0.3, axis='y')
-    axes[2].axhline(y=16, color='r', linestyle='--',
-                    linewidth=LINE_WIDTH, label='Cancellation Threshold')
+    if cancel_after_layers is not None:
+        axes[2].axhline(y=cancel_after_layers, color='r', linestyle='--',
+                        linewidth=LINE_WIDTH, label='Cancellation Threshold')
     # axes[2].legend(fontsize=LEGEND_SIZE)
 
     plt.tight_layout(pad=0)
@@ -812,7 +735,7 @@ def create_separate_legend():
     plt.close()
 
 
-def export_phase4_results(summary):
+def export_phase4_results(summary, cancel_after_layers=None, score_threshold=None):
     """
     Export Phase 4 results to JSON and text
     """
@@ -864,7 +787,20 @@ def export_phase4_results(summary):
                 'min': stats['min_layers_processed'],
                 'max': stats['max_layers_processed'],
                 'median': stats['median_layers_processed'],
-            }
+            },
+            'detections_at_cancel': {
+                'mean': stats['avg_detections_at_cancel'],
+                'std': stats['std_detections_at_cancel'],
+            } if stats['avg_detections_at_cancel'] is not None else None,
+            'population_breakdown': {
+                'num_score_cancelled': stats['num_score_cancelled'],
+                'num_deadline': stats['num_deadline'],
+                'score_cancelled_avg_delay_ms': stats['avg_score_cancelled_delay_ms'],
+                'score_cancelled_avg_runtime_ms': stats['avg_score_cancelled_runtime_ms'],
+                'score_cancelled_avg_layers': stats['avg_score_cancelled_layers'],
+                'deadline_avg_runtime_ms': stats['avg_deadline_runtime_ms'],
+                'deadline_avg_layers': stats['avg_deadline_layers'],
+            },
         }
 
     export_summary = convert_numpy(export_summary)
@@ -887,8 +823,8 @@ def export_phase4_results(summary):
             f"Total Configurations: {len(export_summary['configurations'])}\n\n")
 
         f.write("Client Configuration:\n")
-        f.write("  - Cancel after layers: 16\n")
-        f.write("  - Score threshold: 0.8\n")
+        f.write(f"  - Cancel after layers: {cancel_after_layers if cancel_after_layers is not None else 'N/A'}\n")
+        f.write(f"  - Score threshold: {score_threshold if score_threshold is not None else 'N/A'}\n")
         f.write("  - Target class: 9 (traffic light)\n\n")
 
         f.write("-"*80 + "\n\n")
@@ -937,6 +873,23 @@ def export_phase4_results(summary):
             f.write(f"    Max:  {int(stats['max_layers_processed'])}\n")
             f.write(
                 f"    Median: {stats['median_layers_processed']:.1f}\n\n")
+
+            if stats['avg_detections_at_cancel'] is not None:
+                f.write(f"  Detections at Cancellation:\n")
+                f.write(f"    Mean: {stats['avg_detections_at_cancel']:.2f}\n")
+                f.write(f"    Std:  {stats['std_detections_at_cancel']:.2f}\n\n")
+
+            f.write(f"  Population Breakdown:\n")
+            f.write(f"    Score-cancelled: {stats['num_score_cancelled']} goals\n")
+            f.write(f"    Hard-deadline:   {stats['num_deadline']} goals\n")
+            if stats['avg_score_cancelled_delay_ms'] is not None:
+                f.write(f"    Score-cancelled avg delay:   {stats['avg_score_cancelled_delay_ms']:.2f} ms\n")
+                f.write(f"    Score-cancelled avg runtime: {stats['avg_score_cancelled_runtime_ms']:.2f} ms\n")
+                f.write(f"    Score-cancelled avg layers:  {stats['avg_score_cancelled_layers']:.2f}\n")
+            if stats['avg_deadline_runtime_ms'] is not None:
+                f.write(f"    Hard-deadline avg runtime:   {stats['avg_deadline_runtime_ms']:.2f} ms\n")
+                f.write(f"    Hard-deadline avg layers:    {stats['avg_deadline_layers']:.2f}\n")
+            f.write("\n")
 
             f.write("-"*80 + "\n\n")
 
@@ -995,6 +948,19 @@ def main():
     print(f"Input:  {TRACE_DIR}")
     print(f"Output: {PHASE4_DIR}")
 
+    # Read client config for cancel_after_layers and score_threshold
+    cancel_after_layers = None
+    score_threshold = None
+    client_config_path = CONFIG_DIR / "phase4_client.yaml"
+    if client_config_path.exists():
+        with open(client_config_path) as f:
+            client_cfg = yaml.safe_load(f)
+        cancel_after_layers = client_cfg['anytime_client']['ros__parameters']['cancel_after_layers']
+        score_threshold = client_cfg['anytime_client']['ros__parameters']['score_threshold']
+        print(f"Client config: cancel_after_layers={cancel_after_layers}, score_threshold={score_threshold}")
+    else:
+        print(f"WARNING: Client config not found at {client_config_path}, using no reference lines")
+
     # Find Phase 4 traces (only proactive architecture)
     phase4_traces = [d for d in TRACE_DIR.iterdir()
                      if d.is_dir() and 'phase4_' in d.name and 'proactive' in d.name]
@@ -1026,7 +992,7 @@ def main():
     print(f"\nSuccessfully analyzed {len(all_metrics)} traces")
 
     # Aggregate metrics
-    summary = aggregate_metrics(all_metrics)
+    summary = aggregate_metrics(all_metrics, cancel_after_layers=cancel_after_layers)
 
     print(f"\nAggregated into {len(summary)} configurations")
 
@@ -1034,15 +1000,15 @@ def main():
     print("\nGenerating plots...")
     plot_cancellation_delay_comparison(summary)
     plot_total_runtime_comparison(summary)
-    plot_layers_processed_comparison(summary)
+    plot_layers_processed_comparison(summary, cancel_after_layers=cancel_after_layers)
     plot_metrics_by_block_size(summary)
-    plot_distribution_boxplots(summary)
+    plot_distribution_boxplots(summary, cancel_after_layers=cancel_after_layers)
     create_separate_legend()
 
     print(f"  All plots saved to: {PHASE4_DIR}")
 
     # Export results
-    export_phase4_results(summary)
+    export_phase4_results(summary, cancel_after_layers=cancel_after_layers, score_threshold=score_threshold)
 
     print("\n" + "="*80)
     print("✅ STEP 7 COMPLETE: CANCELLATION ANALYSIS")

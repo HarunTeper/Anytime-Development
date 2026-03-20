@@ -18,7 +18,6 @@ Output: results/runtime_analysis/
 
 import sys
 import json
-import subprocess
 from pathlib import Path
 from collections import defaultdict
 import pandas as pd
@@ -28,6 +27,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from datetime import datetime
 
+from trace_utils import TraceEvent, parse_fields, parse_trace_directory
+
 # Configuration
 SCRIPT_DIR = Path(__file__).resolve().parent
 EXPERIMENT_DIR = SCRIPT_DIR
@@ -35,153 +36,12 @@ TRACE_DIR = EXPERIMENT_DIR / "traces"
 RESULTS_DIR = EXPERIMENT_DIR / "results"
 RUNTIME_DIR = RESULTS_DIR / "runtime_analysis"
 
+# Number of warmup images to skip per trial (GPU JIT overhead)
+WARMUP_IMAGES = 5
+
 # Create output directories
 RESULTS_DIR.mkdir(exist_ok=True)
 RUNTIME_DIR.mkdir(exist_ok=True)
-
-
-class TraceEvent:
-    """Represents a single trace event"""
-
-    def __init__(self, timestamp, event_name, fields):
-        self.timestamp = timestamp
-        self.event_name = event_name
-        self.fields = fields
-
-    def __repr__(self):
-        return f"TraceEvent({self.timestamp}, {self.event_name})"
-
-
-def parse_trace_directory(trace_dir):
-    """
-    Parse a single trace directory using babeltrace
-    """
-    print(f"  Parsing trace: {trace_dir.name}")
-
-    # Use babeltrace2 (without --names none to preserve all fields)
-    try:
-        result = subprocess.run(
-            ['babeltrace2', str(trace_dir)],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        try:
-            result = subprocess.run(
-                ['babeltrace', str(trace_dir)],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-        except subprocess.CalledProcessError as e:
-            print(f"    Error running babeltrace: {e}")
-            return []
-        except FileNotFoundError:
-            print("    Error: babeltrace not found. Please install lttng-tools.")
-            return []
-
-    # Pre-filter lines to only process anytime events
-    anytime_lines = [line for line in result.stdout.split(
-        '\n') if 'anytime:' in line]
-
-    events = []
-    for line in anytime_lines:
-        if not line.strip() or not 'anytime:' in line:
-            continue
-
-        try:
-            # Extract timestamp (in brackets)
-            ts_start = line.find('[')
-            ts_end = line.find(']')
-            if ts_start == -1 or ts_end == -1:
-                continue
-
-            timestamp_str = line[ts_start+1:ts_end]
-            # Convert HH:MM:SS.nanoseconds to nanoseconds
-            parts = timestamp_str.split(':')
-            try:
-                if len(parts) == 3:
-                    hh = int(parts[0])
-                    mm = int(parts[1])
-                    ss = float(parts[2])
-                    seconds_total = hh * 3600 + mm * 60 + ss
-                    timestamp = seconds_total * 1e9
-                else:
-                    timestamp = float(timestamp_str) * 1e9
-            except ValueError:
-                continue
-
-            # Extract event name
-            event_start = line.find('anytime:')
-            if event_start == -1:
-                continue
-
-            event_name_part = line[event_start:]
-            event_name_end = event_name_part.find(
-                ':', 8)  # Find colon after 'anytime:'
-            if event_name_end == -1:
-                continue
-
-            event_name = event_name_part[8:event_name_end]
-
-            # Extract fields (in braces)
-            fields_start = line.find('{', event_start)
-            fields_end = line.rfind('}')
-            if fields_start == -1 or fields_end == -1:
-                fields = {}
-            else:
-                fields_str = line[fields_start+1:fields_end]
-                fields = parse_fields(fields_str)
-
-            events.append(TraceEvent(timestamp, event_name, fields))
-
-        except Exception as e:
-            continue
-
-    print(f"    Parsed {len(events)} events")
-    return events
-
-
-def parse_fields(fields_str):
-    """Parse the fields string into a dictionary"""
-    fields = {}
-
-    parts = []
-    current = []
-    in_string = False
-
-    for char in fields_str + ',':
-        if char == '"':
-            in_string = not in_string
-        elif char == ',' and not in_string:
-            parts.append(''.join(current).strip())
-            current = []
-            continue
-        current.append(char)
-
-    for part in parts:
-        if not part or '=' not in part:
-            continue
-
-        key, value = part.split('=', 1)
-        key = key.strip()
-        value = value.strip()
-
-        if value.startswith('"') and value.endswith('"'):
-            value = value[1:-1]
-        else:
-            try:
-                if '.' in value:
-                    value = float(value)
-                else:
-                    value = int(value)
-            except ValueError:
-                pass
-
-        fields[key] = value
-
-    return fields
 
 
 def parse_config_from_trace_name(trace_name):
@@ -248,7 +108,7 @@ def analyze_runtime_trace(trace_dir):
     goal_counter = 0
 
     for event in events:
-        if event.event_name == 'anytime_base_activate':
+        if event.event_name == 'anytime:anytime_base_activate':
             # New goal started
             if current_goal['goal_start']:
                 goals.append(current_goal)
@@ -267,11 +127,11 @@ def analyze_runtime_trace(trace_dir):
                 'final_exit_cost': None,
             }
 
-        elif event.event_name == 'yolo_layer_start':
+        elif event.event_name == 'anytime:yolo_layer_start':
             layer_num = event.fields.get('layer_num', 0)
             current_goal['layer_start_times'][layer_num] = event.timestamp
 
-        elif event.event_name == 'yolo_layer_end':
+        elif event.event_name == 'anytime:yolo_layer_end':
             layer_num = event.fields.get('layer_num', 0)
             if not is_async:
                 # Sync mode: pair with layer_start for per-layer timing
@@ -288,7 +148,7 @@ def analyze_runtime_trace(trace_dir):
                 current_goal['total_layers'], layer_num)
             current_goal['last_layer_end_time'] = event.timestamp
 
-        elif event.event_name == 'yolo_cuda_callback':
+        elif event.event_name == 'anytime:yolo_cuda_callback':
             # In async mode, CUDA callbacks indicate batch completion
             # Layer computation times are already handled by layer_end events
             processed_layers = event.fields.get('processed_layers', 0)
@@ -297,11 +157,11 @@ def analyze_runtime_trace(trace_dir):
                     current_goal['total_layers'], processed_layers)
                 current_goal['last_layer_end_time'] = event.timestamp
 
-        elif event.event_name == 'yolo_exit_calculation_start':
+        elif event.event_name == 'anytime:yolo_exit_calculation_start':
             layer_num = event.fields.get('layer_num', 0)
             current_goal['exit_calc_start_times'][layer_num] = event.timestamp
 
-        elif event.event_name == 'yolo_exit_calculation_end':
+        elif event.event_name == 'anytime:yolo_exit_calculation_end':
             layer_num = event.fields.get('layer_num', 0)
             if layer_num in current_goal['exit_calc_start_times']:
                 start_time = current_goal['exit_calc_start_times'][layer_num]
@@ -309,7 +169,7 @@ def analyze_runtime_trace(trace_dir):
                     1e6  # Convert to ms
                 current_goal['exit_calculation_times'][layer_num] = calc_time
 
-        elif event.event_name == 'yolo_result':
+        elif event.event_name == 'anytime:yolo_result':
             # Goal completed (Phase 1 style with exit calculations)
             current_goal['goal_end'] = event.timestamp
             # Calculate final exit cost (time from last layer to result)
@@ -317,7 +177,7 @@ def analyze_runtime_trace(trace_dir):
                 current_goal['final_exit_cost'] = (
                     event.timestamp - current_goal['last_layer_end_time']) / 1e6  # Convert to ms
 
-        elif event.event_name == 'anytime_compute_exit':
+        elif event.event_name == 'anytime:anytime_compute_exit':
             # Goal completed (Phase 3 style - batch processing, no intermediate exits)
             current_goal['goal_end'] = event.timestamp
             # Calculate final exit cost (time from last layer to result)
@@ -331,6 +191,10 @@ def analyze_runtime_trace(trace_dir):
     # Don't forget the last goal
     if current_goal['goal_start']:
         goals.append(current_goal)
+
+    # Skip warmup images (GPU JIT overhead in first few images)
+    if WARMUP_IMAGES > 0 and len(goals) > WARMUP_IMAGES:
+        goals = goals[WARMUP_IMAGES:]
 
     # Calculate metrics
     metrics = {
