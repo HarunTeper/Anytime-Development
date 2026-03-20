@@ -44,18 +44,18 @@ The experiment matrix covers:
 - **Modes**: reactive, proactive
 - **Threading**: single, multi
 - **Maps**: depot, warehouse
-- **Runs per config**: 1 (configurable)
+- **Runs per config**: 5 (configurable)
 - **Run duration**: 10 seconds per config (configurable)
-- **Total**: 112 configurations (7 × 2 × 2 × 2 × 1)
+- **Total**: 560 runs (112 configurations × 5 runs)
 
 ### Maps
 
 Two Nav2 occupancy grid maps are used:
 
 - **depot** — 604×307 px, 0.05 m/px (30.2×15.4 m). Small, mostly open layout with scattered obstacles.
-  - Start: (5.0, 5.0), Goal: (25.0, 10.0)
+  - Start: (5.0, 12.0), Goal: (25.0, 2.0)
 - **warehouse** — 1006×1674 px, 0.03 m/px (30.2×50.2 m). Large structured environment with aisles.
-  - Start: (−5.0, −20.0), Goal: (5.0, 20.0)
+  - Start: (−12.5, −20.0), Goal: (12.5, 20.0)
 
 ### Visualizing Maps
 
@@ -117,7 +117,7 @@ Plots are organized into subdirectories under `results/plots/`.
 ### Framework Plots (`results/plots/framework/`)
 - `batch_size_vs_time[_<map>].pdf` — Batch compute time by configuration
 - `throughput[_<map>].pdf` — Iterations per second
-- `cancellation_delay[_<map>].pdf` — Cancellation delay
+- `server_cancel_response[_<map>].pdf` — Server cancel response delay
 - `goal_to_finish_latency.pdf` — Round-trip latency
 - `total_cancellation_time.pdf` — Combined cancel latency
 - `total_iterations.pdf` — Iterations completed per run
@@ -188,7 +188,7 @@ Then regenerate: `python3 generate_configs.py`
 
 Edit `run_rrt_star_experiments.sh`:
 ```bash
-NUM_RUNS=1  # trials per configuration
+NUM_RUNS=5  # trials per configuration
 ```
 
 ## Tracepoints Used
@@ -212,7 +212,7 @@ NUM_RUNS=1  # trials per configuration
 
 - ROS 2 Humble (with `anytime_rrt_star` and `experiments` packages built)
 - LTTng tools (`lttng-tools`, `lttng-modules-dkms`, `liblttng-ust-dev`)
-- babeltrace or babeltrace2 (for trace parsing)
+- babeltrace (for trace parsing)
 - Python 3 with: `pandas`, `numpy`, `matplotlib`
 
 ```bash
@@ -220,7 +220,7 @@ NUM_RUNS=1  # trials per configuration
 pip3 install pandas numpy matplotlib
 
 # Install LTTng + babeltrace (Ubuntu)
-sudo apt-get install lttng-tools liblttng-ust-dev babeltrace2
+sudo apt-get install lttng-tools liblttng-ust-dev babeltrace
 ```
 
 ## Troubleshooting
@@ -232,7 +232,7 @@ sudo apt-get install lttng-tools liblttng-ust-dev babeltrace2
 
 ### babeltrace not found
 ```bash
-sudo apt-get install babeltrace2
+sudo apt-get install babeltrace
 ```
 
 ### Experiments fail to launch

@@ -65,9 +65,15 @@ source install/setup.bash
 
 MAPS_DIR="$(ros2 pkg prefix anytime_rrt_star)/share/anytime_rrt_star/maps"
 
-if [ -d "${CONFIG_DIR}" ]; then
-    find "${CONFIG_DIR}" -name "*_server.yaml" -exec sed -i "s|MAPS_DIR|${MAPS_DIR}|g" {} \;
-fi
+# Regenerate configs to ensure fresh MAPS_DIR placeholders (idempotent)
+echo "Regenerating configs..."
+rm -rf "${CONFIG_DIR}"
+cd "${EXPERIMENT_DIR}"
+python3 generate_configs.py
+cd "${PACKAGES_DIR}"
+
+echo "Updating map paths in config files..."
+find "${CONFIG_DIR}" -name "*_server.yaml" -exec sed -i "s|MAPS_DIR|${MAPS_DIR}|g" {} \;
 
 # Clean old output from previous runs
 echo "Cleaning old traces and results..."
@@ -111,6 +117,8 @@ for batch_size in "${BATCH_SIZES[@]}"; do
                     lttng enable-event --userspace anytime:anytime_calculate_result_exit
                     lttng enable-event --userspace anytime:rrt_star_iteration
                     lttng enable-event --userspace anytime:rrt_star_result
+                    lttng enable-event --userspace anytime:rrt_star_init
+                    lttng enable-event --userspace anytime:rrt_star_reset
 
                     lttng add-context --userspace --type=vpid
                     lttng add-context --userspace --type=vtid

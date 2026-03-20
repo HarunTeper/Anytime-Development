@@ -75,16 +75,11 @@ def parse_trace_directory(trace_dir):
 
     try:
         result = subprocess.run(
-            ['babeltrace2', '--names', 'none', str(trace_dir)],
+            ['babeltrace', str(trace_dir)],
             capture_output=True, text=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        try:
-            result = subprocess.run(
-                ['babeltrace', str(trace_dir)],
-                capture_output=True, text=True, check=True)
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            print(f"    Error: babeltrace not found or failed")
-            return []
+        print(f"    Error: babeltrace not found or failed")
+        return []
 
     anytime_lines = [line for line in result.stdout.split('\n')
                      if 'anytime:' in line]
@@ -156,7 +151,7 @@ def extract_metrics_from_events(events, config_name):
         'total_batches': 0,
         'total_iterations': 0,
         'batch_times': [],
-        'cancellation_delays': [],
+        'server_cancel_response_delays': [],
         'goal_to_finish_latencies': [],
         'goal_to_cancel_latencies': [],
         'cancel_to_finish_latencies': [],
@@ -170,6 +165,7 @@ def extract_metrics_from_events(events, config_name):
         'final_best_costs': [],
         'final_tree_sizes': [],
         'first_solution_iterations': [],
+        'exact_total_iterations': [],
     }
 
     # State tracking
@@ -180,6 +176,25 @@ def extract_metrics_from_events(events, config_name):
     cancel_request_time = None
     goal_sent_time = None
     cancel_sent_time = None
+    current_cycle_convergence = []
+    # Track whether we're in an inter-cycle gap (reset/deactivate to next compute_entry)
+    # so we can exclude the idle gap from overhead measurements
+    in_cycle_gap = True  # start in gap until first compute
+    # Track per-cycle "last seen" result to avoid counting intermediate proactive results
+    cycle_last_best_cost = None
+    cycle_last_tree_size = None
+    cycle_last_total_iters = None
+
+    def _commit_cycle_result():
+        """Commit the last result seen in the current cycle to final metrics."""
+        nonlocal cycle_last_best_cost, cycle_last_tree_size, cycle_last_total_iters
+        if cycle_last_total_iters is not None:
+            metrics['final_best_costs'].append(cycle_last_best_cost)
+            metrics['final_tree_sizes'].append(cycle_last_tree_size)
+            metrics['exact_total_iterations'].append(cycle_last_total_iters)
+        cycle_last_best_cost = None
+        cycle_last_tree_size = None
+        cycle_last_total_iters = None
 
     for event in events:
         name = event.event_name
@@ -188,19 +203,21 @@ def extract_metrics_from_events(events, config_name):
             current_compute_start = event.timestamp
             metrics['total_batches'] += 1
             # Per-batch overhead: gap from previous compute_exit to this compute_entry
-            if prev_compute_exit is not None:
+            # Skip if this gap spans a cycle boundary (inter-goal idle time)
+            if prev_compute_exit is not None and not in_cycle_gap:
                 overhead_ms = (event.timestamp - prev_compute_exit) / 1e6
                 metrics['per_batch_overheads'].append(overhead_ms)
+                # Compute overhead ratio using previous batch time
+                if metrics['batch_times']:
+                    prev_batch_time = metrics['batch_times'][-1]
+                    ratio = overhead_ms / (overhead_ms + prev_batch_time) * 100.0 if (overhead_ms + prev_batch_time) > 0 else 0
+                    metrics['overhead_ratios'].append(ratio)
+            in_cycle_gap = False
 
         elif name == 'anytime:anytime_compute_exit':
             if current_compute_start is not None:
                 batch_time_ms = (event.timestamp - current_compute_start) / 1e6
                 metrics['batch_times'].append(batch_time_ms)
-                # Compute overhead ratio for the previous gap
-                if metrics['per_batch_overheads'] and len(metrics['per_batch_overheads']) == len(metrics['batch_times']):
-                    overhead = metrics['per_batch_overheads'][-1]
-                    ratio = overhead / (overhead + batch_time_ms) * 100.0 if (overhead + batch_time_ms) > 0 else 0
-                    metrics['overhead_ratios'].append(ratio)
                 prev_compute_exit = event.timestamp
                 current_compute_start = None
 
@@ -228,8 +245,9 @@ def extract_metrics_from_events(events, config_name):
         elif name == 'anytime:anytime_base_deactivate':
             if cancel_request_time is not None:
                 delay_ms = (event.timestamp - cancel_request_time) / 1e6
-                metrics['cancellation_delays'].append(delay_ms)
+                metrics['server_cancel_response_delays'].append(delay_ms)
                 cancel_request_time = None
+            in_cycle_gap = True
 
         elif name == 'anytime:anytime_client_goal_sent':
             goal_sent_time = event.timestamp
@@ -252,12 +270,20 @@ def extract_metrics_from_events(events, config_name):
             cancel_sent_time = None
 
         # RRT*-specific events
+        elif name == 'anytime:rrt_star_reset':
+            # New goal cycle — commit last cycle's result and convergence data
+            _commit_cycle_result()
+            if current_cycle_convergence:
+                metrics['convergence_data'].append(current_cycle_convergence)
+                current_cycle_convergence = []
+            in_cycle_gap = True
+
         elif name == 'anytime:rrt_star_iteration':
             try:
                 iteration = int(event.fields.get('iteration_num', 0))
                 tree_size = int(event.fields.get('tree_size', 0))
                 best_cost = float(event.fields.get('best_cost', 'inf'))
-                metrics['convergence_data'].append(
+                current_cycle_convergence.append(
                     (iteration, best_cost, tree_size))
             except (ValueError, TypeError):
                 pass
@@ -267,13 +293,26 @@ def extract_metrics_from_events(events, config_name):
                 best_cost = float(event.fields.get('best_cost', 'inf'))
                 tree_size = int(event.fields.get('tree_size', 0))
                 total_iters = int(event.fields.get('total_iterations', 0))
-                metrics['final_best_costs'].append(best_cost)
-                metrics['final_tree_sizes'].append(tree_size)
+                # Track as latest result in this cycle (overwritten each batch
+                # in proactive mode; only committed at cycle boundary)
+                cycle_last_best_cost = best_cost
+                cycle_last_tree_size = tree_size
+                cycle_last_total_iters = total_iters
+                current_cycle_convergence.append((total_iters, best_cost, tree_size))
             except (ValueError, TypeError):
                 pass
 
+    # Flush the last cycle
+    _commit_cycle_result()
+    if current_cycle_convergence:
+        metrics['convergence_data'].append(current_cycle_convergence)
+
     # Summary statistics
-    metrics['total_iterations'] = metrics['total_batches'] * batch_size
+    metrics['total_iterations'] = (
+        sum(metrics['exact_total_iterations'])
+        if metrics['exact_total_iterations']
+        else metrics['total_batches'] * batch_size
+    )
 
     def safe_mean(lst):
         return np.mean(lst) if lst else 0
@@ -283,8 +322,8 @@ def extract_metrics_from_events(events, config_name):
 
     metrics['avg_time_per_batch'] = safe_mean(metrics['batch_times'])
     metrics['std_time_per_batch'] = safe_std(metrics['batch_times'])
-    metrics['avg_cancellation_delay'] = safe_mean(metrics['cancellation_delays'])
-    metrics['std_cancellation_delay'] = safe_std(metrics['cancellation_delays'])
+    metrics['avg_server_cancel_response'] = safe_mean(metrics['server_cancel_response_delays'])
+    metrics['std_server_cancel_response'] = safe_std(metrics['server_cancel_response_delays'])
     metrics['avg_goal_to_finish_latency'] = safe_mean(metrics['goal_to_finish_latencies'])
     metrics['std_goal_to_finish_latency'] = safe_std(metrics['goal_to_finish_latencies'])
     metrics['avg_goal_to_cancel_latency'] = safe_mean(metrics['goal_to_cancel_latencies'])
@@ -319,6 +358,15 @@ def extract_metrics_from_events(events, config_name):
     return metrics
 
 
+def combined_std(runs, avg_key, std_key):
+    """Combined std via law of total variance: sqrt(E[sigma_i^2] + Var(mu_i))"""
+    if not runs:
+        return 0
+    means = [r[avg_key] for r in runs]
+    stds = [r[std_key] for r in runs]
+    return float(np.sqrt(np.mean([s**2 for s in stds]) + np.var(means)))
+
+
 def aggregate_runs(all_metrics):
     """Aggregate metrics from multiple runs of the same configuration"""
     config_groups = defaultdict(list)
@@ -334,24 +382,24 @@ def aggregate_runs(all_metrics):
             'total_batches': np.mean([r['total_batches'] for r in runs]),
             'total_iterations': np.mean([r['total_iterations'] for r in runs]),
             'avg_time_per_batch': np.mean([r['avg_time_per_batch'] for r in runs]),
-            'std_time_per_batch': np.mean([r['std_time_per_batch'] for r in runs]),
-            'avg_cancellation_delay': np.mean([r['avg_cancellation_delay'] for r in runs if r['avg_cancellation_delay'] > 0]) if any(r['avg_cancellation_delay'] > 0 for r in runs) else 0,
-            'std_cancellation_delay': np.mean([r['std_cancellation_delay'] for r in runs if r['std_cancellation_delay'] > 0]) if any(r['std_cancellation_delay'] > 0 for r in runs) else 0,
+            'std_time_per_batch': combined_std(runs, 'avg_time_per_batch', 'std_time_per_batch'),
+            'avg_server_cancel_response': np.mean([r['avg_server_cancel_response'] for r in runs if r['avg_server_cancel_response'] > 0]) if any(r['avg_server_cancel_response'] > 0 for r in runs) else 0,
+            'std_server_cancel_response': combined_std([r for r in runs if r['avg_server_cancel_response'] > 0], 'avg_server_cancel_response', 'std_server_cancel_response') if any(r['avg_server_cancel_response'] > 0 for r in runs) else 0,
             'avg_goal_to_finish_latency': np.mean([r['avg_goal_to_finish_latency'] for r in runs if r['avg_goal_to_finish_latency'] > 0]) if any(r['avg_goal_to_finish_latency'] > 0 for r in runs) else 0,
-            'std_goal_to_finish_latency': np.mean([r['std_goal_to_finish_latency'] for r in runs if r['std_goal_to_finish_latency'] > 0]) if any(r['std_goal_to_finish_latency'] > 0 for r in runs) else 0,
+            'std_goal_to_finish_latency': combined_std([r for r in runs if r['avg_goal_to_finish_latency'] > 0], 'avg_goal_to_finish_latency', 'std_goal_to_finish_latency') if any(r['avg_goal_to_finish_latency'] > 0 for r in runs) else 0,
             'avg_goal_to_cancel_latency': np.mean([r['avg_goal_to_cancel_latency'] for r in runs if r['avg_goal_to_cancel_latency'] > 0]) if any(r['avg_goal_to_cancel_latency'] > 0 for r in runs) else 0,
-            'std_goal_to_cancel_latency': np.mean([r['std_goal_to_cancel_latency'] for r in runs if r['std_goal_to_cancel_latency'] > 0]) if any(r['std_goal_to_cancel_latency'] > 0 for r in runs) else 0,
+            'std_goal_to_cancel_latency': combined_std([r for r in runs if r['avg_goal_to_cancel_latency'] > 0], 'avg_goal_to_cancel_latency', 'std_goal_to_cancel_latency') if any(r['avg_goal_to_cancel_latency'] > 0 for r in runs) else 0,
             'avg_cancel_to_finish_latency': np.mean([r['avg_cancel_to_finish_latency'] for r in runs if r['avg_cancel_to_finish_latency'] > 0]) if any(r['avg_cancel_to_finish_latency'] > 0 for r in runs) else 0,
-            'std_cancel_to_finish_latency': np.mean([r['std_cancel_to_finish_latency'] for r in runs if r['std_cancel_to_finish_latency'] > 0]) if any(r['std_cancel_to_finish_latency'] > 0 for r in runs) else 0,
+            'std_cancel_to_finish_latency': combined_std([r for r in runs if r['avg_cancel_to_finish_latency'] > 0], 'avg_cancel_to_finish_latency', 'std_cancel_to_finish_latency') if any(r['avg_cancel_to_finish_latency'] > 0 for r in runs) else 0,
             # Overhead metrics
             'avg_per_batch_overhead': np.mean([r['avg_per_batch_overhead'] for r in runs]),
-            'std_per_batch_overhead': np.mean([r['std_per_batch_overhead'] for r in runs]),
+            'std_per_batch_overhead': combined_std(runs, 'avg_per_batch_overhead', 'std_per_batch_overhead'),
             'avg_overhead_ratio': np.mean([r['avg_overhead_ratio'] for r in runs]),
-            'std_overhead_ratio': np.mean([r['std_overhead_ratio'] for r in runs]),
+            'std_overhead_ratio': combined_std(runs, 'avg_overhead_ratio', 'std_overhead_ratio'),
             'avg_feedback_send_time': np.mean([r['avg_feedback_send_time'] for r in runs]),
-            'std_feedback_send_time': np.mean([r['std_feedback_send_time'] for r in runs]),
+            'std_feedback_send_time': combined_std(runs, 'avg_feedback_send_time', 'std_feedback_send_time'),
             'avg_result_compute_time': np.mean([r['avg_result_compute_time'] for r in runs]),
-            'std_result_compute_time': np.mean([r['std_result_compute_time'] for r in runs]),
+            'std_result_compute_time': combined_std(runs, 'avg_result_compute_time', 'std_result_compute_time'),
             'batch_time_p50': np.mean([r['batch_time_p50'] for r in runs]),
             'batch_time_p95': np.mean([r['batch_time_p95'] for r in runs]),
             'batch_time_p99': np.mean([r['batch_time_p99'] for r in runs]),
@@ -376,6 +424,77 @@ def parse_config_name(config_name):
         'threading': parts[3 + offset],
         'map': parts[4 + offset] if len(parts) > 4 + offset else 'unknown',
     }
+
+
+def average_convergence_curves(all_cycles):
+    """Average convergence across cycles using forward-fill interpolation.
+
+    Args:
+        all_cycles: list of cycles, each cycle is list of (iteration, cost, tree_size)
+
+    Returns:
+        (iterations, mean_costs, std_costs) arrays, or (None, None, None) if no data
+    """
+    if not all_cycles:
+        return None, None, None
+    all_iters = sorted(set(
+        it for cycle in all_cycles for it, cost, _ in cycle if cost < 1e10
+    ))
+    if not all_iters:
+        return None, None, None
+    costs_at_iter = {it: [] for it in all_iters}
+    for cycle in all_cycles:
+        valid = [(it, cost) for it, cost, _ in cycle if cost < 1e10]
+        if not valid:
+            continue
+        for target_it in all_iters:
+            last_cost = None
+            for ci, cc in valid:
+                if ci <= target_it:
+                    last_cost = cc
+                else:
+                    break
+            if last_cost is not None:
+                costs_at_iter[target_it].append(last_cost)
+    result_iters, result_means, result_stds = [], [], []
+    for it in all_iters:
+        if costs_at_iter[it]:
+            result_iters.append(it)
+            result_means.append(np.mean(costs_at_iter[it]))
+            result_stds.append(np.std(costs_at_iter[it]))
+    return np.array(result_iters), np.array(result_means), np.array(result_stds)
+
+
+def average_tree_size_curves(all_cycles):
+    """Average tree size across cycles using forward-fill interpolation."""
+    if not all_cycles:
+        return None, None, None
+    all_iters = sorted(set(
+        it for cycle in all_cycles for it, _, size in cycle if size > 0
+    ))
+    if not all_iters:
+        return None, None, None
+    sizes_at_iter = {it: [] for it in all_iters}
+    for cycle in all_cycles:
+        valid = [(it, size) for it, _, size in cycle if size > 0]
+        if not valid:
+            continue
+        for target_it in all_iters:
+            last_size = None
+            for ci, cs in valid:
+                if ci <= target_it:
+                    last_size = cs
+                else:
+                    break
+            if last_size is not None:
+                sizes_at_iter[target_it].append(last_size)
+    result_iters, result_means, result_stds = [], [], []
+    for it in all_iters:
+        if sizes_at_iter[it]:
+            result_iters.append(it)
+            result_means.append(np.mean(sizes_at_iter[it]))
+            result_stds.append(np.std(sizes_at_iter[it]))
+    return np.array(result_iters), np.array(result_means), np.array(result_stds)
 
 
 def make_grouped_bar_chart(df, y_col, ylabel, filename, yerr_col=None,
@@ -421,7 +540,8 @@ def make_grouped_bar_chart(df, y_col, ylabel, filename, yerr_col=None,
                 if yerr_values:
                     kwargs['yerr'] = yerr_values
                     kwargs['capsize'] = CAPSIZE
-                ax.bar(np.array(x_positions) + offset, y_values, width, **kwargs)
+                ax.bar(np.array(x_positions) + offset, y_values, width,
+                       color=f'C{i*2+j}', **kwargs)
 
     ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel(ylabel, fontsize=FONT_SIZE_LABEL)
@@ -429,6 +549,7 @@ def make_grouped_bar_chart(df, y_col, ylabel, filename, yerr_col=None,
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
+    ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
     ax.grid(True, axis='y')
 
     plt.tight_layout(pad=0)
@@ -446,7 +567,10 @@ def generate_plots(aggregated_metrics, all_metrics):
         for config, metrics in aggregated_metrics.items()
     ])
 
-    plt.style.use('seaborn-darkgrid')
+    try:
+        plt.style.use('seaborn-v0_8-darkgrid')
+    except OSError:
+        plt.style.use('seaborn-darkgrid')
 
     # Get unique maps
     all_maps = sorted(df['map'].unique()) if 'map' in df.columns else ['unknown']
@@ -483,17 +607,17 @@ def generate_plots(aggregated_metrics, all_metrics):
                            'throughput.pdf',
                            output_dir=FRAMEWORK_PLOTS_DIR)
 
-    # 3. Cancellation delay
-    print("  - Cancellation delay")
+    # 3. Server cancel response delay
+    print("  - Server cancel response delay")
     for map_name in all_maps:
-        make_grouped_bar_chart(df, 'avg_cancellation_delay',
-                               'Average Cancellation Delay (ms)',
-                               f'cancellation_delay_{map_name}.pdf',
+        make_grouped_bar_chart(df, 'avg_server_cancel_response',
+                               'Server Cancel Response Delay (ms)',
+                               f'server_cancel_response_{map_name}.pdf',
                                map_filter=map_name,
                                output_dir=FRAMEWORK_PLOTS_DIR)
-    make_grouped_bar_chart(df, 'avg_cancellation_delay',
-                           'Average Cancellation Delay (ms)',
-                           'cancellation_delay.pdf',
+    make_grouped_bar_chart(df, 'avg_server_cancel_response',
+                           'Server Cancel Response Delay (ms)',
+                           'server_cancel_response.pdf',
                            output_dir=FRAMEWORK_PLOTS_DIR)
 
     # 4. Goal-to-finish latency
@@ -512,11 +636,11 @@ def generate_plots(aggregated_metrics, all_metrics):
                            yerr_col='std_goal_to_cancel_latency',
                            output_dir=FRAMEWORK_PLOTS_DIR)
 
-    # 6. Cancel-to-finish latency
-    print("  - Cancel-to-finish latency")
+    # 6. Cancellation latency
+    print("  - Cancellation latency")
     make_grouped_bar_chart(df, 'avg_cancel_to_finish_latency',
-                           'Average Cancel-to-Finish Latency (ms)',
-                           'cancel_to_finish_latency.pdf',
+                           'Cancellation Latency (ms)',
+                           'cancellation_latency.pdf',
                            yerr_col='std_cancel_to_finish_latency',
                            output_dir=FRAMEWORK_PLOTS_DIR)
 
@@ -529,7 +653,7 @@ def generate_plots(aggregated_metrics, all_metrics):
 
     # 8. Total cancellation time
     print("  - Total cancellation time")
-    df['total_cancellation_time'] = df['avg_goal_to_cancel_latency'] + df['avg_cancellation_delay']
+    df['total_cancellation_time'] = df['avg_goal_to_cancel_latency'] + df['avg_server_cancel_response']
     make_grouped_bar_chart(df, 'total_cancellation_time',
                            'Total Cancellation Time (ms)',
                            'total_cancellation_time.pdf',
@@ -597,82 +721,51 @@ def generate_plots(aggregated_metrics, all_metrics):
                            yerr_col='std_result_compute_time',
                            output_dir=OVERHEAD_PLOTS_DIR)
 
-    # 19. Batch time percentiles
+    # 19. Batch time percentiles (broken out by mode/threading)
     print("  - Batch time percentiles")
-    for map_name in all_maps:
-        plot_df = df[df['map'] == map_name] if map_name != 'unknown' else df
-        if plot_df.empty:
-            continue
-        fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
-        all_batch_sizes = sorted(plot_df['batch_size'].unique())
-        x = np.arange(len(all_batch_sizes))
-        width = 0.25
-
-        for idx, (pct_col, pct_label) in enumerate([
-            ('batch_time_p50', 'p50'), ('batch_time_p95', 'p95'), ('batch_time_p99', 'p99')
-        ]):
-            # Average across mode/threading for simplicity
-            y_values = []
-            for bs in all_batch_sizes:
-                bd = plot_df[plot_df['batch_size'] == bs]
-                y_values.append(bd[pct_col].mean() if not bd.empty else 0)
-            offset = (idx - 1) * width
-            ax.bar(x + offset, y_values, width, label=pct_label)
-
-        ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
-        ax.set_ylabel('Batch Time (ms)', fontsize=FONT_SIZE_LABEL)
-        ax.set_xticks(x)
-        ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
-        ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-        ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
-        ax.legend(fontsize=LEGEND_SIZE)
-        ax.grid(True, axis='y')
-        plt.tight_layout(pad=0)
-        plt.savefig(OVERHEAD_PLOTS_DIR / f'batch_time_percentiles_{map_name}.pdf',
-                    dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
-        plt.close()
-
-    # Also combined
-    fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
-    all_batch_sizes = sorted(df['batch_size'].unique())
-    x = np.arange(len(all_batch_sizes))
-    width = 0.25
-    for idx, (pct_col, pct_label) in enumerate([
+    for pct_col, pct_label in [
         ('batch_time_p50', 'p50'), ('batch_time_p95', 'p95'), ('batch_time_p99', 'p99')
-    ]):
-        y_values = []
-        for bs in all_batch_sizes:
-            bd = df[df['batch_size'] == bs]
-            y_values.append(bd[pct_col].mean() if not bd.empty else 0)
-        offset = (idx - 1) * width
-        ax.bar(x + offset, y_values, width, label=pct_label)
+    ]:
+        for map_name in all_maps:
+            make_grouped_bar_chart(df, pct_col,
+                                   f'Batch Time {pct_label} (ms)',
+                                   f'batch_time_{pct_label}_{map_name}.pdf',
+                                   map_filter=map_name,
+                                   output_dir=OVERHEAD_PLOTS_DIR)
+        make_grouped_bar_chart(df, pct_col,
+                               f'Batch Time {pct_label} (ms)',
+                               f'batch_time_{pct_label}.pdf',
+                               output_dir=OVERHEAD_PLOTS_DIR)
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
-    ax.set_ylabel('Batch Time (ms)', fontsize=FONT_SIZE_LABEL)
-    ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
-    ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
-    ax.legend(fontsize=LEGEND_SIZE)
-    ax.grid(True, axis='y')
-    plt.tight_layout(pad=0)
-    plt.savefig(OVERHEAD_PLOTS_DIR / 'batch_time_percentiles.pdf',
-                dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
-    plt.close()
-
-    # 20. Batch time trend
+    # 20. Batch time trend (aggregated by config)
     print("  - Batch time trend")
     for map_name in all_maps:
         fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
         has_data = False
+
+        config_batchtimes = defaultdict(list)
         for m in all_metrics:
             parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
             if parsed['map'] != map_name:
                 continue
-            if m['batch_times']:
-                ax.plot(range(len(m['batch_times'])), m['batch_times'],
-                        label=f"bs={parsed['batch_size']}", alpha=0.7, linewidth=1)
-                has_data = True
+            config_key = f"bs={parsed['batch_size']},{parsed['mode']}-{parsed['threading']}"
+            config_batchtimes[config_key].append(m['batch_times'])
+
+        color_idx = 0
+        for config_key, runs_batchtimes in sorted(config_batchtimes.items()):
+            min_len = min((len(bt) for bt in runs_batchtimes if bt), default=0)
+            if min_len == 0:
+                continue
+            arr = np.array([bt[:min_len] for bt in runs_batchtimes])
+            mean_bt = arr.mean(axis=0)
+            std_bt = arr.std(axis=0)
+            color = f'C{color_idx % 10}'
+            ax.plot(range(min_len), mean_bt, label=config_key, color=color,
+                    alpha=0.7, linewidth=1.5)
+            ax.fill_between(range(min_len), mean_bt - std_bt, mean_bt + std_bt,
+                            alpha=0.15, color=color)
+            has_data = True
+            color_idx += 1
 
         if has_data:
             ax.set_xlabel('Batch Number', fontsize=FONT_SIZE_LABEL)
@@ -685,13 +778,28 @@ def generate_plots(aggregated_metrics, all_metrics):
                         dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
         plt.close()
 
-    # Combined batch time trend
+    # Combined batch time trend (aggregated by config across maps)
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
+    has_data = False
+    config_batchtimes = defaultdict(list)
     for m in all_metrics:
         if m['batch_times']:
             parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
-            ax.plot(range(len(m['batch_times'])), m['batch_times'],
-                    label=f"bs={parsed['batch_size']},{parsed['map']}", alpha=0.5, linewidth=1)
+            config_key = f"bs={parsed['batch_size']},{parsed['map']}"
+            config_batchtimes[config_key].append(m['batch_times'])
+
+    color_idx = 0
+    for config_key, runs_batchtimes in sorted(config_batchtimes.items()):
+        min_len = min((len(bt) for bt in runs_batchtimes if bt), default=0)
+        if min_len == 0:
+            continue
+        arr = np.array([bt[:min_len] for bt in runs_batchtimes])
+        mean_bt = arr.mean(axis=0)
+        color = f'C{color_idx % 10}'
+        ax.plot(range(min_len), mean_bt, label=config_key, color=color,
+                alpha=0.5, linewidth=1)
+        has_data = True
+        color_idx += 1
 
     ax.set_xlabel('Batch Number', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Batch Compute Time (ms)', fontsize=FONT_SIZE_LABEL)
@@ -704,26 +812,33 @@ def generate_plots(aggregated_metrics, all_metrics):
 
     # ==================== RRT*-Specific Metrics ====================
 
-    # 10. Convergence curve
+    # 10. Convergence curve (averaged across runs and cycles)
     print("  - Convergence curves")
     for map_name in all_maps:
         fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
         has_data = False
+
+        # Group metrics by config (batch_size, mode, threading)
+        config_curves = defaultdict(list)
         for m in all_metrics:
             parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
             if parsed['map'] != map_name:
                 continue
-            if m['convergence_data']:
-                iters = [d[0] for d in m['convergence_data']]
-                costs = [d[1] for d in m['convergence_data']]
-                # Filter out infinity values
-                valid = [(i, c) for i, c in zip(iters, costs) if c < 1e10]
-                if valid:
-                    vi, vc = zip(*valid)
-                    ax.plot(vi, vc,
-                            label=f"bs={parsed['batch_size']},{parsed['mode']}",
-                            alpha=0.7, linewidth=1.5)
-                    has_data = True
+            config_key = (parsed['batch_size'], parsed['mode'], parsed['threading'])
+            for cycle in m['convergence_data']:
+                config_curves[config_key].append(cycle)
+
+        color_idx = 0
+        for config_key, cycles in sorted(config_curves.items()):
+            iters, means, stds = average_convergence_curves(cycles)
+            if iters is not None and len(iters) > 0:
+                label = f"bs={config_key[0]},{config_key[1]}-{config_key[2]}"
+                color = f'C{color_idx % 10}'
+                ax.plot(iters, means, label=label, color=color, linewidth=1.5)
+                ax.fill_between(iters, means - stds, means + stds,
+                                alpha=0.2, color=color)
+                has_data = True
+                color_idx += 1
 
         if has_data:
             ax.set_xlabel('Iteration', fontsize=FONT_SIZE_LABEL)
@@ -736,57 +851,67 @@ def generate_plots(aggregated_metrics, all_metrics):
                         dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
         plt.close()
 
-        # Save convergence data as CSV
+        # Save convergence data as CSV (with cycle column)
         conv_rows = []
         for m in all_metrics:
             parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
             if parsed['map'] != map_name:
                 continue
-            for d in m['convergence_data']:
-                conv_rows.append({
-                    'config': m['config'],
-                    'iteration': d[0],
-                    'best_cost': d[1],
-                    'tree_size': d[2],
-                })
+            for cycle_idx, cycle in enumerate(m['convergence_data']):
+                for d in cycle:
+                    conv_rows.append({
+                        'config': m['config'],
+                        'cycle': cycle_idx,
+                        'iteration': d[0],
+                        'best_cost': d[1],
+                        'tree_size': d[2],
+                    })
         if conv_rows:
             conv_df = pd.DataFrame(conv_rows)
             conv_df.to_csv(CONVERGENCE_DIR / f'{map_name}_convergence.csv', index=False)
 
-    # 11. Convergence by map comparison
+    # 11. Convergence by map comparison (averaged)
     print("  - Convergence by map")
     if len(all_maps) > 1:
         fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
-        colors = {'depot': 'C0', 'warehouse': 'C1'}
-        for m in all_metrics:
-            parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
-            if m['convergence_data']:
-                valid = [(d[0], d[1]) for d in m['convergence_data'] if d[1] < 1e10]
-                if valid:
-                    vi, vc = zip(*valid)
-                    ax.plot(vi, vc, color=colors.get(parsed['map'], 'C2'),
-                            alpha=0.4, linewidth=1)
+        map_colors = {'depot': 'C0', 'warehouse': 'C1'}
+        has_data = False
+        for map_name in all_maps:
+            map_cycles = []
+            for m in all_metrics:
+                parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
+                if parsed['map'] != map_name:
+                    continue
+                for cycle in m['convergence_data']:
+                    map_cycles.append(cycle)
+            iters, means, stds = average_convergence_curves(map_cycles)
+            if iters is not None and len(iters) > 0:
+                color = map_colors.get(map_name, 'C2')
+                ax.plot(iters, means, color=color, linewidth=1.5)
+                ax.fill_between(iters, means - stds, means + stds,
+                                alpha=0.2, color=color)
+                has_data = True
 
-        # Legend by map
-        legend_elements = [Patch(facecolor=colors.get(m, 'C2'), label=m) for m in all_maps]
-        ax.legend(handles=legend_elements, fontsize=LEGEND_SIZE)
-        ax.set_xlabel('Iteration', fontsize=FONT_SIZE_LABEL)
-        ax.set_ylabel('Best Path Cost', fontsize=FONT_SIZE_LABEL)
-        ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-        ax.grid(True)
-        plt.tight_layout(pad=0)
-        plt.savefig(RRT_STAR_PLOTS_DIR / 'convergence_by_map.pdf',
-                    dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
+        if has_data:
+            legend_elements = [Patch(facecolor=map_colors.get(m, 'C2'), label=m)
+                               for m in all_maps]
+            ax.legend(handles=legend_elements, fontsize=LEGEND_SIZE)
+            ax.set_xlabel('Iteration', fontsize=FONT_SIZE_LABEL)
+            ax.set_ylabel('Best Path Cost', fontsize=FONT_SIZE_LABEL)
+            ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
+            ax.grid(True)
+            plt.tight_layout(pad=0)
+            plt.savefig(RRT_STAR_PLOTS_DIR / 'convergence_by_map.pdf',
+                        dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
         plt.close()
 
-    # 12. First solution iteration (from RRT* result events or convergence data)
+    # 12. First solution iteration (from convergence data, per cycle)
     print("  - First solution iteration")
-    # Estimate first solution iteration from convergence data
     first_sol_data = []
     for m in all_metrics:
         parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
-        if m['convergence_data']:
-            finite_costs = [d for d in m['convergence_data'] if d[1] < 1e10]
+        for cycle in m['convergence_data']:
+            finite_costs = [d for d in cycle if d[1] < 1e10]
             if finite_costs:
                 first_sol_data.append({
                     **parsed,
@@ -824,13 +949,14 @@ def generate_plots(aggregated_metrics, all_metrics):
                     if y_values:
                         offset = (i * 2 + j - 1.5) * width
                         ax.bar(np.array(x_positions) + offset, y_values, width,
-                               label=f'{mode}-{threading}')
+                               color=f'C{i*2+j}', label=f'{mode}-{threading}')
 
             ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
             ax.set_ylabel('First Solution Iteration', fontsize=FONT_SIZE_LABEL)
             ax.set_xticks(x)
             ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
             ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
+            ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
             ax.grid(True, axis='y')
             plt.tight_layout(pad=0)
             plt.savefig(RRT_STAR_PLOTS_DIR / f'first_solution_iteration_{map_name}.pdf',
@@ -850,22 +976,32 @@ def generate_plots(aggregated_metrics, all_metrics):
                                map_filter=map_name,
                                output_dir=RRT_STAR_PLOTS_DIR)
 
-    # 14. Tree size vs iterations (from convergence data)
+    # 14. Tree size vs iterations (averaged across runs and cycles)
     print("  - Tree size vs iterations")
     for map_name in all_maps:
         fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
         has_data = False
+
+        config_curves = defaultdict(list)
         for m in all_metrics:
             parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
             if parsed['map'] != map_name:
                 continue
-            if m['convergence_data']:
-                iters = [d[0] for d in m['convergence_data']]
-                sizes = [d[2] for d in m['convergence_data']]
-                ax.plot(iters, sizes,
-                        label=f"bs={parsed['batch_size']},{parsed['mode']}",
-                        alpha=0.7, linewidth=1.5)
+            config_key = (parsed['batch_size'], parsed['mode'], parsed['threading'])
+            for cycle in m['convergence_data']:
+                config_curves[config_key].append(cycle)
+
+        color_idx = 0
+        for config_key, cycles in sorted(config_curves.items()):
+            iters, means, stds = average_tree_size_curves(cycles)
+            if iters is not None and len(iters) > 0:
+                label = f"bs={config_key[0]},{config_key[1]}-{config_key[2]}"
+                color = f'C{color_idx % 10}'
+                ax.plot(iters, means, label=label, color=color, linewidth=1.5)
+                ax.fill_between(iters, means - stds, means + stds,
+                                alpha=0.2, color=color)
                 has_data = True
+                color_idx += 1
 
         if has_data:
             ax.set_xlabel('Iteration', fontsize=FONT_SIZE_LABEL)
@@ -893,6 +1029,73 @@ def generate_plots(aggregated_metrics, all_metrics):
     plt.close()
 
     print(f"  All plots saved to: {PLOTS_DIR}")
+
+
+def run_statistical_tests(all_metrics, results_dir):
+    """Run Mann-Whitney U tests comparing reactive vs proactive and single vs multi."""
+    from scipy.stats import mannwhitneyu
+
+    results = []
+
+    # Group raw batch_times by config dimensions
+    groups = defaultdict(list)
+    for m in all_metrics:
+        parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
+        key = (parsed['batch_size'], parsed['map'], parsed['mode'], parsed['threading'])
+        groups[key].extend(m['batch_times'])
+
+    # Test reactive vs proactive (for each batch_size, map, threading)
+    for batch_size in sorted(set(k[0] for k in groups)):
+        for map_name in sorted(set(k[1] for k in groups)):
+            for threading in ['single', 'multi']:
+                reactive_key = (batch_size, map_name, 'reactive', threading)
+                proactive_key = (batch_size, map_name, 'proactive', threading)
+                if reactive_key in groups and proactive_key in groups:
+                    r_data = groups[reactive_key]
+                    p_data = groups[proactive_key]
+                    if len(r_data) >= 5 and len(p_data) >= 5:
+                        stat, pval = mannwhitneyu(r_data, p_data, alternative='two-sided')
+                        results.append({
+                            'comparison': 'reactive_vs_proactive',
+                            'batch_size': batch_size,
+                            'map': map_name,
+                            'threading': threading,
+                            'n_reactive': len(r_data),
+                            'n_proactive': len(p_data),
+                            'U_statistic': stat,
+                            'p_value': pval,
+                            'significant_005': pval < 0.05,
+                        })
+
+    # Test single vs multi (for each batch_size, map, mode)
+    for batch_size in sorted(set(k[0] for k in groups)):
+        for map_name in sorted(set(k[1] for k in groups)):
+            for mode in ['reactive', 'proactive']:
+                single_key = (batch_size, map_name, mode, 'single')
+                multi_key = (batch_size, map_name, mode, 'multi')
+                if single_key in groups and multi_key in groups:
+                    s_data = groups[single_key]
+                    m_data = groups[multi_key]
+                    if len(s_data) >= 5 and len(m_data) >= 5:
+                        stat, pval = mannwhitneyu(s_data, m_data, alternative='two-sided')
+                        results.append({
+                            'comparison': 'single_vs_multi',
+                            'batch_size': batch_size,
+                            'map': map_name,
+                            'mode': mode,
+                            'n_single': len(s_data),
+                            'n_multi': len(m_data),
+                            'U_statistic': stat,
+                            'p_value': pval,
+                            'significant_005': pval < 0.05,
+                        })
+
+    if results:
+        stat_df = pd.DataFrame(results)
+        stat_df.to_csv(results_dir / 'statistical_tests.csv', index=False)
+        print(f"  Statistical tests saved to: {results_dir / 'statistical_tests.csv'}")
+
+    return results
 
 
 def main():
@@ -945,11 +1148,21 @@ def main():
         print("\nError: No metrics could be extracted from traces")
         return 1
 
-    # Save individual run metrics
+    # Save individual run metrics (exclude list columns that don't serialize to CSV)
     print(f"\nSaving individual run metrics...")
+    list_columns = [
+        'batch_times', 'server_cancel_response_delays',
+        'goal_to_finish_latencies', 'goal_to_cancel_latencies',
+        'cancel_to_finish_latencies', 'per_batch_overheads', 'overhead_ratios',
+        'feedback_send_times', 'result_compute_times', 'convergence_data',
+        'final_best_costs', 'final_tree_sizes', 'first_solution_iterations',
+        'exact_total_iterations',
+    ]
     individual_df = pd.DataFrame(all_metrics)
+    scalar_df = individual_df.drop(columns=[c for c in list_columns if c in individual_df.columns],
+                                   errors='ignore')
     individual_csv = RESULTS_DIR / 'individual_runs.csv'
-    individual_df.to_csv(individual_csv, index=False)
+    scalar_df.to_csv(individual_csv, index=False)
     print(f"  Saved to: {individual_csv}")
 
     # Aggregate runs
@@ -972,6 +1185,16 @@ def main():
 
     # Generate plots
     generate_plots(aggregated, all_metrics)
+
+    # Run statistical significance tests
+    print("\nRunning statistical significance tests...")
+    try:
+        stat_results = run_statistical_tests(all_metrics, RESULTS_DIR)
+        sig_count = sum(1 for r in stat_results if r.get('significant_005'))
+        print(f"  {len(stat_results)} tests performed, {sig_count} significant at p < 0.05")
+    except ImportError:
+        print("  WARNING: scipy not installed, skipping statistical tests")
+        print("  Install with: pip3 install scipy")
 
     # Generate map visualizations with start/goal positions
     print("\nGenerating map visualizations...")

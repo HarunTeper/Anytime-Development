@@ -43,7 +43,7 @@ BATCH_SIZES=(1 16 64 256 1024 4096 16384)
 MODES=("reactive" "proactive")
 THREADING=("single" "multi")
 MAPS=("depot" "warehouse")
-NUM_RUNS=1  # Number of trials per configuration
+NUM_RUNS=5  # Number of trials per configuration
 
 # Duration for each experiment run (in seconds)
 RUN_DURATION=10
@@ -69,11 +69,16 @@ source install/setup.bash
 MAPS_DIR="$(ros2 pkg prefix anytime_rrt_star)/share/anytime_rrt_star/maps"
 echo "Maps directory: ${MAPS_DIR}"
 
+# Regenerate configs to ensure fresh MAPS_DIR placeholders (idempotent)
+echo "Regenerating configs..."
+rm -rf "${CONFIG_DIR}"
+cd "${EXPERIMENT_DIR}"
+python3 generate_configs.py
+cd "${PACKAGES_DIR}"
+
 # Update MAPS_DIR placeholder in generated configs
-if [ -d "${CONFIG_DIR}" ]; then
-    echo "Updating map paths in config files..."
-    find "${CONFIG_DIR}" -name "*_server.yaml" -exec sed -i "s|MAPS_DIR|${MAPS_DIR}|g" {} \;
-fi
+echo "Updating map paths in config files..."
+find "${CONFIG_DIR}" -name "*_server.yaml" -exec sed -i "s|MAPS_DIR|${MAPS_DIR}|g" {} \;
 
 # Clean old output from previous runs
 echo "Cleaning old traces and results..."

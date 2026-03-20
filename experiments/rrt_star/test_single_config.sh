@@ -97,4 +97,4 @@ lttng destroy rrt_star_test
 
 echo ""
 echo "Trace saved to: ${trace_output}"
-echo "View with: babeltrace2 ${trace_output}"
+echo "View with: babeltrace ${trace_output}"
