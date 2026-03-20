@@ -42,33 +42,74 @@ def launch_setup(context, *args, **kwargs):
         'server_config', default_server_config)
     log_level = context.launch_configurations.get('log_level', 'info')
 
-    # Both client and server in the same container
-    print(f"Configuration: Client and Server in SAME container ({executor_type.lower()})")
-    print("="*80 + "\n")
+    if use_multi_threaded == 'true':
+        # Multi-threaded: Both client and server in the same container
+        print("Configuration: Client and Server in SAME container (multi-threaded)")
+        print("="*80 + "\n")
 
-    container = ComposableNodeContainer(
-        name=container_name,
-        namespace='',
-        package='rclcpp_components',
-        executable=executable_name,
-        composable_node_descriptions=[
-            ComposableNode(
-                package='anytime_rrt_star',
-                plugin='AnytimeRrtActionServer',
-                name='anytime_server',
-                parameters=[server_config],
-            ),
-            ComposableNode(
-                package='anytime_rrt_star',
-                plugin='AnytimeRrtActionClient',
-                name='anytime_client',
-                parameters=[client_config],
-            ),
-        ],
-        output='screen',
-        arguments=['--ros-args', '--log-level', log_level],
-    )
-    return [container]
+        container = ComposableNodeContainer(
+            name=container_name,
+            namespace='',
+            package='rclcpp_components',
+            executable=executable_name,
+            composable_node_descriptions=[
+                ComposableNode(
+                    package='anytime_rrt_star',
+                    plugin='AnytimeRrtActionServer',
+                    name='anytime_server',
+                    parameters=[server_config],
+                ),
+                ComposableNode(
+                    package='anytime_rrt_star',
+                    plugin='AnytimeRrtActionClient',
+                    name='anytime_client',
+                    parameters=[client_config],
+                ),
+            ],
+            output='screen',
+            arguments=['--ros-args', '--log-level', log_level],
+        )
+        return [container]
+    else:
+        # Single-threaded: Separate containers for client and server
+        print("Configuration: Client and Server in SEPARATE containers (single-threaded)")
+        print("="*80 + "\n")
+
+        server_container = ComposableNodeContainer(
+            name=f'{container_name}_server',
+            namespace='',
+            package='rclcpp_components',
+            executable=executable_name,
+            composable_node_descriptions=[
+                ComposableNode(
+                    package='anytime_rrt_star',
+                    plugin='AnytimeRrtActionServer',
+                    name='anytime_server',
+                    parameters=[server_config],
+                ),
+            ],
+            output='screen',
+            arguments=['--ros-args', '--log-level', log_level],
+        )
+
+        client_container = ComposableNodeContainer(
+            name=f'{container_name}_client',
+            namespace='',
+            package='rclcpp_components',
+            executable=executable_name,
+            composable_node_descriptions=[
+                ComposableNode(
+                    package='anytime_rrt_star',
+                    plugin='AnytimeRrtActionClient',
+                    name='anytime_client',
+                    parameters=[client_config],
+                ),
+            ],
+            output='screen',
+            arguments=['--ros-args', '--log-level', log_level],
+        )
+
+        return [server_container, client_container]
 
 
 def generate_launch_description():
