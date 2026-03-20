@@ -9,9 +9,9 @@
 #   --full            Use full experiment scripts (7 batch sizes, 10s runs)
 #
 # Experiment selection:
-#   --cpu-only        Run only CPU experiments (Monte Carlo + Interference)
+#   --cpu-only        Run only CPU experiments (RRT* + Interference)
 #   --gpu-only        Run only GPU experiments (YOLO)
-#   --monte-carlo     Run Monte Carlo experiments
+#   --rrt-star        Run RRT* experiments
 #   --interference    Run Interference experiments
 #   --yolo            Run YOLO experiments
 #
@@ -31,7 +31,7 @@
 #   --clean               Remove experiment outputs (traces, results, configs, figures, logs)
 #   --clean-all           Remove everything --clean does, plus build artifacts and weights
 #
-# If none of --monte-carlo, --interference, --yolo, --cpu-only, --gpu-only
+# If none of --rrt-star, --interference, --yolo, --cpu-only, --gpu-only
 # are specified, all experiments are run.
 #
 # Duration estimates (on Jetson Orin NX):
@@ -52,7 +52,7 @@ cleanup() {
     fi
     lttng stop 2>/dev/null || true
     pkill -9 -f 'component_container' 2>/dev/null || true
-    pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
+    pkill -9 -f 'anytime_rrt_star' 2>/dev/null || true
     pkill -9 -f 'interference_timer' 2>/dev/null || true
     pkill -9 -f 'ros2' 2>/dev/null || true
     sleep 1
@@ -68,7 +68,7 @@ PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 MODE="quick"
 CPU_ONLY=false
 GPU_ONLY=false
-RUN_MC=false
+RUN_RRT=false
 RUN_IF=false
 RUN_YOLO=false
 NO_SMOKE=false
@@ -89,7 +89,7 @@ for arg in "$@"; do
         --full)  MODE="full" ;;
         --cpu-only) CPU_ONLY=true ;;
         --gpu-only) GPU_ONLY=true ;;
-        --monte-carlo) RUN_MC=true; EXPLICIT_SELECTION=true ;;
+        --rrt-star) RUN_RRT=true; EXPLICIT_SELECTION=true ;;
         --interference) RUN_IF=true; EXPLICIT_SELECTION=true ;;
         --yolo) RUN_YOLO=true; EXPLICIT_SELECTION=true ;;
         --no-smoke-test) NO_SMOKE=true ;;
@@ -110,9 +110,9 @@ for arg in "$@"; do
             echo "  --full                Full experiments (7 batch sizes, 10s)"
             echo ""
             echo "Experiment selection:"
-            echo "  --cpu-only            Run only CPU experiments (Monte Carlo + Interference)"
+            echo "  --cpu-only            Run only CPU experiments (RRT* + Interference)"
             echo "  --gpu-only            Run only GPU experiments (YOLO)"
-            echo "  --monte-carlo         Run Monte Carlo experiments"
+            echo "  --rrt-star            Run RRT* experiments"
             echo "  --interference        Run Interference experiments"
             echo "  --yolo                Run YOLO experiments"
             echo ""
@@ -135,7 +135,7 @@ for arg in "$@"; do
             echo "                        YOLO weights, video frames, and __pycache__"
             echo ""
             echo "If no experiment flags are given, all experiments are run."
-            echo "Flags can be combined: --monte-carlo --interference"
+            echo "Flags can be combined: --rrt-star --interference"
             echo ""
             echo "Duration estimates (on Jetson Orin NX):"
             echo "  --quick --cpu-only     ~5 minutes"
@@ -161,7 +161,7 @@ if [ "${DO_CLEAN}" = true ] || [ "${DO_CLEAN_ALL}" = true ]; then
 
     # Experiment outputs (always)
     echo "  Experiment outputs:"
-    for exp in monte_carlo interference yolo; do
+    for exp in rrt_star interference_rrt_star yolo; do
         for sub in traces results configs; do
             dir="${WORKSPACE_DIR}/experiments/${exp}/${sub}"
             if [ -d "${dir}" ]; then
@@ -216,7 +216,7 @@ if [ "${DO_CLEAN}" = true ] || [ "${DO_CLEAN_ALL}" = true ]; then
     echo ""
 
     # Remove experiment outputs
-    for exp in monte_carlo interference yolo; do
+    for exp in rrt_star interference_rrt_star yolo; do
         for sub in traces results configs; do
             dir="${WORKSPACE_DIR}/experiments/${exp}/${sub}"
             if [ -d "${dir}" ]; then
@@ -300,12 +300,12 @@ fi
 # Resolve experiment selection
 # --cpu-only and --gpu-only are shorthands
 if [ "${CPU_ONLY}" = true ]; then
-    RUN_MC=true
+    RUN_RRT=true
     RUN_IF=true
     RUN_YOLO=false
     EXPLICIT_SELECTION=true
 elif [ "${GPU_ONLY}" = true ]; then
-    RUN_MC=false
+    RUN_RRT=false
     RUN_IF=false
     RUN_YOLO=true
     EXPLICIT_SELECTION=true
@@ -313,7 +313,7 @@ fi
 
 # If no explicit selection, run everything
 if [ "${EXPLICIT_SELECTION}" = false ]; then
-    RUN_MC=true
+    RUN_RRT=true
     RUN_IF=true
     RUN_YOLO=true
 fi
@@ -346,7 +346,7 @@ echo "Anytime ROS 2 -- Artifact Evaluation"
 echo "========================================="
 echo ""
 echo "Mode:          ${MODE}"
-echo "Monte Carlo:   ${RUN_MC}"
+echo "RRT*:          ${RUN_RRT}"
 echo "Interference:  ${RUN_IF}"
 echo "YOLO:          ${RUN_YOLO}"
 echo "Smoke test:    $([ "${NO_SMOKE}" = true ] && echo "skip" || echo "yes")"
@@ -515,16 +515,16 @@ else
 fi
 
 # ─────────────────────────────────────────────
-# Phase 2: Monte Carlo experiments
+# Phase 2: RRT* experiments
 # ─────────────────────────────────────────────
-if [ "${RUN_MC}" = true ]; then
+if [ "${RUN_RRT}" = true ]; then
     if [ "${MODE}" = "quick" ]; then
-        run_phase "Monte Carlo experiments (quick)" "${WORKSPACE_DIR}/experiments/monte_carlo/run_quick.sh"
+        run_phase "RRT* experiments (quick)" "${WORKSPACE_DIR}/experiments/rrt_star/run_quick.sh"
     else
-        run_phase "Monte Carlo experiments (full)" "${WORKSPACE_DIR}/experiments/monte_carlo/run_monte_carlo_experiments.sh"
+        run_phase "RRT* experiments (full)" "${WORKSPACE_DIR}/experiments/rrt_star/run_rrt_star_experiments.sh"
     fi
 else
-    skip_phase "Monte Carlo experiments" "not selected"
+    skip_phase "RRT* experiments" "not selected"
 fi
 
 # ─────────────────────────────────────────────
@@ -532,9 +532,9 @@ fi
 # ─────────────────────────────────────────────
 if [ "${RUN_IF}" = true ]; then
     if [ "${MODE}" = "quick" ]; then
-        run_phase "Interference experiments (quick)" "${WORKSPACE_DIR}/experiments/interference/run_quick.sh"
+        run_phase "Interference experiments (quick)" "${WORKSPACE_DIR}/experiments/interference_rrt_star/run_quick.sh"
     else
-        run_phase "Interference experiments (full)" "${WORKSPACE_DIR}/experiments/interference/run_interference_experiments.sh"
+        run_phase "Interference experiments (full)" "${WORKSPACE_DIR}/experiments/interference_rrt_star/run_interference_experiments.sh"
     fi
 else
     skip_phase "Interference experiments" "not selected"
@@ -691,11 +691,11 @@ total=$((passed + failed + skipped))
     printf "  %-45s %-10s %s\n" "TOTAL" "" "$(format_duration ${OVERALL_DURATION})"
     echo ""
     echo "Result locations (relative to workspace root):"
-    if [ "${RUN_MC}" = true ]; then
-        echo "  Monte Carlo:    experiments/monte_carlo/results/"
+    if [ "${RUN_RRT}" = true ]; then
+        echo "  RRT*:           experiments/rrt_star/results/"
     fi
     if [ "${RUN_IF}" = true ]; then
-        echo "  Interference:   experiments/interference/results/"
+        echo "  Interference:   experiments/interference_rrt_star/results/"
     fi
     if [ "${RUN_YOLO}" = true ] && [ "${HAS_GPU}" = true ] && [ "${MODE}" = "full" ]; then
         echo "  YOLO:           experiments/yolo/results/"
