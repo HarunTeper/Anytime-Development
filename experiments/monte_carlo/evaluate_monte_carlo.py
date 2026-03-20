@@ -66,28 +66,17 @@ def parse_trace_directory(trace_dir):
     """
     print(f"  Parsing trace: {trace_dir.name}")
 
-    # Use babeltrace2 with filter if available (faster)
     try:
-        # Try babeltrace2 first (newer, faster)
         result = subprocess.run(
-            ['babeltrace2', '--names', 'none', str(trace_dir)],
+            ['babeltrace', str(trace_dir)],
             capture_output=True,
             text=True,
             check=True
         )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        # Fall back to babeltrace
-        try:
-            result = subprocess.run(
-                ['babeltrace', str(trace_dir)],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-        except subprocess.CalledProcessError as e:
-            print(f"    Error running babeltrace: {e}")
-            return []
-        except FileNotFoundError:
+    except subprocess.CalledProcessError as e:
+        print(f"    Error running babeltrace: {e}")
+        return []
+    except FileNotFoundError:
             print("    Error: babeltrace not found. Please install lttng-tools.")
             return []
 
@@ -182,7 +171,7 @@ def extract_metrics_from_events(events, config_name):
         'total_iterations': 0,  # Will be calculated as total_batches * batch_size
         'batch_times': [],  # Time per batch in ms
         'iterations_per_batch': [],  # Will be set to batch_size
-        'cancellation_delays': [],  # Time from cancel to deactivate in ms
+        'server_cancel_response_delays': [],  # Time from cancel to deactivate in ms
         'compute_times': [],  # Time spent in compute
         'feedback_times': [],  # Time spent sending feedback
         'result_times': [],  # Time spent calculating results
@@ -251,7 +240,7 @@ def extract_metrics_from_events(events, config_name):
             if cancel_request_time is not None:
                 cancellation_delay_ms = (
                     event.timestamp - cancel_request_time) / 1e6
-                metrics['cancellation_delays'].append(cancellation_delay_ms)
+                metrics['server_cancel_response_delays'].append(cancellation_delay_ms)
                 cancel_request_time = None
 
         # New: Track goal sent timestamp
@@ -298,14 +287,14 @@ def extract_metrics_from_events(events, config_name):
     # No variation since it's the configured batch_size
     metrics['std_iterations_per_batch'] = 0
 
-    if metrics['cancellation_delays']:
-        metrics['avg_cancellation_delay'] = np.mean(
-            metrics['cancellation_delays'])
-        metrics['std_cancellation_delay'] = np.std(
-            metrics['cancellation_delays'])
+    if metrics['server_cancel_response_delays']:
+        metrics['avg_server_cancel_response'] = np.mean(
+            metrics['server_cancel_response_delays'])
+        metrics['std_server_cancel_response'] = np.std(
+            metrics['server_cancel_response_delays'])
     else:
-        metrics['avg_cancellation_delay'] = 0
-        metrics['std_cancellation_delay'] = 0
+        metrics['avg_server_cancel_response'] = 0
+        metrics['std_server_cancel_response'] = 0
 
     # New: Compute latency statistics
     if metrics['goal_to_finish_latencies']:
@@ -364,8 +353,8 @@ def aggregate_runs(all_metrics):
             'std_time_per_batch': np.mean([r['std_time_per_batch'] for r in runs]),
             'avg_iterations_per_batch': np.mean([r['avg_iterations_per_batch'] for r in runs]),
             'std_iterations_per_batch': np.mean([r['std_iterations_per_batch'] for r in runs]),
-            'avg_cancellation_delay': np.mean([r['avg_cancellation_delay'] for r in runs if r['avg_cancellation_delay'] > 0]) if any(r['avg_cancellation_delay'] > 0 for r in runs) else 0,
-            'std_cancellation_delay': np.mean([r['std_cancellation_delay'] for r in runs if r['std_cancellation_delay'] > 0]) if any(r['std_cancellation_delay'] > 0 for r in runs) else 0,
+            'avg_server_cancel_response': np.mean([r['avg_server_cancel_response'] for r in runs if r['avg_server_cancel_response'] > 0]) if any(r['avg_server_cancel_response'] > 0 for r in runs) else 0,
+            'std_server_cancel_response': np.mean([r['std_server_cancel_response'] for r in runs if r['std_server_cancel_response'] > 0]) if any(r['std_server_cancel_response'] > 0 for r in runs) else 0,
             # New latency metrics
             'avg_goal_to_finish_latency': np.mean([r['avg_goal_to_finish_latency'] for r in runs if r['avg_goal_to_finish_latency'] > 0]) if any(r['avg_goal_to_finish_latency'] > 0 for r in runs) else 0,
             'std_goal_to_finish_latency': np.mean([r['std_goal_to_finish_latency'] for r in runs if r['std_goal_to_finish_latency'] > 0]) if any(r['std_goal_to_finish_latency'] > 0 for r in runs) else 0,
@@ -407,7 +396,10 @@ def generate_plots(aggregated_metrics):
     ])
 
     # Set plot style
-    plt.style.use('seaborn-darkgrid')
+    try:
+        plt.style.use('seaborn-v0_8-darkgrid')
+    except OSError:
+        plt.style.use('seaborn-darkgrid')
 
     # Plot 1: Batch Size vs Average Iterations per Batch
     print("  - Batch size vs iterations per batch")
@@ -508,8 +500,8 @@ def generate_plots(aggregated_metrics):
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
-    # Plot 3: Cancellation Delay Comparison
-    print("  - Cancellation delay comparison")
+    # Plot 3: Server Cancel Response Delay Comparison
+    print("  - Server cancel response delay comparison")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT_SMALL))
 
     # Get all unique batch sizes present in the data
@@ -533,7 +525,7 @@ def generate_plots(aggregated_metrics):
                 batch_data = data[data['batch_size'] == batch_size]
                 if not batch_data.empty:
                     y_values.append(
-                        batch_data['avg_cancellation_delay'].iloc[0])
+                        batch_data['avg_server_cancel_response'].iloc[0])
                     x_positions.append(all_batch_sizes.index(batch_size))
 
             if y_values:
@@ -542,8 +534,8 @@ def generate_plots(aggregated_metrics):
                        label=f'{mode}-{threading}')
 
     ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
-    ax.set_ylabel('Average Cancellation Delay (ms)', fontsize=FONT_SIZE_LABEL)
-    # ax.set_title('Cancellation Delay Comparison', fontsize=FONT_SIZE_TITLE)
+    ax.set_ylabel('Server Cancel Response Delay (ms)', fontsize=FONT_SIZE_LABEL)
+    # ax.set_title('Server Cancel Response Delay Comparison', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
@@ -552,7 +544,7 @@ def generate_plots(aggregated_metrics):
     ax.grid(True, axis='y')
 
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / 'cancellation_delay.pdf',
+    plt.savefig(PLOTS_DIR / 'server_cancel_response.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
@@ -747,9 +739,9 @@ def generate_plots(aggregated_metrics):
                        label=f'{mode}-{threading}', yerr=yerr_values, capsize=CAPSIZE)
 
     ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
-    ax.set_ylabel('Average Cancel-to-Finish Latency (ms)',
+    ax.set_ylabel('Cancellation Latency (ms)',
                   fontsize=FONT_SIZE_LABEL)
-    # ax.set_title('Batch Size vs Cancel-to-Finish Latency', fontsize=FONT_SIZE_TITLE)
+    # ax.set_title('Batch Size vs Cancellation Latency', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
@@ -758,7 +750,7 @@ def generate_plots(aggregated_metrics):
     ax.grid(True, axis='y')
 
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / 'cancel_to_finish_latency.pdf',
+    plt.savefig(PLOTS_DIR / 'cancellation_latency.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
@@ -808,12 +800,12 @@ def generate_plots(aggregated_metrics):
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
-    # Plot 9: Total Cancellation Time (goal_to_cancel + cancellation_delay)
+    # Plot 9: Total Cancellation Time (goal_to_cancel + server_cancel_response)
     print("  - Total cancellation time (start to cancel + cancellation delay)")
 
     # Calculate combined cancellation time
     df['total_cancellation_time'] = df['avg_goal_to_cancel_latency'] + \
-        df['avg_cancellation_delay']
+        df['avg_server_cancel_response']
 
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
@@ -848,7 +840,7 @@ def generate_plots(aggregated_metrics):
     ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Total Cancellation Time (ms)', fontsize=FONT_SIZE_LABEL)
     # ax.set_title(
-    #     'Batch Size vs Total Cancellation Time\n(Goal-to-Cancel + Cancellation Delay)', fontsize=FONT_SIZE_TITLE)
+    #     'Batch Size vs Total Cancellation Time\n(Goal-to-Cancel + Server Cancel Response)', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
     ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)

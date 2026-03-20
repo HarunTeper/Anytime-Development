@@ -69,7 +69,7 @@ def parse_trace_directory(trace_dir):
     """
     print(f"  Parsing trace: {trace_dir.name}")
 
-    # Use babeltrace2 to parse traces
+    # Use babeltrace to parse traces
     try:
         result = subprocess.run(
             ['babeltrace', str(trace_dir)],
@@ -347,7 +347,10 @@ def generate_plots(aggregated_metrics):
     ])
 
     # Set plot style
-    plt.style.use('seaborn-darkgrid')
+    try:
+        plt.style.use('seaborn-v0_8-darkgrid')
+    except OSError:
+        plt.style.use('seaborn-darkgrid')
 
     # Plot 1: Timer Period vs Batch Size
     print("  - Timer period vs batch size")

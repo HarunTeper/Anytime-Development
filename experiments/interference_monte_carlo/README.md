@@ -30,7 +30,7 @@ ls results/plots/
 - Period: 100ms (10 Hz)
 - Execution: 10ms busy-wait
 
-**Total**: 18 configs × 1 run = 18 experiments
+**Total**: 18 configs × 5 runs = 90 experiments
 
 ## Metrics
 
@@ -69,7 +69,7 @@ chmod +x run_interference_experiments.sh
 ```
 
 This will:
-- Run all 18 experiments (9 batch sizes × 2 modes × 1 run)
+- Run all 90 experiments (9 batch sizes × 2 modes × 5 runs)
 - Each run lasts 10 seconds
 - Total time: ~7 minutes (including setup/teardown)
 - Automatically call the evaluation script when done
@@ -171,8 +171,8 @@ interference_timer:
 ## Output Files
 
 ### CSV Files
-- `individual_runs.csv`: Raw metrics from all 18 runs
-- `aggregated_results.csv`: Averaged metrics for each of 18 configurations
+- `individual_runs.csv`: Raw metrics from all 90 runs
+- `aggregated_results.csv`: Averaged metrics for each of 18 configurations (averaged across 5 runs)
 
 ### JSON File
 - `aggregated_results.json`: Complete results in JSON format for further processing
@@ -227,7 +227,7 @@ RUN_DURATION=10  # Change to desired duration in seconds
 ### Modify Number of Runs
 Edit `run_interference_experiments.sh`:
 ```bash
-NUM_RUNS=1  # Change to desired number of runs per config
+NUM_RUNS=5  # Change to desired number of runs per config
 ```
 
 ### Modify Batch Sizes
@@ -287,7 +287,7 @@ pip3 install pandas numpy matplotlib
 ## Expected Runtime
 
 - Single configuration test: ~15 seconds
-- Full experiment suite (18 configs × 10s): ~7 minutes
+- Full experiment suite (90 runs × 10s): ~20 minutes
 - Quick experiment suite (8 configs × 5s): ~3 minutes
 - Evaluation script: ~1 minute
 
