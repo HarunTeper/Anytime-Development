@@ -127,7 +127,8 @@ USER $USERNAME
 # Add user to necessary groups
 RUN sudo usermod -a -G video $USERNAME && \
     sudo groupadd -f -r tracing && \
-    sudo usermod -a -G tracing $USERNAME
+    sudo usermod -a -G tracing $USERNAME && \
+    sudo usermod -a -G 104 $USERNAME
 
 # Configure ROS2 environment
 RUN echo "" >> /home/$USERNAME/.bashrc && \
