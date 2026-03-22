@@ -50,7 +50,7 @@ python3 2b_analyze_blocks.py
 ./3_measure_throughput.sh
 ```
 - Tests 4 configurations: sync/async × single/multi-threaded
-- All use batch_size=25 (full model, no cancellation)
+- All use batch_size=22 (full model, no cancellation)
 - **Output:** `traces/phase3_{sync|async}_{single|multi}_trial{1,2,3}/`
 
 ### Step 4: Analyze Throughput Results
@@ -72,7 +72,7 @@ python3 4_analyze_throughput.py
 python3 5_generate_configs.py
 ```
 - Creates configs for 24 combinations:
-  - Block sizes: 1, 8, 13, 15, 16, 25
+  - Block sizes: 1, 4, 8, 13, 16, 20, 22
   - Mode: proactive
   - Sync: sync, async
   - Threading: single, multi
@@ -83,8 +83,8 @@ python3 5_generate_configs.py
 ./6_run_experiments.sh
 ```
 - Runs all 24 configurations × 3 trials = 72 experiments
-- Client cancels after 25 layers OR score threshold 0.8
-- **Output:** `traces/phase4_bs{1,8,13,15,16,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/`
+- Client cancels after 22 layers OR score threshold 0.8
+- **Output:** `traces/phase4_bs{1,4,8,13,16,20,22}_proactive_{sync|async}_{single|multi}_trial{1,2,3,4,5}/`
 - **Note:** To test a single config: `./6a_test_single_config.sh bs1_proactive_sync_single`
 
 ### Step 7: Analyze Cancellation Performance
@@ -132,7 +132,7 @@ python3 7_analyze_cancellation.py
 
 ### Baseline Collection (Step 1)
 - **Purpose:** Establish baseline performance and quality data
-- **Configuration:** Single-threaded, batch_size=1, all 25 layers
+- **Configuration:** Single-threaded, batch_size=1, all 22 layers
 - **Duration:** ~30-60 minutes for 3 trials
 - **Use cases:** Understanding layer-wise quality progression, identifying when detections stabilize
 
@@ -175,7 +175,7 @@ python3 7_analyze_cancellation.py
 
 ### Cancellation Experiments (Step 6)
 - **Purpose:** Measure cancellation responsiveness
-- **Client behavior:** Cancel after 25 layers OR score ≥ 0.8 (whichever comes first)
+- **Client behavior:** Cancel after 22 layers OR score ≥ 0.8 (whichever comes first)
 - **Duration:** ~1.5-3 hours for 24 configs × 3 trials
 - **Output:** Traces with cancellation timing data
 
@@ -193,11 +193,11 @@ python3 7_analyze_cancellation.py
 
 ### Configuration Files (YAML)
 Located in `configs/`, these specify:
-- **batch_size**: Number of layers processed per block (1, 8, 13, 15, 16, or 25)
+- **batch_size**: Number of layers processed per block (1, 4, 8, 13, 16, 20, or 22)
 - **is_reactive_proactive**: Mode ("reactive" or "proactive")
 - **is_sync_async**: Executor type ("sync" or "async")
 - **multi_threading**: Threading mode (true/false)
-- **cancel_after_layers**: Client cancellation threshold (25 for Step 6)
+- **cancel_after_layers**: Client cancellation threshold (22 for Step 6)
 - **score_threshold**: Quality-based cancellation (0.8 for Step 6)
 
 ### Metrics Collected

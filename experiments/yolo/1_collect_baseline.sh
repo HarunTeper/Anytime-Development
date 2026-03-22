@@ -3,7 +3,7 @@
 # Step 1: Collect Baseline Data
 #
 # Purpose: Run baseline configuration to collect layer-wise detection and timing data
-# Configuration: batch_size=1, proactive, single-threaded, all 25 layers
+# Configuration: batch_size=1, proactive, single-threaded, all 22 layers
 # Output: traces/phase1_baseline_trial{1,2,3}/
 #
 
@@ -34,7 +34,7 @@ echo "Configuration:"
 echo "  - Batch size: 1 (layer-by-layer)"
 echo "  - Mode: Proactive"
 echo "  - Threading: Single"
-echo "  - Layers: All 25 layers"
+echo "  - Layers: All 22 layers"
 echo "  - Trials: ${NUM_TRIALS}"
 echo "  - Trace output: ${TRACE_DIR}"
 echo ""

@@ -4,7 +4,7 @@
 #
 # Purpose: Test different configurations to find maximum throughput
 # Configurations: sync/async × single/multi-threaded (4 total)
-# Each uses batch_size=25 (all layers, no cancellation)
+# Each uses batch_size=22 (all layers, no cancellation)
 # Output: traces/phase3_{sync|async}_{single|multi}_trial{1,2,3}/
 #
 
@@ -41,7 +41,7 @@ echo -e "${GREEN}Step 3: Measure Maximum Throughput${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Testing configurations:"
-echo "  - Batch size: 25 (all layers, no cancellation)"
+echo "  - Batch size: 22 (all layers, no cancellation)"
 echo "  - Mode: Proactive"
 echo "  - Configurations: ${#CONFIGS[@]}"
 echo "  - Trials per config: ${NUM_TRIALS}"
@@ -138,7 +138,7 @@ for config in "${CONFIGS[@]}"; do
         
         # Launch YOLO server and client components
         echo -e "${BLUE}Launching YOLO server and client...${NC}"
-        echo "  - Batch size: 25 (all layers)"
+        echo "  - Batch size: 22 (all layers)"
         echo "  - Mode: Proactive"
         echo "  - Sync: ${sync_mode}"
         echo "  - Multi-threading: ${threading_mode}"

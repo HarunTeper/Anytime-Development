@@ -3,7 +3,7 @@
 Step 5: Generate Cancellation Experiment Configurations
 
 Creates configuration files for all combinations:
-- Block sizes: 1, 4, 8, 13, 16, 20, 25
+- Block sizes: 1, 4, 8, 13, 16, 20, 22
 - Mode: proactive
 - Sync modes: sync, async
 - Threading: single, multi
@@ -11,7 +11,7 @@ Creates configuration files for all combinations:
 Total: 7 × 1 × 2 × 2 = 28 server configs + 1 client config
 
 Client cancellation settings:
-- Cancel after 25 layers (no hard deadline — score-only cancellation)
+- Cancel after 22 layers (no hard deadline — score-only cancellation)
 - Score threshold: 0.8
 - Target class: 9 (traffic light)
 
@@ -30,7 +30,7 @@ WORKSPACE_DIR = SCRIPT_DIR.parent.parent
 CONFIG_DIR.mkdir(exist_ok=True)
 
 # Configuration parameters
-BLOCK_SIZES = [1, 4, 8, 13, 16, 20, 25]
+BLOCK_SIZES = [1, 4, 8, 13, 16, 20, 22]
 MODES = ["proactive"]
 SYNC_MODES = ["sync", "async"]
 THREADING_MODES = ["single", "multi"]
@@ -40,7 +40,7 @@ CLIENT_CONFIG = {
     "anytime_client": {
         "ros__parameters": {
             "image_topic": "video_frames",
-            "cancel_after_layers": 25,  # No hard deadline — score-only cancellation
+            "cancel_after_layers": 22,  # No hard deadline — score-only cancellation
             "cancel_layer_score": True,  # Enable score-based cancellation
             "score_threshold": 0.8,       # Score threshold for detection quality
             "target_class_id": "9",       # Traffic light
@@ -124,7 +124,7 @@ def main():
         f"  Total: {len(BLOCK_SIZES) * len(MODES) * len(SYNC_MODES) * len(THREADING_MODES)} combinations")
 
     print("\nClient Cancellation Settings:")
-    print(f"  Cancel after: 25 layers (no hard deadline)")
+    print(f"  Cancel after: 22 layers (no hard deadline)")
     print(f"  Score threshold: \u2265 0.8")
     print(f"  Target class: 9 (traffic light)")
 

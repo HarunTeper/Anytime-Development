@@ -4,7 +4,7 @@ Step 2b: Block Size Analysis
 
 Analyzes baseline traces (from Step 1) to determine total delay for different block sizes.
 
-For each block size (1-25 layers), calculates total delay by summing:
+For each block size (1-22 layers), calculates total delay by summing:
 - Layer computation times within each block
 - Exit calculation time at the end of each block
 
@@ -55,7 +55,7 @@ RESULTS_DIR.mkdir(exist_ok=True)
 PLOTS_DIR.mkdir(exist_ok=True)
 BLOCK_DIR.mkdir(exist_ok=True)
 
-MAX_LAYER = 25  # Maximum layer number (0-indexed, so 0-24 = 25 layers total)
+MAX_LAYER = 22  # Actual model layer count (22 layer chunks, indices 0-21)
 
 
 def extract_timing_data(trace_dir):
@@ -355,7 +355,7 @@ def plot_num_blocks_vs_block_size(block_size_stats):
     print(f"    Saved: {BLOCK_DIR / 'num_blocks_vs_block_size.png'}")
 
 
-def plot_per_block_delay_distribution(block_size_stats, selected_block_sizes=[1, 3, 5, 8, 16, 25]):
+def plot_per_block_delay_distribution(block_size_stats, selected_block_sizes=[1, 3, 5, 8, 16, 22]):
     """
     Plot distribution of per-block delays for selected block sizes
     """

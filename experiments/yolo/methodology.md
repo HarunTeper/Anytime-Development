@@ -3,7 +3,7 @@
 ## 1. Experiment Purpose
 
 This experiment evaluates the **cancellation performance** of an anytime YOLO object
-detection system. The model has 25 neural network layers that can be interrupted at
+detection system. The model has 22 neural network layers that can be interrupted at
 layer boundaries; earlier layers yield faster but lower-quality detections, later layers
 yield better results at higher cost.
 
@@ -32,7 +32,7 @@ Three ROS 2 components form the processing pipeline:
    result, publishes to `images` to trigger the next image.
 
 3. **Anytime Server** (`anytime_management.hpp`, `anytime_base.hpp`) -- Runs the
-   25-layer YOLO model. Computes layers in configurable block sizes. Emits feedback
+   22-layer YOLO model. Computes layers in configurable block sizes. Emits feedback
    containing intermediate detection results after each block. On cancellation, calls
    `calculate_result()` and returns the latest intermediate result.
 
@@ -45,13 +45,13 @@ Three ROS 2 components form the processing pipeline:
 | Sync mode | sync, async | Sync blocks on each GPU layer; async pipelines submissions via CUDA callbacks |
 | Threading | single, multi | Single-threaded uses one executor thread; multi-threaded allows parallel callback processing |
 
-Phase 1 baseline uses fixed batch_size=1. Phase 3 throughput uses fixed batch_size=25.
+Phase 1 baseline uses fixed batch_size=1. Phase 3 throughput uses fixed batch_size=22.
 
 ### Phase 2 (Cancellation Experiments)
 
 | Variable | Values | Rationale |
 |----------|--------|-----------|
-| Block size | 1, 4, 8, 13, 16, 20, 25 | 1=max responsiveness, 25=max throughput, 4 fills the steep 1→8 curve, 20 fills the 16→25 gap, 8/13/16 cover the transition to 2-block plateau |
+| Block size | 1, 4, 8, 13, 16, 20, 22 | 1=max responsiveness, 22=max throughput (all layers), 4 fills the steep 1→8 curve, 20 fills the 16→22 gap, 8/13/16 cover the transition to 2-block plateau |
 | Sync mode | sync, async | Same as Phase 1 |
 | Threading | single, multi | Same as Phase 1 |
 
@@ -62,12 +62,12 @@ Total Phase 2 configurations: 7 block sizes x 2 sync modes x 2 threading modes =
 | Variable | Value | Notes |
 |----------|-------|-------|
 | Anytime mode | proactive | Reactive mode does not support score-based cancellation feedback (see Design Decisions) |
-| Total layers | 25 | Fixed YOLO architecture (layers 0-24) |
+| Total layers | 22 | Fixed YOLO architecture (22 layer chunks, indices 0-21) |
 | Image set | ~190 images from `packages/src/video_publisher/images/` | Sorted by filename, same order every trial |
 | Image resolution | 640x640 (resized internally) | Input images normalized and resized before GPU inference |
 | Target class | 9 (traffic light, COCO) | Used for score-based cancellation and quality filtering |
 | Score threshold | 0.8 | Detection confidence required to trigger early cancellation |
-| cancel_after_layers | 25 | Hard deadline equals total layers, so score-only cancellation in Phase 2 |
+| cancel_after_layers | 22 | Hard deadline equals total layers, so score-only cancellation in Phase 2 |
 | Warmup images | 5 per trial | Skipped in analysis to exclude GPU JIT compilation overhead |
 | Trials | 5 per configuration | For statistical variance estimation; consistent with RRT* experiment |
 | Weights | `packages/src/anytime_yolo/weights_32/` | TensorRT FP32 weights, engines cached after first build |
@@ -109,7 +109,7 @@ Quick environmental verification:
 
 ### Step 1: Baseline Collection (`1_collect_baseline.sh`)
 
-**Purpose:** Collect per-layer timing and detection data with all 25 layers.
+**Purpose:** Collect per-layer timing and detection data with all 22 layers.
 
 | Parameter | Value |
 |-----------|-------|
@@ -204,7 +204,7 @@ Quality thresholds evaluated: 50%, 60%, 70%, 80%, 90%, 95%, 99%.
 **Parameters:**
 ```
 WARMUP_IMAGES = 5
-MAX_LAYER = 25
+MAX_LAYER = 22
 ```
 
 **Block delay calculation:**
@@ -228,9 +228,9 @@ max_block_delay = max(block_delay for each block)
 
 | Metric | Definition |
 |--------|------------|
-| Total delay | Sum of all block delays for processing all 25 layers |
+| Total delay | Sum of all block delays for processing all 22 layers |
 | Max per-block delay | Worst-case single block delay (cancellation responsiveness bound) |
-| Number of blocks | `ceil(25 / block_size)` |
+| Number of blocks | `ceil(22 / block_size)` |
 
 Statistics computed: mean, std, min, max, median across all images (all trials pooled).
 
@@ -238,10 +238,10 @@ Statistics computed: mean, std, min, max, median across all images (all trials p
 
 | Plot | Description |
 |------|-------------|
-| `block_size_delays.png` | Total delay vs block size (0-25), with block_size=1 reference line |
+| `block_size_delays.png` | Total delay vs block size (0-22), with block_size=1 reference line |
 | `max_block_delay.png` | Max per-block delay vs block size |
 | `num_blocks_vs_block_size.png` | Number of blocks vs block size |
-| `per_block_delay_distribution.png` | Histograms for block sizes [1, 3, 5, 8, 16, 25] |
+| `per_block_delay_distribution.png` | Histograms for block sizes [1, 3, 5, 8, 16, 22] |
 | `detailed_block_breakdown.png` | Per-block delay bars + cumulative line for sizes [1, 4, 8, 16] |
 
 **Output:** `results/block_analysis/` (plots + `block_analysis.json` + `block_summary.txt`)
@@ -253,7 +253,7 @@ Statistics computed: mean, std, min, max, median across all images (all trials p
 
 | Parameter | Value |
 |-----------|-------|
-| batch_size | 25 (all layers in one block) |
+| batch_size | 22 (all layers in one block) |
 | Mode | proactive |
 | Cancellation | none |
 | Trials | 3 per config |
@@ -335,7 +335,7 @@ anytime_server:
   ros__parameters:
     is_reactive_proactive: "proactive"
     multi_threading: true/false
-    batch_size: 1/8/13/15/16/25
+    batch_size: 1/4/8/13/16/20/22
     is_sync_async: "sync"/"async"
     weights_path: <absolute path to weights_32>
 ```
@@ -345,7 +345,7 @@ anytime_server:
 anytime_client:
   ros__parameters:
     image_topic: "video_frames"
-    cancel_after_layers: 25
+    cancel_after_layers: 22
     cancel_layer_score: true
     score_threshold: 0.8
     target_class_id: "9"
@@ -422,8 +422,8 @@ WARMUP_IMAGES = 5
 
 Goals are classified into two populations:
 - **Score-cancelled**: Client detected a qualifying traffic light (score >= 0.8)
-  and sent cancel before layer 25. `layers_processed < cancel_after_layers`.
-- **Hard-deadline**: No qualifying detection found. All 25 layers completed.
+  and sent cancel before layer 22. `layers_processed < cancel_after_layers`.
+- **Hard-deadline**: No qualifying detection found. All 22 layers completed.
   `layers_processed >= cancel_after_layers` or no cancel sent.
 
 This separation prevents blending early-exit images (where cancellation is meaningful)
@@ -559,7 +559,7 @@ ensures fresh results in every feedback message.
 
 In both sync and async modes, the C++ instrumentation emits:
 - `yolo_layer_start(N)` — before GPU step, where N = 0..24 (pre-increment)
-- `yolo_layer_end(N+1)` — after GPU step, where N+1 = 1..25 (post-increment)
+- `yolo_layer_end(N+1)` — after GPU step, where N+1 = 1..22 (post-increment)
 
 All analysis scripts account for this offset: when processing a `yolo_layer_end`
 event with `layer_num=K`, the matching start time is looked up at `layer_num=K-1`.
@@ -587,7 +587,7 @@ analysis scripts.
 
 ### Population-Separated Reporting
 For Phase 2, each configuration reports two sets of metrics:
-- **Score-cancelled goals**: only goals where `cancel_sent AND layers_processed < 25`
+- **Score-cancelled goals**: only goals where `cancel_sent AND layers_processed < 22`
 - **Hard-deadline goals**: all remaining goals
 - Combined metrics are also reported for backward compatibility.
 
@@ -626,8 +626,8 @@ included in timing statistics.
 | # | Decision | Rationale |
 |---|----------|-----------|
 | 1 | Proactive mode only for Phase 2 | Reactive mode does not call `calculate_result()` before `send_feedback()`, making score-based cancellation unreliable |
-| 2 | Block sizes [1, 4, 8, 13, 16, 20, 25] | 1 and 25 are boundary cases; 4 fills the steep 1→8 overhead curve; 8 and 16 are powers of 2; 13 is the first 2-block size; 20 fills the 16→25 gap |
-| 3 | cancel_after_layers = 25 (score-only) | Isolates score-based cancellation behavior without hard-deadline interference |
+| 2 | Block sizes [1, 4, 8, 13, 16, 20, 22] | 1 and 22 are boundary cases (22 = all layers); 4 fills the steep 1→8 overhead curve; 8 and 16 are powers of 2; 13 is the first 2-block size; 20 fills the 16→22 gap |
+| 3 | cancel_after_layers = 22 (score-only) | Isolates score-based cancellation behavior without hard-deadline interference |
 | 4 | Score threshold 0.8, class 9 | Simulates targeted detection (traffic light) with high confidence requirement |
 | 5 | 5 warmup images, fixed count | GPU JIT completes within first few inferences; fixed count is simple and reproducible |
 | 6 | 5 trials per config | Consistent with RRT* experiment; provides tighter confidence intervals (~935 goals per config) |

@@ -4,7 +4,7 @@ Step 0: Generate Baseline Configurations
 
 Creates configuration files needed for Step 1 (baseline data collection):
 - phase1_server.yaml: Server config with batch_size=1, proactive, sync, single-threaded
-- phase1_client.yaml: Client config with no cancellation (processes all 25 layers)
+- phase1_client.yaml: Client config with no cancellation (processes all 22 layers)
 
 These configs are used to collect baseline quality and timing data.
 
@@ -48,7 +48,7 @@ def create_phase1_configs():
         "anytime_client": {
             "ros__parameters": {
                 "image_topic": "video_frames",
-                "cancel_after_layers": 25,  # Don't cancel, process all layers
+                "cancel_after_layers": 22,  # Don't cancel, process all layers
                 "cancel_layer_score": False,  # Disable score-based cancellation
                 "score_threshold": 0.0,       # Not used
                 # Traffic light (for future reference)
@@ -81,13 +81,13 @@ def create_phase3_configs():
         for threading_mode in ["single", "multi"]:
             multi_threading = (threading_mode == "multi")
 
-            # Server configuration: batch_size=25, proactive, no cancellation
+            # Server configuration: batch_size=22, proactive, no cancellation
             server_config = {
                 "anytime_server": {
                     "ros__parameters": {
                         "is_reactive_proactive": "proactive",
                         "multi_threading": multi_threading,
-                        "batch_size": 25,  # All layers at once
+                        "batch_size": 22,  # All layers at once
                         "is_sync_async": sync_mode,
                         "weights_path": WEIGHTS_PATH,
                         "log_level": "info"
@@ -108,7 +108,7 @@ def create_phase3_configs():
         "anytime_client": {
             "ros__parameters": {
                 "image_topic": "video_frames",
-                "cancel_after_layers": 25,  # Don't cancel, process all layers
+                "cancel_after_layers": 22,  # Don't cancel, process all layers
                 "cancel_layer_score": False,  # Disable score-based cancellation
                 "score_threshold": 0.0,
                 "target_class_id": "9",
@@ -139,7 +139,7 @@ def main():
     print("  - Mode: Proactive")
     print("  - Sync: sync")
     print("  - Threading: single")
-    print("  - Cancellation: disabled (all 25 layers)")
+    print("  - Cancellation: disabled (all 22 layers)")
     print()
     create_phase1_configs()
 
@@ -147,11 +147,11 @@ def main():
 
     # Create Phase 3 configs
     print("Phase 3 (Throughput) Configurations:")
-    print("  - Batch size: 25")
+    print("  - Batch size: 22")
     print("  - Mode: Proactive")
     print("  - Sync modes: sync, async")
     print("  - Threading modes: single, multi")
-    print("  - Cancellation: disabled (all 25 layers)")
+    print("  - Cancellation: disabled (all 22 layers)")
     print()
     create_phase3_configs()
 

@@ -11,12 +11,12 @@ Key Metrics:
 3. Layers processed: How many layers were computed before cancellation
 
 Configurations analyzed:
-- Block sizes: 1, 8, 13, 15, 16, 25
+- Block sizes: 1, 4, 8, 13, 16, 20, 22
 - Mode: proactive
 - Sync modes: sync, async
 - Threading: single, multi
 
-Input:  traces/phase4_bs{1,8,13,15,16,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/
+Input:  traces/phase4_bs{1,4,8,13,16,20,22}_proactive_{sync|async}_{single|multi}_trial{1,2,3,4,5}/
 Output: results/phase4_analysis/
 """
 

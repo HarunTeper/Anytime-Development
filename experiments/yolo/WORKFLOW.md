@@ -71,7 +71,7 @@ python3 5_generate_configs.py
 ./6_run_experiments.sh
 ```
 **Duration:** ~1.5-3 hours (24 configs × 3 trials = 72 experiments)
-**Output:** `traces/phase4_bs{1,8,13,15,16,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/`
+**Output:** `traces/phase4_bs{1,4,8,13,16,20,22}_proactive_{sync|async}_{single|multi}_trial{1,2,3,4,5}/`
 
 **To test single config:**
 ```bash
