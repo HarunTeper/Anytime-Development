@@ -4,8 +4,8 @@ Interference RRT* Experiment Evaluation Script
 
 This script parses LTTng traces from Interference experiments and generates:
 - Primary Metrics: Timer period jitter (deviation from expected 100ms)
-- Secondary Metrics: RRT* compute batch timing
-- Plots: Timer jitter vs batch size, mode comparison, threading comparison
+- Secondary Metrics: RRT* compute block timing
+- Plots: Timer jitter vs block size, mode comparison, threading comparison
 - CSV/JSON exports of results
 """
 
@@ -152,18 +152,18 @@ def extract_metrics_from_events(events, config_name):
 
     Focus:
     - Timer period jitter (time between consecutive timer callback entries)
-    - Compute batch timing
+    - Compute block timing
 
     Returns:
         Dictionary with metrics
     """
-    # Parse batch_size from config_name
+    # Parse block_size from config_name
     config_parts = config_name.split('_')
-    batch_size = int(config_parts[1])
+    block_size = int(config_parts[1])
 
     metrics = {
         'config': config_name,
-        'batch_size': batch_size,
+        'block_size': block_size,
 
         # Timer metrics (PRIMARY FOCUS)
         'timer_periods': [],  # Time between consecutive timer starts (ms)
@@ -173,8 +173,8 @@ def extract_metrics_from_events(events, config_name):
         'skipped_firings': 0,  # Number of timer firings skipped by ROS 2 catch-up
 
         # Compute metrics (SECONDARY)
-        'compute_times': [],  # Time per compute batch (ms)
-        'total_compute_batches': 0,
+        'compute_times': [],  # Time per compute block (ms)
+        'total_compute_blocks': 0,
     }
 
     # Warm-up filtering: discard events before the first compute entry.
@@ -228,7 +228,7 @@ def extract_metrics_from_events(events, config_name):
 
         # === RRT* COMPUTE EVENTS (SECONDARY) ===
         elif event.event_name == 'anytime_compute_entry':
-            # If a previous entry had no matching exit (cancelled mid-batch),
+            # If a previous entry had no matching exit (cancelled mid-block),
             # discard the stale entry rather than pairing it with a future exit.
             current_compute_entry_time = event.timestamp
 
@@ -237,7 +237,7 @@ def extract_metrics_from_events(events, config_name):
                 compute_ns = event.timestamp - current_compute_entry_time
                 compute_ms = compute_ns / 1_000_000.0
                 metrics['compute_times'].append(compute_ms)
-                metrics['total_compute_batches'] += 1
+                metrics['total_compute_blocks'] += 1
                 current_compute_entry_time = None
 
     # Compute summary statistics for timer metrics
@@ -314,7 +314,7 @@ def aggregate_runs(all_metrics):
     for base_config, runs in config_groups.items():
         agg = {
             'config': base_config,
-            'batch_size': runs[0]['batch_size'],
+            'block_size': runs[0]['block_size'],
             'num_runs': len(runs),
 
             # Timer metrics - averages across runs
@@ -346,7 +346,7 @@ def aggregate_runs(all_metrics):
             'std_compute_time': combined_std(runs, 'avg_compute_time', 'std_compute_time'),
             'min_compute_time': np.min([r['min_compute_time'] for r in runs if r['min_compute_time'] > 0] or [0]),
             'max_compute_time': np.max([r['max_compute_time'] for r in runs]),
-            'total_compute_batches': np.mean([r['total_compute_batches'] for r in runs]),
+            'total_compute_blocks': np.mean([r['total_compute_blocks'] for r in runs]),
         }
 
         aggregated[base_config] = agg
@@ -356,28 +356,28 @@ def aggregate_runs(all_metrics):
 
 def parse_config_name(config_name):
     """Parse configuration name into components"""
-    # Format: batch_<size>_<mode>_<threading>
+    # Format: block_<size>_<mode>_<threading>
     parts = config_name.split('_')
 
     # Skip 'test' prefix if present
     offset = 1 if parts[0] == 'test' else 0
 
     return {
-        'batch_size': int(parts[1 + offset]),
+        'block_size': int(parts[1 + offset]),
         'mode': parts[2 + offset],
         'threading': parts[3 + offset]
     }
 
 
-def _bar_plot(df, ax, all_batch_sizes, y_col, yerr_col=None):
+def _bar_plot(df, ax, all_block_sizes, y_col, yerr_col=None):
     """Helper: draw grouped bars for all mode × threading combinations."""
-    x = np.arange(len(all_batch_sizes))
+    x = np.arange(len(all_block_sizes))
     width = 0.2
 
     for i, mode in enumerate(['reactive', 'proactive']):
         for j, threading in enumerate(['single', 'multi']):
             data = df[(df['mode'] == mode) & (df['threading'] == threading)]
-            data = data.sort_values('batch_size')
+            data = data.sort_values('block_size')
 
             if data.empty:
                 continue
@@ -385,13 +385,13 @@ def _bar_plot(df, ax, all_batch_sizes, y_col, yerr_col=None):
             y_values = []
             yerr_values = []
             x_positions = []
-            for bs in all_batch_sizes:
-                bd = data[data['batch_size'] == bs]
+            for bs in all_block_sizes:
+                bd = data[data['block_size'] == bs]
                 if not bd.empty:
                     y_values.append(bd[y_col].iloc[0])
                     if yerr_col and yerr_col in bd.columns:
                         yerr_values.append(bd[yerr_col].iloc[0])
-                    x_positions.append(all_batch_sizes.index(bs))
+                    x_positions.append(all_block_sizes.index(bs))
 
             if y_values:
                 offset = (i * 2 + j - 1.5) * width
@@ -404,7 +404,7 @@ def _bar_plot(df, ax, all_batch_sizes, y_col, yerr_col=None):
                        color=f'C{i*2+j}', **kwargs)
 
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.grid(True, axis='y', alpha=0.3)
 
@@ -427,40 +427,40 @@ def generate_plots(aggregated_metrics):
     except OSError:
         plt.style.use('seaborn-darkgrid')
 
-    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
+    all_block_sizes = sorted(df['block_size'].unique(), reverse=True)
 
-    # Plot 1: Timer Period vs Batch Size
-    print("  - Timer period vs batch size")
+    # Plot 1: Timer Period vs Block Size
+    print("  - Timer period vs block size")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
-    _bar_plot(df, ax, all_batch_sizes, 'avg_timer_period', 'std_timer_period')
+    _bar_plot(df, ax, all_block_sizes, 'avg_timer_period', 'std_timer_period')
     ax.axhline(y=EXPECTED_TIMER_PERIOD_MS, color='red',
                linestyle=':', linewidth=LINE_WIDTH,
                label=f'Expected ({EXPECTED_TIMER_PERIOD_MS} ms)')
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Average Timer Period (ms)', fontsize=FONT_SIZE_LABEL)
     ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / 'timer_period_vs_batch_size.pdf',
+    plt.savefig(PLOTS_DIR / 'timer_period_vs_block_size.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
-    # Plot 2: Absolute Jitter vs Batch Size
-    print("  - Jitter vs batch size")
+    # Plot 2: Absolute Jitter vs Block Size
+    print("  - Jitter vs block size")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
-    _bar_plot(df, ax, all_batch_sizes, 'max_abs_jitter', 'max_abs_jitter_std')
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    _bar_plot(df, ax, all_block_sizes, 'max_abs_jitter', 'max_abs_jitter_std')
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Mean Max Absolute Jitter (ms)', fontsize=FONT_SIZE_LABEL)
     ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / 'jitter_vs_batch_size.pdf',
+    plt.savefig(PLOTS_DIR / 'jitter_vs_block_size.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
     # Plot 3: Skipped Firings Percentage
     print("  - Skipped firings analysis")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT_SMALL))
-    _bar_plot(df, ax, all_batch_sizes, 'skipped_firings_percent')
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    _bar_plot(df, ax, all_block_sizes, 'skipped_firings_percent')
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Skipped Firings (%)', fontsize=FONT_SIZE_LABEL)
     ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
     plt.tight_layout(pad=0)
@@ -468,15 +468,15 @@ def generate_plots(aggregated_metrics):
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
-    # Plot 4: Compute Time vs Batch Size
-    print("  - Compute time vs batch size")
+    # Plot 4: Compute Time vs Block Size
+    print("  - Compute time vs block size")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
-    _bar_plot(df, ax, all_batch_sizes, 'avg_compute_time', 'std_compute_time')
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
-    ax.set_ylabel('Average Compute Batch Time (ms)', fontsize=FONT_SIZE_LABEL)
+    _bar_plot(df, ax, all_block_sizes, 'avg_compute_time', 'std_compute_time')
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Average Compute Block Time (ms)', fontsize=FONT_SIZE_LABEL)
     ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / 'compute_time_vs_batch_size.pdf',
+    plt.savefig(PLOTS_DIR / 'compute_time_vs_block_size.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
@@ -488,21 +488,21 @@ def generate_plots(aggregated_metrics):
 
     for idx, (mode, threading) in enumerate(combos):
         ax = axes[idx // 2][idx % 2]
-        batch_labels = []
+        block_labels = []
         period_data = []
 
         for config, metrics in sorted(aggregated_metrics.items(),
-                                       key=lambda x: x[1]['batch_size']):
+                                       key=lambda x: x[1]['block_size']):
             parsed = parse_config_name(config)
             if parsed['mode'] != mode or parsed['threading'] != threading:
                 continue
             raw_periods = metrics.get('all_timer_periods', [])
             if raw_periods:
-                batch_labels.append(str(parsed['batch_size']))
+                block_labels.append(str(parsed['block_size']))
                 period_data.append(raw_periods)
 
         if period_data:
-            bp = ax.boxplot(period_data, labels=batch_labels,
+            bp = ax.boxplot(period_data, labels=block_labels,
                             patch_artist=True, showmeans=True)
             for patch in bp['boxes']:
                 patch.set_facecolor(f'C{combos.index((mode, threading))}')
@@ -511,7 +511,7 @@ def generate_plots(aggregated_metrics):
                        linestyle=':', linewidth=LINE_WIDTH, label='Expected')
 
         ax.set_title(f'{mode}-{threading}', fontsize=FONT_SIZE_LABEL)
-        ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_TICK_LABELS)
+        ax.set_xlabel('Block Size', fontsize=FONT_SIZE_TICK_LABELS)
         ax.set_ylabel('Timer Period (ms)', fontsize=FONT_SIZE_TICK_LABELS)
         ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
         ax.grid(True, alpha=0.3)
@@ -555,22 +555,22 @@ def run_statistical_tests(all_metrics, results_dir):
 
     results = []
 
-    # Group raw timer periods by (batch_size, mode, threading)
+    # Group raw timer periods by (block_size, mode, threading)
     groups = defaultdict(list)
     for m in all_metrics:
         base_config = re.sub(r'_run\d+$', '', m['config'])
         parsed = parse_config_name(base_config)
-        key = (parsed['batch_size'], parsed['mode'], parsed['threading'])
+        key = (parsed['block_size'], parsed['mode'], parsed['threading'])
         groups[key].extend(m['timer_periods'])
 
-    all_batch_sizes = sorted(set(k[0] for k in groups))
+    all_block_sizes = sorted(set(k[0] for k in groups))
     all_threading = sorted(set(k[2] for k in groups))
 
-    # Test 1: reactive vs proactive for each (batch_size, threading)
+    # Test 1: reactive vs proactive for each (block_size, threading)
     for threading in all_threading:
-        for batch_size in all_batch_sizes:
-            reactive_key = (batch_size, 'reactive', threading)
-            proactive_key = (batch_size, 'proactive', threading)
+        for block_size in all_block_sizes:
+            reactive_key = (block_size, 'reactive', threading)
+            proactive_key = (block_size, 'proactive', threading)
             if reactive_key in groups and proactive_key in groups:
                 r_data = groups[reactive_key]
                 p_data = groups[proactive_key]
@@ -579,7 +579,7 @@ def run_statistical_tests(all_metrics, results_dir):
                     results.append({
                         'comparison': 'reactive_vs_proactive',
                         'threading': threading,
-                        'batch_size': batch_size,
+                        'block_size': block_size,
                         'n_a': len(r_data),
                         'n_b': len(p_data),
                         'U_statistic': stat,
@@ -587,12 +587,12 @@ def run_statistical_tests(all_metrics, results_dir):
                         'significant_005': pval < 0.05,
                     })
 
-    # Test 2: single vs multi for each (batch_size, mode)
+    # Test 2: single vs multi for each (block_size, mode)
     if 'single' in all_threading and 'multi' in all_threading:
         for mode in ['reactive', 'proactive']:
-            for batch_size in all_batch_sizes:
-                single_key = (batch_size, mode, 'single')
-                multi_key = (batch_size, mode, 'multi')
+            for block_size in all_block_sizes:
+                single_key = (block_size, mode, 'single')
+                multi_key = (block_size, mode, 'multi')
                 if single_key in groups and multi_key in groups:
                     s_data = groups[single_key]
                     m_data = groups[multi_key]
@@ -601,7 +601,7 @@ def run_statistical_tests(all_metrics, results_dir):
                         results.append({
                             'comparison': 'single_vs_multi',
                             'threading': f"{mode}",
-                            'batch_size': batch_size,
+                            'block_size': block_size,
                             'n_a': len(s_data),
                             'n_b': len(m_data),
                             'U_statistic': stat,
@@ -670,13 +670,13 @@ def main():
 
     # Select key columns for CSV export
     csv_columns = [
-        'config', 'batch_size',
+        'config', 'block_size',
         'avg_timer_period', 'std_timer_period', 'min_timer_period',
         'max_timer_period', 'median_timer_period',
         'avg_jitter', 'std_jitter', 'max_abs_jitter',
         'avg_timer_execution', 'std_timer_execution',
         'total_timer_callbacks', 'skipped_firings',
-        'avg_compute_time', 'std_compute_time', 'total_compute_batches'
+        'avg_compute_time', 'std_compute_time', 'total_compute_blocks'
     ]
 
     individual_df[csv_columns].to_csv(
@@ -697,19 +697,19 @@ def main():
         json.dump(aggregated, f, indent=2, default=str)
     print(f"  Saved: {RESULTS_DIR / 'aggregated_results.json'}")
 
-    # Save condensed Table I: skipped firings % by mode, threading and batch size
-    table_batch_sizes = [1, 64, 256, 1024, 4096]
+    # Save condensed Table I: skipped firings % by mode, threading and block size
+    table_block_sizes = [1, 64, 256, 1024, 4096]
     table_rows = {}
     for config, metrics in aggregated.items():
         parsed = parse_config_name(config)
         label = f"{parsed['mode'].capitalize()} ({parsed['threading']})"
-        bs = parsed['batch_size']
-        if bs in table_batch_sizes:
+        bs = parsed['block_size']
+        if bs in table_block_sizes:
             table_rows.setdefault(label, {})[bs] = metrics['skipped_firings_percent']
     table1_rows = []
     for label in sorted(table_rows.keys()):
         row = {'Configuration': label}
-        for bs in table_batch_sizes:
+        for bs in table_block_sizes:
             row[str(bs)] = f"{table_rows[label].get(bs, 0):.2f}%"
         table1_rows.append(row)
     table1_df = pd.DataFrame(table1_rows)
@@ -737,7 +737,7 @@ def main():
     for config, metrics in sorted(aggregated.items()):
         parsed = parse_config_name(config)
         print(f"\n{config}:")
-        print(f"  Batch Size: {parsed['batch_size']}")
+        print(f"  Block Size: {parsed['block_size']}")
         print(f"  Mode: {parsed['mode']}")
         print(f"  Threading: {parsed['threading']}")
         print(f"  Timer Callbacks: {metrics['total_timer_callbacks']:.0f}")

@@ -25,7 +25,7 @@ TRACE_DIR="${EXPERIMENT_DIR}/traces"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 
 # Test configuration
-TEST_CONFIG="batch_256_reactive_single"
+TEST_CONFIG="block_256_reactive_single"
 RUN_DURATION=10
 
 # Interference timer parameters

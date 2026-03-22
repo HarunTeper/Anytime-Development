@@ -8,7 +8,7 @@ Based on **Karaman et al. (ICRA 2011) — "Anytime Motion Planning using the RRT
 
 The package mirrors the `anytime_monte_carlo` structure:
 
-- **Action Server** — Runs RRT\* iterations in configurable batches, reports best path cost as feedback
+- **Action Server** — Runs RRT\* iterations in configurable blocks, reports best path cost as feedback
 - **Action Client** — Sends iteration goals, receives feedback/results, controls cancel timing
 - **Management Class** — Core RRT\* algorithm: sample, nearest, steer, collision-check, choose-parent, insert, rewire, prune
 
@@ -56,7 +56,7 @@ ros2 run anytime_rrt_star anytime_rrt_server \
   -p map_yaml_path:=/path/to/maps/depot.yaml \
   -p start_x:=5.0 -p start_y:=5.0 \
   -p goal_x:=25.0 -p goal_y:=10.0 \
-  -p batch_size:=1024 \
+  -p block_size:=1024 \
   -p is_reactive_proactive:=reactive \
   --is_single_multi single \
   --log-level info
@@ -82,7 +82,7 @@ ros2 launch anytime_rrt_star action_server.launch.py \
 |---|---|---|---|
 | `is_reactive_proactive` | string | `"reactive"` | Algorithm mode: `"reactive"` or `"proactive"` |
 | `multi_threading` | bool | `false` | Enable multi-threading |
-| `batch_size` | int | `1024` | RRT\* iterations per batch |
+| `block_size` | int | `1024` | RRT\* iterations per block |
 | `random_seed` | int | `42` | RNG seed for reproducibility |
 | `map_yaml_path` | string | `""` | Path to Nav2 YAML map file |
 | `start_x` | double | `5.0` | Start X position (meters) |
@@ -165,5 +165,5 @@ Tests cover:
 Defined in `anytime_interfaces/action/RrtStar.action`:
 
 - **Goal:** `int32 goal` — number of RRT\* iterations to perform
-- **Result:** `float32 result` (best path cost), `int32 iterations`, `int32 batch_size`, `Duration batch_time`
+- **Result:** `float32 result` (best path cost), `int32 iterations`, `int32 block_size`, `Duration block_time`
 - **Feedback:** `float32 feedback` — current best path cost (infinity if no path found yet)

@@ -51,7 +51,7 @@ protected:
 
 TEST_F(MonteCarloManagementTest, ConstructorInitializes)
 {
-  // Reactive mode, batch_size=1
+  // Reactive mode, block_size=1
   TestableAnytimeManagement<false> mc(node_.get(), 1);
 
   EXPECT_EQ(mc.count_total_, 0);
@@ -195,11 +195,11 @@ TEST_F(MonteCarloManagementTest, ProactiveModeConstructs)
   EXPECT_EQ(mc.loop_count_, 0);
 }
 
-TEST_F(MonteCarloManagementTest, DifferentBatchSizes)
+TEST_F(MonteCarloManagementTest, DifferentBlockSizes)
 {
-  // Various batch sizes should construct correctly
+  // Various block sizes should construct correctly
   for (int bs : {1, 5, 10, 100}) {
     TestableAnytimeManagement<false> mc(node_.get(), bs);
-    EXPECT_EQ(mc.get_batch_iterations(), bs);
+    EXPECT_EQ(mc.get_block_iterations(), bs);
   }
 }

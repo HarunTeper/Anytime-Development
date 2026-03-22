@@ -33,7 +33,7 @@ public:
   static constexpr int IMAGE_SIZE = 640;
 
   // Constructor
-  AnytimeManagement(rclcpp::Node * node, int batch_size = 1, const std::string & weights_path = "")
+  AnytimeManagement(rclcpp::Node * node, int block_size = 1, const std::string & weights_path = "")
   : weights_path_(weights_path),
     yolo_(weights_path, false),
     max_network_layers_(yolo_.getLayerCount()),
@@ -42,9 +42,9 @@ public:
       IMAGE_SIZE * IMAGE_SIZE * 3 * (halfPrecision ? sizeof(__half) : sizeof(float)))
   {
     // Initialize common base class functionality
-    this->template initialize_anytime_base<isReactiveProactive>(node, batch_size);
+    this->template initialize_anytime_base<isReactiveProactive>(node, block_size);
 
-    TRACE_YOLO_INIT(node, batch_size, isReactiveProactive, isSyncAsync, weights_path.c_str());
+    TRACE_YOLO_INIT(node, block_size, isReactiveProactive, isSyncAsync, weights_path.c_str());
   }
 
   // ----------------- Domain-Specific Implementations -----------------
@@ -90,14 +90,14 @@ public:
   }
 
   // Override to limit iterations by remaining layers
-  int get_batch_iterations() const override
+  int get_block_iterations() const override
   {
     if constexpr (isSyncAsync) {
       int layers_left = static_cast<int>(max_network_layers_) - submitted_layers_;
-      return std::max(0, std::min(this->batch_size_, layers_left));
+      return std::max(0, std::min(this->block_size_, layers_left));
     } else {
       int layers_left = static_cast<int>(max_network_layers_) - processed_layers_;
-      return std::max(0, std::min(this->batch_size_, layers_left));
+      return std::max(0, std::min(this->block_size_, layers_left));
     }
   }
 
@@ -200,8 +200,8 @@ public:
     }
 
     // Add additional information to result
-    result->average_batch_time = this->average_computation_time_;
-    result->batch_size = this->batch_size_;
+    result->average_block_time = this->average_computation_time_;
+    result->block_size = this->block_size_;
     result->processed_layers = processed_layers_;
     result->result_processed_layers = result_processed_layers_;
 

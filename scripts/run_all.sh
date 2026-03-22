@@ -5,8 +5,8 @@
 # Usage: ./scripts/run_all.sh [OPTIONS]
 #
 # Mode flags:
-#   --quick           Use quick experiment scripts (3 batch sizes, 5s runs) [default]
-#   --full            Use full experiment scripts (all batch sizes, 10s+ runs)
+#   --quick           Use quick experiment scripts (3 block sizes, 5s runs) [default]
+#   --full            Use full experiment scripts (all block sizes, 10s+ runs)
 #
 # Experiment selection:
 #   --cpu-only        Run only CPU experiments (RRT* + Interference)
@@ -106,8 +106,8 @@ for arg in "$@"; do
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Mode flags:"
-            echo "  --quick               Quick experiments (3 batch sizes, 5s) [default]"
-            echo "  --full                Full experiments (all batch sizes, 10s+ runs)"
+            echo "  --quick               Quick experiments (3 block sizes, 5s) [default]"
+            echo "  --full                Full experiments (all block sizes, 10s+ runs)"
             echo ""
             echo "Experiment selection:"
             echo "  --cpu-only            Run only CPU experiments (RRT* + Interference)"

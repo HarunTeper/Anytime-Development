@@ -7,9 +7,9 @@
 
 // Helper macros for tracing in anytime_yolo
 
-#define TRACE_YOLO_INIT(node, batch_size, is_reactive_proactive, is_sync_async, weights_path) \
+#define TRACE_YOLO_INIT(node, block_size, is_reactive_proactive, is_sync_async, weights_path) \
   ANYTIME_TRACEPOINT(                                                                         \
-    yolo_init, static_cast<const void *>(node->get_node_base_interface().get()), batch_size,  \
+    yolo_init, static_cast<const void *>(node->get_node_base_interface().get()), block_size,  \
     is_reactive_proactive, is_sync_async, weights_path)
 
 #define TRACE_YOLO_LAYER_START(node, layer_num) \

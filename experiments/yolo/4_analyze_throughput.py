@@ -143,13 +143,13 @@ def analyze_runtime_trace(trace_dir):
                     current_goal['layer_computation_times'][layer_num] = computation_time
             # Async mode: skip per-layer timing (GPU processes all layers as a
             # pipeline internally; CPU-side tracing cannot observe individual
-            # layer boundaries with batch_size > 1)
+            # layer boundaries with block_size > 1)
             current_goal['total_layers'] = max(
                 current_goal['total_layers'], layer_num)
             current_goal['last_layer_end_time'] = event.timestamp
 
         elif event.event_name == 'anytime:yolo_cuda_callback':
-            # In async mode, CUDA callbacks indicate batch completion
+            # In async mode, CUDA callbacks indicate block completion
             # Layer computation times are already handled by layer_end events
             processed_layers = event.fields.get('processed_layers', 0)
             if processed_layers > 0:
@@ -178,7 +178,7 @@ def analyze_runtime_trace(trace_dir):
                     event.timestamp - current_goal['last_layer_end_time']) / 1e6  # Convert to ms
 
         elif event.event_name == 'anytime:anytime_compute_exit':
-            # Goal completed (Phase 3 style - batch processing, no intermediate exits)
+            # Goal completed (Phase 3 style - block processing, no intermediate exits)
             current_goal['goal_end'] = event.timestamp
             # Calculate final exit cost (time from last layer to result)
             if current_goal['last_layer_end_time']:
@@ -502,7 +502,7 @@ def plot_exit_calculation_times_by_config(summary):
         ax1.legend(loc='best', fontsize=10)
         ax1.grid(True, alpha=0.3)
     else:
-        ax1.text(0.5, 0.5, 'No per-layer exit data\n(Phase 3 batch mode)',
+        ax1.text(0.5, 0.5, 'No per-layer exit data\n(Phase 3 block mode)',
                  ha='center', va='center', transform=ax1.transAxes, fontsize=12)
         ax1.set_title('Per-Layer Exit Calculation Time', fontsize=14)
 

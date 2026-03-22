@@ -5,7 +5,7 @@ Custom LTTng tracepoints for anytime system performance analysis.
 ## Overview
 
 Provides low-overhead tracing for:
-- Anytime base computation (batch timing, iterations)
+- Anytime base computation (block timing, iterations)
 - Server/client action lifecycle
 - Monte Carlo domain events
 - YOLO layer processing and detections
@@ -31,7 +31,7 @@ lttng destroy
 
 ## Key Tracepoints
 
-- `anytime_compute_entry/exit` - Batch computation timing
+- `anytime_compute_entry/exit` - Block computation timing
 - `anytime_compute_iteration` - Individual iteration tracking
 - `client_send_goal` - Goal request timing
 - `yolo_layer_start/end` - Layer processing

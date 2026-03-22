@@ -24,7 +24,7 @@ AnytimeRrtActionServer::AnytimeRrtActionServer(rclcpp::NodeOptions options)
   RCLCPP_DEBUG(this->get_logger(), "Starting RRT* Anytime action server");
 
   std::string reactive_proactive_str = this->declare_parameter("is_reactive_proactive", "reactive");
-  int batch_size = this->declare_parameter("batch_size", 1);
+  int block_size = this->declare_parameter("block_size", 1);
 
   // Declare RRT* algorithm parameters (read by AnytimeManagement constructor)
   this->declare_parameter("map_yaml_path", "");
@@ -43,9 +43,9 @@ AnytimeRrtActionServer::AnytimeRrtActionServer(rclcpp::NodeOptions options)
 
   RCLCPP_INFO(this->get_logger(), "RRT* Action Server initialized with parameters:");
   RCLCPP_INFO(this->get_logger(), "  is_reactive_proactive: %s", reactive_proactive_str.c_str());
-  RCLCPP_INFO(this->get_logger(), "  batch_size: %d", batch_size);
+  RCLCPP_INFO(this->get_logger(), "  block_size: %d", block_size);
 
-  this->anytime_management_ = create_anytime_management(this, is_reactive_proactive, batch_size);
+  this->anytime_management_ = create_anytime_management(this, is_reactive_proactive, block_size);
 }
 
 AnytimeRrtActionServer::~AnytimeRrtActionServer() {}
@@ -55,12 +55,12 @@ std::shared_ptr<
     AnytimeRrtActionServer::Anytime,
     AnytimeRrtActionServer::GoalHandleType>>
 AnytimeRrtActionServer::create_anytime_management(
-  rclcpp::Node * node, bool is_reactive_proactive, int batch_size)
+  rclcpp::Node * node, bool is_reactive_proactive, int block_size)
 {
   if (is_reactive_proactive) {
-    return std::make_shared<AnytimeManagement<true>>(node, batch_size);
+    return std::make_shared<AnytimeManagement<true>>(node, block_size);
   } else {
-    return std::make_shared<AnytimeManagement<false>>(node, batch_size);
+    return std::make_shared<AnytimeManagement<false>>(node, block_size);
   }
 }
 

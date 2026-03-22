@@ -164,9 +164,9 @@
             "default": "false"
         },
         {
-            "id": "batch_size",
+            "id": "block_size",
             "type": "promptString",
-            "description": "Enter the batch size parameter",
+            "description": "Enter the block size parameter",
             "default": "1"
         },
         {

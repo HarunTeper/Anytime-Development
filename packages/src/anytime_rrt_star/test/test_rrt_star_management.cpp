@@ -450,7 +450,7 @@ TEST_F(RrtStarWithMapTest, PopulateResultAfterRun)
   management->populate_result(result);
 
   EXPECT_EQ(result->iterations, 10000);
-  EXPECT_EQ(result->batch_size, 1);
+  EXPECT_EQ(result->block_size, 1);
   // Result should be the best path cost (may be inf if no path found,
   // or a positive value if path was found)
   EXPECT_GT(result->result, 0.0f);

@@ -2,12 +2,12 @@
 
 ## 1. Research Question
 
-**How does the batch size of an anytime RRT* path planner affect the timing accuracy of a co-located periodic callback sharing the same single-threaded ROS 2 executor?**
+**How does the block size of an anytime RRT* path planner affect the timing accuracy of a co-located periodic callback sharing the same single-threaded ROS 2 executor?**
 
-In a single-threaded executor, all callbacks (timers, action server work, subscriptions) run sequentially on one thread. A compute-heavy callback that holds the executor for longer than the timer period will delay or skip subsequent timer firings. This experiment quantifies that effect across a range of batch sizes and two anytime scheduling modes (reactive vs. proactive).
+In a single-threaded executor, all callbacks (timers, action server work, subscriptions) run sequentially on one thread. A compute-heavy callback that holds the executor for longer than the timer period will delay or skip subsequent timer firings. This experiment quantifies that effect across a range of block sizes and two anytime scheduling modes (reactive vs. proactive).
 
 ### Why This Matters
-Real-time robotics systems often host multiple nodes in a single process for low-latency intra-process communication. Understanding how batch computation interferes with periodic tasks (e.g., control loops, sensor polling) is critical for selecting safe batch sizes that keep jitter within acceptable bounds.
+Real-time robotics systems often host multiple nodes in a single process for low-latency intra-process communication. Understanding how block computation interferes with periodic tasks (e.g., control loops, sensor polling) is critical for selecting safe block sizes that keep jitter within acceptable bounds.
 
 ## 2. System Under Test
 
@@ -24,8 +24,8 @@ Three ROS 2 composable nodes are loaded into component containers managed by a s
 │  │  Server              │  │  Node                │ │
 │  │                      │  │                      │ │
 │  │  - Waitable triggers │  │  - 100 ms wall timer │ │
-│  │    batch computation │  │  - 10 ms busy-wait   │ │
-│  │  - batch_size iters  │  │    per callback      │ │
+│  │    block computation │  │  - 10 ms busy-wait   │ │
+│  │  - block_size iters  │  │    per callback      │ │
 │  │    per activation    │  │                      │ │
 │  └──────────────────────┘  └──────────────────────┘ │
 └─────────────────────────────────────────────────────┘
@@ -47,31 +47,31 @@ Three ROS 2 composable nodes are loaded into component containers managed by a s
 
 The server and interference timer share the **same** single-threaded executor. The client is in a separate container so its timers do not interfere with measurement.
 
-### 2.2 RRT* Server: How Batch Computation Works
+### 2.2 RRT* Server: How Block Computation Works
 
-The server uses the anytime framework's waitable pattern to yield to the executor between batches:
+The server uses the anytime framework's waitable pattern to yield to the executor between blocks:
 
 1. **Goal arrives** from the client. The server resets the RRT* tree and activates the waitable.
 2. **Waitable triggers** → executor calls the anytime function (reactive or proactive).
-3. **`compute()` executes `batch_size` iterations** of the RRT* algorithm:
+3. **`compute()` executes `block_size` iterations** of the RRT* algorithm:
    - Each iteration: sample random point (with goal bias) → find nearest node → steer → collision check → find nearby nodes → choose best parent → insert node → rewire nearby nodes → check goal reached → periodic pruning.
    - The `anytime_compute_entry` tracepoint fires before the loop; `anytime_compute_exit` fires after.
    - Within the loop, if a cancellation is detected, the function returns early **without** emitting `anytime_compute_exit`. This produces unpaired entry events that the evaluation script must handle (see Section 9.2).
-4. **After the batch**, the anytime function sends feedback and calls `notify_waitable()`, which triggers a guard condition.
+4. **After the block**, the anytime function sends feedback and calls `notify_waitable()`, which triggers a guard condition.
 5. **Executor resumes** → processes any ready callbacks (the interference timer if its period has elapsed) → returns to the waitable when it fires again.
 
-This means the timer can only execute **between batches**. If a single batch takes longer than 100 ms (the timer period), one or more timer firings will be delayed or skipped entirely.
+This means the timer can only execute **between blocks**. If a single block takes longer than 100 ms (the timer period), one or more timer firings will be delayed or skipped entirely.
 
 ### 2.3 Reactive vs. Proactive Mode
 
-Both modes execute the same `compute()` batch loop. They differ in what happens after:
+Both modes execute the same `compute()` block loop. They differ in what happens after:
 
 | | Reactive | Proactive |
 |---|----------|-----------|
-| **After batch** | Check cancel → if cancel or done: calculate result, finish goal | Check cancel → if cancel or done: finish goal (no result calc) |
+| **After block** | Check cancel → if cancel or done: calculate result, finish goal | Check cancel → if cancel or done: finish goal (no result calc) |
 | **If continuing** | Send feedback, notify waitable | Calculate result, send feedback, notify waitable |
 | **Cancel response** | Immediate: result calculated only when stopping | Slightly delayed: result already calculated each cycle |
-| **Executor occupancy** | Less work between batches → more timer opportunities | More work per cycle (result calc every time) → fewer timer opportunities |
+| **Executor occupancy** | Less work between blocks → more timer opportunities | More work per cycle (result calc every time) → fewer timer opportunities |
 
 ### 2.4 Interference Timer Node
 
@@ -103,7 +103,7 @@ When the executor dispatches a timer callback, it advances the timer's `next_cal
 
 | Variable | Values | Rationale |
 |----------|--------|-----------|
-| **Batch size** | 1, 16, 64, 256, 1024, 4096, 16384 | Spans from negligible (<1 ms) to multi-hundred-ms compute per batch, crossing the 100 ms timer period threshold |
+| **Block size** | 1, 16, 64, 256, 1024, 4096, 16384 | Spans from negligible (<1 ms) to multi-hundred-ms compute per block, crossing the 100 ms timer period threshold |
 | **Anytime mode** | reactive, proactive | Tests whether the scheduling mode's per-cycle overhead difference is measurable in timer jitter |
 
 Total configurations: 7 × 2 = 14.
@@ -115,8 +115,8 @@ Total configurations: 7 × 2 = 14.
 | **Timer period** | Primary | Time between consecutive `interference_timer_callback_entry` events (ms) |
 | **Jitter** | Primary | `actual_period − 100 ms`. Positive = delayed |
 | **Max absolute jitter** | Primary | Worst-case `|jitter|` per run |
-| **Skipped firings** | Primary | Timer firings the executor never dispatched due to batch blocking |
-| **Compute batch time** | Secondary | Duration between `anytime_compute_entry` and `anytime_compute_exit` (ms) |
+| **Skipped firings** | Primary | Timer firings the executor never dispatched due to block blocking |
+| **Compute block time** | Secondary | Duration between `anytime_compute_entry` and `anytime_compute_exit` (ms) |
 
 ### 3.3 Controlled Variables
 
@@ -143,13 +143,13 @@ Total configurations: 7 × 2 = 14.
 
 **Script**: `generate_configs.py`
 
-For each of the 14 (batch_size, mode) combinations, produces three YAML files in `configs/`:
+For each of the 14 (block_size, mode) combinations, produces three YAML files in `configs/`:
 
 | File pattern | ROS 2 node name | Content |
 |-------------|-----------------|---------|
-| `batch_{size}_{mode}_single_server.yaml` | `anytime_server` | Algorithm mode, batch_size, map path (`MAPS_DIR/depot.yaml` placeholder), start/goal coordinates, RRT* parameters, random seed |
-| `batch_{size}_{mode}_single_client.yaml` | `anytime_client` | goal_timer_period_ms=500, cancel_timeout_period_ms=200 |
-| `batch_{size}_{mode}_single_interference.yaml` | `interference_timer` | timer_period_ms=100, execution_time_ms=10 |
+| `block_{size}_{mode}_single_server.yaml` | `anytime_server` | Algorithm mode, block_size, map path (`MAPS_DIR/depot.yaml` placeholder), start/goal coordinates, RRT* parameters, random seed |
+| `block_{size}_{mode}_single_client.yaml` | `anytime_client` | goal_timer_period_ms=500, cancel_timeout_period_ms=200 |
+| `block_{size}_{mode}_single_interference.yaml` | `interference_timer` | timer_period_ms=100, execution_time_ms=10 |
 
 Config files contain only parameters that are declared and read by their respective nodes.
 Threading is controlled by the launch file's executor type (`component_container` vs.
@@ -189,13 +189,13 @@ All three configs are passed as `parameters=[config_path]` to their respective `
 
 ### 6.2 Per-Configuration Run Loop
 
-For each (batch_size, mode, thread_mode, run_number):
+For each (block_size, mode, thread_mode, run_number):
 
 | Step | Action | Purpose |
 |------|--------|---------|
 | 1 | `lttng create interference_exp --output=traces/{run_name}/` | Create a fresh session with per-run output directory |
-| 2 | `lttng enable-event --userspace anytime:anytime_compute_entry` | Enable compute batch start tracepoint |
-| | `lttng enable-event --userspace anytime:anytime_compute_exit` | Enable compute batch end tracepoint |
+| 2 | `lttng enable-event --userspace anytime:anytime_compute_entry` | Enable compute block start tracepoint |
+| | `lttng enable-event --userspace anytime:anytime_compute_exit` | Enable compute block end tracepoint |
 | | `lttng enable-event --userspace anytime:interference_timer_init` | Enable timer init tracepoint |
 | | `lttng enable-event --userspace anytime:interference_timer_callback_entry` | Enable timer callback start tracepoint |
 | | `lttng enable-event --userspace anytime:interference_timer_callback_exit` | Enable timer callback end tracepoint |
@@ -216,7 +216,7 @@ LTTng buffers trace events in shared memory. If processes are killed before `ltt
 
 | Parameter | Full | Quick |
 |-----------|------|-------|
-| Batch sizes | 1, 16, 64, 256, 1024, 4096, 16384 | 1, 256, 4096, 16384 |
+| Block sizes | 1, 16, 64, 256, 1024, 4096, 16384 | 1, 256, 4096, 16384 |
 | Runs per config | 5 | 1 |
 | Duration per run | 10 s | 5 s |
 | Total time | ~70 min | ~3 min |
@@ -238,8 +238,8 @@ LTTng buffers trace events in shared memory. If processes are killed before `ltt
 | `anytime:interference_timer_callback_entry` | `interference_timer_node.cpp:46` | `node_handle`, `execution_count` | Primary: marks timer callback start |
 | `anytime:interference_timer_callback_exit` | `interference_timer_node.cpp:71` | `node_handle`, `execution_count`, `actual_duration_ns` | Primary: marks timer callback end with measured busy-wait duration |
 | `anytime:interference_timer_init` | `interference_timer_node.cpp:22` | `node_handle`, `timer_period_ms`, `execution_time_ms` | Diagnostic: confirms timer configuration |
-| `anytime:anytime_compute_entry` | `anytime_base.hpp:164` | `node_handle`, `batch_size` | Secondary + warm-up cutoff: marks batch start |
-| `anytime:anytime_compute_exit` | `anytime_base.hpp:226` | `node_handle`, `iterations_completed`, `computation_time_ns`, `average_time_ns` | Secondary: marks batch end with timing |
+| `anytime:anytime_compute_entry` | `anytime_base.hpp:164` | `node_handle`, `block_size` | Secondary + warm-up cutoff: marks block start |
+| `anytime:anytime_compute_exit` | `anytime_base.hpp:226` | `node_handle`, `iterations_completed`, `computation_time_ns`, `average_time_ns` | Secondary: marks block end with timing |
 
 ### 7.3 Context Fields
 
@@ -308,20 +308,20 @@ For each trace directory, events are processed sequentially:
 
 Summary statistics per run: mean, std, min, max, median for timer periods; mean and std for jitter; mean and std for execution time.
 
-### 9.2 Per-Run Metrics (Secondary: Compute Batch)
+### 9.2 Per-Run Metrics (Secondary: Compute Block)
 
 | Metric | How computed |
 |--------|-------------|
 | **Compute time** | Duration between paired `anytime_compute_entry` and `anytime_compute_exit` events, in ms. |
-| **Total compute batches** | Count of complete entry/exit pairs. |
+| **Total compute blockes** | Count of complete entry/exit pairs. |
 
 Summary statistics: mean, std, min, max for compute times.
 
-**Handling unpaired events**: When the server is cancelled mid-batch, `compute()` returns
+**Handling unpaired events**: When the server is cancelled mid-block, `compute()` returns
 early without emitting `anytime_compute_exit` (see Section 2.2). This produces an orphaned
 `anytime_compute_entry` with no matching exit. The evaluation script handles this by
 overwriting `current_compute_entry_time` on each new entry — if a stale entry exists from
-a cancelled batch, the next entry simply replaces it, and the stale timestamp is discarded.
+a cancelled block, the next entry simply replaces it, and the stale timestamp is discarded.
 Only complete entry/exit pairs contribute to compute time metrics.
 
 ### 9.3 Aggregation Across Runs
@@ -387,16 +387,16 @@ Same pattern: `avg_compute_time` ± cross-run std of per-run `avg_compute_time`.
 
 | File | Y-axis | Error bar | X-axis | Description |
 |------|--------|-----------|--------|-------------|
-| `timer_period_vs_batch_size.pdf` | Avg timer period (ms) | std_timer_period | Batch size | Shows how batch size inflates the timer period beyond the expected 100 ms. Red dashed line at 100 ms. |
-| `jitter_vs_batch_size.pdf` | Mean max abs jitter (ms) | max_abs_jitter_std | Batch size | Worst-case timing deviation, averaged across runs. |
-| `skipped_firings_percentage.pdf` | Skipped firings (%) | None | Batch size | Percentage of timer firings the executor never dispatched. |
-| `compute_time_vs_batch_size.pdf` | Avg compute batch time (ms) | std_compute_time | Batch size | How long each RRT* batch holds the executor. |
-| `timer_period_distribution.pdf` | Timer period (ms) | Box plot whiskers | Batch size | Raw period distributions. Two panels: reactive (left), proactive (right). Data pooled across all runs per config. |
+| `timer_period_vs_block_size.pdf` | Avg timer period (ms) | std_timer_period | Block size | Shows how block size inflates the timer period beyond the expected 100 ms. Red dashed line at 100 ms. |
+| `jitter_vs_block_size.pdf` | Mean max abs jitter (ms) | max_abs_jitter_std | Block size | Worst-case timing deviation, averaged across runs. |
+| `skipped_firings_percentage.pdf` | Skipped firings (%) | None | Block size | Percentage of timer firings the executor never dispatched. |
+| `compute_time_vs_block_size.pdf` | Avg compute block time (ms) | std_compute_time | Block size | How long each RRT* block holds the executor. |
+| `timer_period_distribution.pdf` | Timer period (ms) | Box plot whiskers | Block size | Raw period distributions. Two panels: reactive (left), proactive (right). Data pooled across all runs per config. |
 | `legend.pdf` | — | — | — | Standalone legend for figure composition. |
 
 ### Plot Conventions
-- X-axis: batch sizes sorted **descending** (high to low). This is an intentional choice: the largest batch sizes (leftmost) show the most interference, creating a visual "staircase" from disrupted to ideal.
-- Bar grouping: reactive and proactive side by side for each batch size.
+- X-axis: block sizes sorted **descending** (high to low). This is an intentional choice: the largest block sizes (leftmost) show the most interference, creating a visual "staircase" from disrupted to ideal.
+- Bar grouping: reactive and proactive side by side for each block size.
 - Style: `seaborn-v0_8-darkgrid`.
 - Format: PDF at 300 DPI.
 
@@ -404,29 +404,29 @@ Same pattern: `avg_compute_time` ± cross-run std of per-run `avg_compute_time`.
 
 | File | Format | Content |
 |------|--------|---------|
-| `results/individual_runs.csv` | CSV | One row per trace: config name, batch_size, all per-run metrics |
+| `results/individual_runs.csv` | CSV | One row per trace: config name, block_size, all per-run metrics |
 | `results/aggregated_results.csv` | CSV | One row per config: aggregated metrics across runs |
 | `results/aggregated_results.json` | JSON | Same as aggregated CSV, nested by config name |
-| `results/table_1_skipped_firings.csv` | CSV | Condensed table: skipped firings % by mode (rows) and batch size (columns) |
+| `results/table_1_skipped_firings.csv` | CSV | Condensed table: skipped firings % by mode (rows) and block size (columns) |
 | `results/plots/*.pdf` | PDF | All plots listed above |
 
 ## 13. Expected Results and Interpretation
 
 ### 13.1 Expected Trends
 
-- **Small batch sizes (1, 16, 64)**: Compute time per batch << 100 ms. Timer period should be close to 100 ms. Jitter should be small. No skipped firings.
-- **Medium batch sizes (256, 1024)**: Compute time approaches or crosses 100 ms. Timer period inflates. Some jitter. Occasional skipped firings.
-- **Large batch sizes (4096, 16384)**: Compute time >> 100 ms. Timer periods are multiples of the compute time. Large jitter. Significant skipped firings.
+- **Small block sizes (1, 16, 64)**: Compute time per block << 100 ms. Timer period should be close to 100 ms. Jitter should be small. No skipped firings.
+- **Medium block sizes (256, 1024)**: Compute time approaches or crosses 100 ms. Timer period inflates. Some jitter. Occasional skipped firings.
+- **Large block sizes (4096, 16384)**: Compute time >> 100 ms. Timer periods are multiples of the compute time. Large jitter. Significant skipped firings.
 
 ### 13.2 Reactive vs. Proactive Difference
 
-The difference should be subtle. Proactive mode calculates the result (path cost, tree statistics) on every cycle, adding overhead between batches. Reactive mode only calculates the result when finishing or cancelling. In practice, this difference may be negligible compared to the batch computation itself.
+The difference should be subtle. Proactive mode calculates the result (path cost, tree statistics) on every cycle, adding overhead between blocks. Reactive mode only calculates the result when finishing or cancelling. In practice, this difference may be negligible compared to the block computation itself.
 
 ### 13.3 What Validates the Experiment
 
-1. Timer period for batch_size=1 should be close to 100 ms (near-zero interference).
-2. Timer period should monotonically increase with batch size.
-3. Compute batch time should scale proportionally with batch size.
+1. Timer period for block_size=1 should be close to 100 ms (near-zero interference).
+2. Timer period should monotonically increase with block size.
+3. Compute block time should scale proportionally with block size.
 4. Skipped firings should appear only when compute time exceeds 100 ms.
 
 ## 14. Reproducibility
@@ -443,8 +443,8 @@ The difference should be subtle. Proactive mode calculates the result (path cost
 - These are captured by the 5-run averaging and error bars.
 
 ### 14.3 Test Scripts
-- `test_single_config.sh`: Runs a single config (batch_256_reactive_single) for 10 s and verifies tracepoints are captured. Use this to validate the setup before running the full experiment.
-- `run_quick.sh`: Runs a reduced parameter sweep (4 batch sizes, 1 run each, 5 s) to verify the entire pipeline in ~3 minutes.
+- `test_single_config.sh`: Runs a single config (block_256_reactive_single) for 10 s and verifies tracepoints are captured. Use this to validate the setup before running the full experiment.
+- `run_quick.sh`: Runs a reduced parameter sweep (4 block sizes, 1 run each, 5 s) to verify the entire pipeline in ~3 minutes.
 
 ## 15. Design Decisions Log
 
@@ -454,12 +454,12 @@ The difference should be subtle. Proactive mode calculates the result (path cost
 | 2 | Data-driven warm-up cutoff (first `anytime_compute_entry`) | Adaptive to actual startup duration; semantically correct; avoids arbitrary time window |
 | 3 | Option C for jitter error bars: mean(per-run max) ± std(per-run max) | Statistically valid: bar height and error bar describe the same quantity |
 | 4 | Single-threaded executor as default in launch file | Matches experiment scope; prevents accidental multi-threaded runs during manual debugging |
-| 5 | Descending x-axis on all bar plots | Intentional: largest batch sizes (most interference) appear first, creating a visual staircase to ideal timing |
+| 5 | Descending x-axis on all bar plots | Intentional: largest block sizes (most interference) appear first, creating a visual staircase to ideal timing |
 | 6 | 5 runs × 10 s per config | Balances statistical power with total experiment duration (~70 min) |
 | 7 | Client in separate container | Isolates client timer scheduling from server/interference measurement. Client timers do not compete for the server executor. |
 | 8 | Busy-wait (not sleep) for interference timer | `sleep` would yield the thread; busy-wait holds the executor for a known, measurable duration. This faithfully simulates a compute-bound periodic task. |
 | 9 | Wall timer (not ROS timer) for interference | Wall timers use wall-clock time, matching real-time expectations. ROS timers would depend on `/clock` topic, which is not published in this experiment. |
 | 10 | 100,000 iteration goal from client | Intentionally unreachable within the 200 ms cancel window. Ensures the server is always actively computing when cancelled, never idle. |
-| 11 | Discard orphaned `compute_entry` events (no matching `exit`) | Cancellation mid-batch causes `compute()` to return without emitting `exit`. Overwriting the entry timestamp on the next entry prevents stale/inflated compute time measurements. |
+| 11 | Discard orphaned `compute_entry` events (no matching `exit`) | Cancellation mid-block causes `compute()` to return without emitting `exit`. Overwriting the entry timestamp on the next entry prevents stale/inflated compute time measurements. |
 | 12 | Config YAMLs contain only parameters read by nodes | Removed unused `multi_threading` (threading is set by executor type in launch file) and `log_level` (set via `--ros-args --log-level` on the container). Prevents confusion about what actually controls behavior. |
 | 13 | Trace field parsing uses `int(value, 0)` / `float(value)` try/except | Handles negative integers, hex pointers (`0x...`), and edge cases that `str.isdigit()` misses. |

@@ -1,6 +1,6 @@
 # Interference Experiments
 
-Measure timing interference between Monte Carlo batch processing and a periodic timer task.
+Measure timing interference between Monte Carlo block processing and a periodic timer task.
 
 ## Quick Start
 
@@ -22,7 +22,7 @@ ls results/plots/
 ## Configuration
 
 **Monte Carlo:**
-- Batch sizes: 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144
+- Block sizes: 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144
 - Modes: reactive, proactive
 - Threading: single
 
@@ -36,7 +36,7 @@ ls results/plots/
 
 - Timer period jitter
 - Missed timer periods (>150% expected)
-- Compute batch timing
+- Compute block timing
 - Interference severity
 
 ## Quick Start
@@ -69,7 +69,7 @@ chmod +x run_interference_experiments.sh
 ```
 
 This will:
-- Run all 90 experiments (9 batch sizes × 2 modes × 5 runs)
+- Run all 90 experiments (9 block sizes × 2 modes × 5 runs)
 - Each run lasts 10 seconds
 - Total time: ~7 minutes (including setup/teardown)
 - Automatically call the evaluation script when done
@@ -88,7 +88,7 @@ anytime_server:
   ros__parameters:
     is_reactive_proactive: "reactive"  # or "proactive"
     multi_threading: false             # single-threaded for interference measurement
-    batch_size: 1024                   # 1024 to 262144
+    block_size: 1024                   # 1024 to 262144
     log_level: "info"
 ```
 
@@ -131,10 +131,10 @@ interference_timer:
 
 ### Secondary Metrics (Monte Carlo Performance)
 
-5. **Compute Batch Time**: Duration of each Monte Carlo compute batch
-   - Shows how long each batch takes
+5. **Compute Block Time**: Duration of each Monte Carlo compute block
+   - Shows how long each block takes
 
-6. **Total Compute Batches**: Number of batches completed in 10s
+6. **Total Compute Blocks**: Number of blocks completed in 10s
 
 ### Aggregation
 
@@ -143,14 +143,14 @@ interference_timer:
 
 ## Generated Plots
 
-1. **timer_period_vs_batch_size.pdf**:
-   - Shows average timer period vs. batch size
+1. **timer_period_vs_block_size.pdf**:
+   - Shows average timer period vs. block size
    - Compares reactive/proactive modes (single-threaded)
    - Includes expected 100ms reference line
    - **Key plot**: Shows interference effect clearly
 
-2. **jitter_vs_batch_size.pdf**:
-   - Shows maximum absolute jitter vs. batch size
+2. **jitter_vs_block_size.pdf**:
+   - Shows maximum absolute jitter vs. block size
    - Log-log scale to show growth trends
    - Higher values = more interference
 
@@ -159,9 +159,9 @@ interference_timer:
    - Periods > 150% of expected (>150ms)
    - Direct measure of severe interference
 
-4. **compute_time_vs_batch_size.pdf**:
-   - Shows Monte Carlo compute batch timing
-   - Explains why larger batches cause more interference
+4. **compute_time_vs_block_size.pdf**:
+   - Shows Monte Carlo compute block timing
+   - Explains why larger blocks cause more interference
 
 5. **timer_period_distribution.pdf**:
    - Box plots showing timer period distributions
@@ -187,26 +187,26 @@ The experiments rely on these LTTng tracepoints:
 - `anytime:interference_timer_callback_exit` - Timer callback end (used to measure execution time)
 
 ### Monte Carlo Events (Secondary)
-- `anytime:anytime_compute_entry` - Compute batch start
-- `anytime:anytime_compute_exit` - Compute batch end
+- `anytime:anytime_compute_entry` - Compute block start
+- `anytime:anytime_compute_exit` - Compute block end
 
 **Note**: We do NOT trace individual Monte Carlo iterations to reduce overhead and trace size.
 
 ## Expected Results
 
-### Small Batch Sizes (1024, 2048)
+### Small Block Sizes (1024, 2048)
 - Timer period ≈ 100ms
 - Low jitter (<5ms)
 - No missed periods (0%)
 - Minimal interference
 
-### Medium Batch Sizes (4096, 8192, 16384)
+### Medium Block Sizes (4096, 8192, 16384)
 - Timer period starts deviating (100-120ms)
 - Moderate jitter (5-20ms)
 - Few missed periods (<10%)
 - Noticeable interference
 
-### Large Batch Sizes (32768, 65536, 131072, 262144)
+### Large Block Sizes (32768, 65536, 131072, 262144)
 - Timer period significantly delayed (>150ms)
 - High jitter (>50ms)
 - Many missed periods (>30%)
@@ -230,10 +230,10 @@ Edit `run_interference_experiments.sh`:
 NUM_RUNS=5  # Change to desired number of runs per config
 ```
 
-### Modify Batch Sizes
+### Modify Block Sizes
 Edit `generate_configs.py`:
 ```python
-batch_sizes = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
+block_sizes = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
 ```
 Then regenerate configs:
 ```bash
@@ -293,9 +293,9 @@ pip3 install pandas numpy matplotlib
 
 ## Analysis Tips
 
-1. **Look for trends in timer period vs batch size**
+1. **Look for trends in timer period vs block size**
    - Does period increase linearly? Exponentially?
-   - At what batch size does interference become significant?
+   - At what block size does interference become significant?
 
 2. **Compare reactive vs proactive**
    - Does mode affect interference patterns?
@@ -303,7 +303,7 @@ pip3 install pandas numpy matplotlib
 
 4. **Analyze missed periods**
    - What percentage is acceptable for your application?
-   - At what batch size does it become problematic?
+   - At what block size does it become problematic?
 
 ## Related Experiments
 

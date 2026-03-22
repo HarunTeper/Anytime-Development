@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Override experiment parameters for quick run
-export BATCH_SIZES=(1 256 4096)
+export BLOCK_SIZES=(1 256 4096)
 export MODES=("reactive" "proactive")
 export THREADING=("single")
 export MAPS=("depot")
@@ -17,12 +17,12 @@ export RUN_DURATION=5
 echo "========================================="
 echo "Quick RRT* Experiment Run"
 echo "========================================="
-echo "  Batch sizes: ${BATCH_SIZES[*]}"
+echo "  Block sizes: ${BLOCK_SIZES[*]}"
 echo "  Modes: ${MODES[*]}"
 echo "  Threading: ${THREADING[*]}"
 echo "  Maps: ${MAPS[*]}"
 echo "  Duration: ${RUN_DURATION}s per config"
-echo "  Total configs: $((${#BATCH_SIZES[@]} * ${#MODES[@]} * ${#THREADING[@]} * ${#MAPS[@]}))"
+echo "  Total configs: $((${#BLOCK_SIZES[@]} * ${#MODES[@]} * ${#THREADING[@]} * ${#MAPS[@]}))"
 echo "========================================="
 echo ""
 
@@ -83,16 +83,16 @@ rm -rf "${RESULTS_DIR}"
 mkdir -p "${TRACE_DIR}"
 mkdir -p "${RESULTS_DIR}"
 
-total_configs=$((${#BATCH_SIZES[@]} * ${#MODES[@]} * ${#THREADING[@]} * ${#MAPS[@]} * NUM_RUNS))
+total_configs=$((${#BLOCK_SIZES[@]} * ${#MODES[@]} * ${#THREADING[@]} * ${#MAPS[@]} * NUM_RUNS))
 current_config=0
 
-for batch_size in "${BATCH_SIZES[@]}"; do
+for block_size in "${BLOCK_SIZES[@]}"; do
     for mode in "${MODES[@]}"; do
         for thread_mode in "${THREADING[@]}"; do
             for map_name in "${MAPS[@]}"; do
                 for run in $(seq 1 ${NUM_RUNS}); do
                     current_config=$((current_config + 1))
-                    config_name="batch_${batch_size}_${mode}_${thread_mode}_${map_name}"
+                    config_name="block_${block_size}_${mode}_${thread_mode}_${map_name}"
                     run_name="${config_name}_run${run}"
 
                     echo ""

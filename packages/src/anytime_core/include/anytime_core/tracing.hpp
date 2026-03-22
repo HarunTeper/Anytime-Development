@@ -27,10 +27,10 @@ namespace anytime_core
 
 // ==================== Core: AnytimeBase Tracing Helpers ====================
 
-#define TRACE_ANYTIME_BASE_INIT(node, batch_size, is_reactive_proactive) \
+#define TRACE_ANYTIME_BASE_INIT(node, block_size, is_reactive_proactive) \
   ANYTIME_TRACEPOINT( \
     anytime_base_init, static_cast<const void *>(node->get_node_base_interface().get()), \
-    batch_size, is_reactive_proactive)
+    block_size, is_reactive_proactive)
 
 #define TRACE_ANYTIME_BASE_ACTIVATE(node) \
   ANYTIME_TRACEPOINT( \
@@ -66,10 +66,10 @@ namespace anytime_core
     static_cast<const void *>(node->get_node_base_interface().get()), should_finish, \
     should_cancel)
 
-#define TRACE_ANYTIME_COMPUTE_ENTRY(node, batch_size) \
+#define TRACE_ANYTIME_COMPUTE_ENTRY(node, block_size) \
   ANYTIME_TRACEPOINT( \
     anytime_compute_entry, static_cast<const void *>(node->get_node_base_interface().get()), \
-    batch_size)
+    block_size)
 
 #define TRACE_ANYTIME_COMPUTE_EXIT( \
     node, iterations_completed, computation_time_ns, average_time_ns) \

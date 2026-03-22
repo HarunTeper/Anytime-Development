@@ -6,7 +6,7 @@ Generate all Interference RRT* experiment configuration files
 import os
 
 # Configuration parameters
-batch_sizes = [1, 64, 256, 1024, 4096]
+block_sizes = [1, 64, 256, 1024, 4096]
 modes = ["reactive", "proactive"]
 threading = ["single", "multi"]
 
@@ -30,8 +30,8 @@ server_template = """anytime_server:
     # Anytime algorithm mode
     is_reactive_proactive: "{mode}"  # Options: "reactive", "proactive"
 
-    # Batch processing configuration
-    batch_size: {batch_size}  # Number of RRT* iterations to compute per batch
+    # Block processing configuration
+    block_size: {block_size}  # Number of RRT* iterations to compute per block
 
     # Reproducibility
     random_seed: 42  # Seed for reproducible RRT* results
@@ -81,16 +81,16 @@ def main():
 
     # Generate all combinations
     config_count = 0
-    for batch_size in batch_sizes:
+    for block_size in block_sizes:
         for mode in modes:
             for thread_mode in threading:
                 # Create config name
-                config_name = f"batch_{batch_size}_{mode}_{thread_mode}"
+                config_name = f"block_{block_size}_{mode}_{thread_mode}"
 
                 # Create server config
                 server_content = server_template.format(
                     mode=mode,
-                    batch_size=batch_size,
+                    block_size=block_size,
                     start_x=DEPOT_START_X,
                     start_y=DEPOT_START_Y,
                     goal_x=DEPOT_GOAL_X,

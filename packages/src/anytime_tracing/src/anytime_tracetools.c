@@ -46,10 +46,10 @@ bool anytime_trace_compile_status()
 void ANYTIME_TRACEPOINT(
   anytime_base_init,
   const void * node_handle,
-  const int batch_size,
+  const int block_size,
   const bool is_reactive_proactive)
 {
-  CONDITIONAL_TP(anytime_base_init, node_handle, batch_size, is_reactive_proactive);
+  CONDITIONAL_TP(anytime_base_init, node_handle, block_size, is_reactive_proactive);
 }
 
 void ANYTIME_TRACEPOINT(anytime_base_activate, const void * node_handle)
@@ -98,9 +98,9 @@ void ANYTIME_TRACEPOINT(
 void ANYTIME_TRACEPOINT(
   anytime_compute_entry,
   const void * node_handle,
-  const int batch_size)
+  const int block_size)
 {
-  CONDITIONAL_TP(anytime_compute_entry, node_handle, batch_size);
+  CONDITIONAL_TP(anytime_compute_entry, node_handle, block_size);
 }
 
 void ANYTIME_TRACEPOINT(
@@ -249,10 +249,10 @@ void ANYTIME_TRACEPOINT(
 void ANYTIME_TRACEPOINT(
   monte_carlo_init,
   const void * node_handle,
-  const int batch_size,
+  const int block_size,
   const bool is_reactive_proactive)
 {
-  CONDITIONAL_TP(monte_carlo_init, node_handle, batch_size, is_reactive_proactive);
+  CONDITIONAL_TP(monte_carlo_init, node_handle, block_size, is_reactive_proactive);
 }
 
 void ANYTIME_TRACEPOINT(
@@ -288,10 +288,10 @@ void ANYTIME_TRACEPOINT(monte_carlo_reset, const void * node_handle)
 void ANYTIME_TRACEPOINT(
   rrt_star_init,
   const void * node_handle,
-  const int batch_size,
+  const int block_size,
   const bool is_reactive_proactive)
 {
-  CONDITIONAL_TP(rrt_star_init, node_handle, batch_size, is_reactive_proactive);
+  CONDITIONAL_TP(rrt_star_init, node_handle, block_size, is_reactive_proactive);
 }
 
 void ANYTIME_TRACEPOINT(
@@ -324,12 +324,12 @@ void ANYTIME_TRACEPOINT(rrt_star_reset, const void * node_handle)
 void ANYTIME_TRACEPOINT(
   yolo_init,
   const void * node_handle,
-  const int batch_size,
+  const int block_size,
   const bool is_reactive_proactive,
   const bool is_sync_async,
   const char * weights_path)
 {
-  CONDITIONAL_TP(yolo_init, node_handle, batch_size, is_reactive_proactive, is_sync_async, weights_path);
+  CONDITIONAL_TP(yolo_init, node_handle, block_size, is_reactive_proactive, is_sync_async, weights_path);
 }
 
 void ANYTIME_TRACEPOINT(

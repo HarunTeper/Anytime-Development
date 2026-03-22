@@ -4,7 +4,7 @@
 
 This document describes how to evaluate the `anytime_rrt_star` package using the same infrastructure as the Monte Carlo experiments: LTTng tracing, parameter sweeps, Docker containers, and automated plotting. The evaluation answers two questions:
 
-1. **Framework metrics** (same as Monte Carlo): How do batch size, mode, and threading affect throughput, cancellation delay, and latency?
+1. **Framework metrics** (same as Monte Carlo): How do block size, mode, and threading affect throughput, cancellation delay, and latency?
 2. **RRT*-specific metrics** (new): How does path cost converge over time? How does the anytime property manifest across configurations?
 
 ## 2. What Needs to Be Built
@@ -24,11 +24,11 @@ TRACEPOINT_EVENT(
   TRACEPOINT_PROVIDER, rrt_star_init,
   TP_ARGS(
     const void *, node_handle_arg,
-    const int, batch_size_arg,
+    const int, block_size_arg,
     const bool, is_reactive_proactive_arg),
   TP_FIELDS(
     ctf_integer_hex(const void *, node_handle, node_handle_arg)
-    ctf_integer(int, batch_size, batch_size_arg)
+    ctf_integer(int, block_size, block_size_arg)
     ctf_integer(bool, is_reactive_proactive, is_reactive_proactive_arg)
     ctf_string(version, anytime_tracing_VERSION)))
 
@@ -83,10 +83,10 @@ ANYTIME_DECLARE_TRACEPOINT(rrt_star_reset, const void *)
 // ==================== RRT* ====================
 
 void ANYTIME_TRACEPOINT(
-  rrt_star_init, const void * node_handle, const int batch_size,
+  rrt_star_init, const void * node_handle, const int block_size,
   const bool is_reactive_proactive)
 {
-  CONDITIONAL_TP(rrt_star_init, node_handle, batch_size, is_reactive_proactive);
+  CONDITIONAL_TP(rrt_star_init, node_handle, block_size, is_reactive_proactive);
 }
 
 void ANYTIME_TRACEPOINT(
@@ -112,10 +112,10 @@ void ANYTIME_TRACEPOINT(rrt_star_reset, const void * node_handle)
 4. **`anytime_rrt_star/include/anytime_rrt_star/tracing.hpp`** — Replace placeholders with real macros:
 
 ```cpp
-#define TRACE_RRT_STAR_INIT(node, batch_size, is_reactive_proactive) \
+#define TRACE_RRT_STAR_INIT(node, block_size, is_reactive_proactive) \
   ANYTIME_TRACEPOINT( \
     rrt_star_init, static_cast<const void *>(node->get_node_base_interface().get()), \
-    batch_size, is_reactive_proactive)
+    block_size, is_reactive_proactive)
 
 #define TRACE_RRT_STAR_ITERATION(node, iteration_num, tree_size, best_cost) \
   ANYTIME_TRACEPOINT( \
@@ -144,8 +144,8 @@ int32 goal
 # Result
 float32 result
 int32 iterations
-int32 batch_size
-builtin_interfaces/Duration batch_time
+int32 block_size
+builtin_interfaces/Duration block_time
 builtin_interfaces/Time action_server_receive
 builtin_interfaces/Time action_server_accept
 builtin_interfaces/Time action_server_start
@@ -192,13 +192,13 @@ The key difference from Monte Carlo: the server config also carries RRT* paramet
 Files to create (mirroring `experiments/monte_carlo/`):
 
 1. **`generate_configs.py`** — Generate all configuration combinations:
-   - Batch sizes: `[1, 16, 64, 256, 1024, 4096, 16384]` (7 values)
+   - Block sizes: `[1, 16, 64, 256, 1024, 4096, 16384]` (7 values)
    - Modes: `["reactive", "proactive"]` (2 values)
    - Threading: `["single", "multi"]` (2 values)
    - Maps: `["depot", "warehouse"]` (2 values)
    - Total: 7 × 2 × 2 × 2 = **56 configurations**
    - Each config gets a server YAML with all RRT* params + a client YAML
-   - Config naming: `batch_{size}_{mode}_{threading}_{map}`
+   - Config naming: `block_{size}_{mode}_{threading}_{map}`
 
 2. **`run_rrt_star_experiments.sh`** — Main experiment runner:
    - Loop through all configs
@@ -212,7 +212,7 @@ Files to create (mirroring `experiments/monte_carlo/`):
    - Run evaluation script at end
 
 3. **`run_quick.sh`** — Quick version:
-   - 3 batch sizes (1, 256, 4096), depot map only, 5s runs
+   - 3 block sizes (1, 256, 4096), depot map only, 5s runs
 
 4. **`test_single_config.sh`** — Sanity test with 10s on one config
 
@@ -236,31 +236,31 @@ These use the **same tracepoints** as Monte Carlo (`anytime_compute_entry/exit`,
 
 | Metric | Source | Description |
 |---|---|---|
-| Time per batch (ms) | `compute_entry` → `compute_exit` | Duration of one batch of N iterations |
-| Throughput (iter/sec) | batch_size / (time_per_batch / 1000) | Iterations per second |
+| Time per block (ms) | `compute_entry` → `compute_exit` | Duration of one block of N iterations |
+| Throughput (iter/sec) | block_size / (time_per_block / 1000) | Iterations per second |
 | Cancellation delay (ms) | `server_handle_cancel` → `base_deactivate` | Time from cancel to deactivation |
 | Goal-to-finish latency (ms) | `client_goal_sent` → `client_goal_finished` | End-to-end goal lifecycle |
 | Goal-to-cancel latency (ms) | `client_goal_sent` → `client_cancel_sent` | Time client waits before cancelling |
 | Cancel-to-finish latency (ms) | `client_cancel_sent` → `client_goal_finished` | Cancel round-trip time |
-| Total segments completed | count of `compute_exit` events × batch_size | Total iterations in run |
+| Total segments completed | count of `compute_exit` events × block_size | Total iterations in run |
 
-**Plots (grouped bar charts, batch size on x-axis, 4 groups: reactive-single, reactive-multi, proactive-single, proactive-multi):**
+**Plots (grouped bar charts, block size on x-axis, 4 groups: reactive-single, reactive-multi, proactive-single, proactive-multi):**
 
-1. `batch_size_vs_time.pdf` — Time per batch vs batch size
-2. `throughput.pdf` — Throughput vs batch size
-3. `cancellation_delay.pdf` — Cancellation delay vs batch size
-4. `goal_to_finish_latency.pdf` — Goal-to-finish latency vs batch size
-5. `goal_to_cancel_latency.pdf` — Goal-to-cancel latency vs batch size
-6. `cancel_to_finish_latency.pdf` — Cancel-to-finish latency vs batch size
-7. `total_iterations.pdf` — Total iterations completed vs batch size
-8. `total_cancellation_time.pdf` — Combined cancellation time vs batch size
+1. `block_size_vs_time.pdf` — Time per block vs block size
+2. `throughput.pdf` — Throughput vs block size
+3. `cancellation_delay.pdf` — Cancellation delay vs block size
+4. `goal_to_finish_latency.pdf` — Goal-to-finish latency vs block size
+5. `goal_to_cancel_latency.pdf` — Goal-to-cancel latency vs block size
+6. `cancel_to_finish_latency.pdf` — Cancel-to-finish latency vs block size
+7. `total_iterations.pdf` — Total iterations completed vs block size
+8. `total_cancellation_time.pdf` — Combined cancellation time vs block size
 9. `legend.pdf` — Separate legend
 
 **Per-map:** Generate the above plots **per map** (depot, warehouse) and also a comparison across maps.
 
 ### 3.2 Overhead and Communication Metrics
 
-These metrics address the reviewer's concern about framework overhead — the time spent between computation batches on communication, feedback delivery, and result processing. Each metric gets its own plot to allow independent assessment of what is worth reporting.
+These metrics address the reviewer's concern about framework overhead — the time spent between computation blocks on communication, feedback delivery, and result processing. Each metric gets its own plot to allow independent assessment of what is worth reporting.
 
 **Tracepoints required:** In addition to `anytime_compute_entry/exit`, these metrics require enabling:
 - `anytime:anytime_send_feedback_entry` / `anytime:anytime_send_feedback_exit`
@@ -270,26 +270,26 @@ These tracepoints exist in the framework but are commented out in the Monte Carl
 
 | Metric | Source | Description |
 |---|---|---|
-| Per-batch overhead (ms) | `compute_exit[i]` → `compute_entry[i+1]` | Time gap between consecutive batches — includes feedback sending, scheduling, and any framework bookkeeping |
-| Overhead ratio (%) | `overhead / (overhead + compute_time) × 100` | Fraction of wall time spent on non-computation. Key metric for the reviewer: should be negligible (<5%) for large batches |
+| Per-block overhead (ms) | `compute_exit[i]` → `compute_entry[i+1]` | Time gap between consecutive blocks — includes feedback sending, scheduling, and any framework bookkeeping |
+| Overhead ratio (%) | `overhead / (overhead + compute_time) × 100` | Fraction of wall time spent on non-computation. Key metric for the reviewer: should be negligible (<5%) for large blocks |
 | Feedback send time (ms) | `send_feedback_entry` → `send_feedback_exit` | Time to serialize and publish one feedback message |
 | Result compute time (ms) | `calculate_result_entry` → `calculate_result_exit` | Time to populate and send the final result after cancellation |
-| Batch time percentiles | Distribution of `compute_exit - compute_entry` | p50, p95, p99 of batch compute time — shows timing consistency |
-| Batch time trend | `compute_exit - compute_entry` vs batch index | Whether batch compute time changes over the course of a run (e.g., due to tree growth increasing Near() cost) |
+| Block time percentiles | Distribution of `compute_exit - compute_entry` | p50, p95, p99 of block compute time — shows timing consistency |
+| Block time trend | `compute_exit - compute_entry` vs block index | Whether block compute time changes over the course of a run (e.g., due to tree growth increasing Near() cost) |
 
-**Plots (one per metric, grouped bar charts with batch size on x-axis):**
+**Plots (one per metric, grouped bar charts with block size on x-axis):**
 
-15. `per_batch_overhead.pdf` — Per-batch overhead (ms) vs batch size. Expect overhead to be roughly constant regardless of batch size, so it becomes proportionally smaller for larger batches.
+15. `per_block_overhead.pdf` — Per-block overhead (ms) vs block size. Expect overhead to be roughly constant regardless of block size, so it becomes proportionally smaller for larger blocks.
 
-16. `overhead_ratio.pdf` — Overhead ratio (%) vs batch size. This is the key plot for the reviewer. Should show overhead ratio dropping from potentially significant (small batches) to negligible (large batches).
+16. `overhead_ratio.pdf` — Overhead ratio (%) vs block size. This is the key plot for the reviewer. Should show overhead ratio dropping from potentially significant (small blocks) to negligible (large blocks).
 
-17. `feedback_send_time.pdf` — Feedback send time (ms) vs batch size. Should be roughly constant since feedback message size doesn't change with batch size.
+17. `feedback_send_time.pdf` — Feedback send time (ms) vs block size. Should be roughly constant since feedback message size doesn't change with block size.
 
-18. `result_compute_time.pdf` — Result compute time (ms) vs batch size. May vary with tree size since result includes path extraction.
+18. `result_compute_time.pdf` — Result compute time (ms) vs block size. May vary with tree size since result includes path extraction.
 
-19. `batch_time_percentiles.pdf` — Box plot or bar chart showing p50/p95/p99 batch compute times per configuration. Reveals timing jitter and outliers.
+19. `block_time_percentiles.pdf` — Box plot or bar chart showing p50/p95/p99 block compute times per configuration. Reveals timing jitter and outliers.
 
-20. `batch_time_trend.pdf` — Line plot: batch compute time (y-axis) vs batch number within a run (x-axis). One line per batch size. Shows whether RRT* tree growth causes increasing per-batch cost over time (expected, since Near() is O(n log n)).
+20. `block_time_trend.pdf` — Line plot: block compute time (y-axis) vs block number within a run (x-axis). One line per block size. Shows whether RRT* tree growth causes increasing per-block cost over time (expected, since Near() is O(n log n)).
 
 **Per-map:** Generate overhead plots per map, since tree growth characteristics differ between depot and warehouse.
 
@@ -307,13 +307,13 @@ These require the `rrt_star_iteration` tracepoint to be enabled and/or the enhan
 
 **Plots:**
 
-10. `convergence_curve.pdf` — **Key RRT* plot.** Path cost (y-axis) vs iteration (x-axis). One line per configuration (or averaged across runs). Shows the anytime property: cost decreases over time. Compare different batch sizes — they should all converge to similar final costs, but the curves will have different granularity (larger batches = less frequent feedback points).
+10. `convergence_curve.pdf` — **Key RRT* plot.** Path cost (y-axis) vs iteration (x-axis). One line per configuration (or averaged across runs). Shows the anytime property: cost decreases over time. Compare different block sizes — they should all converge to similar final costs, but the curves will have different granularity (larger blocks = less frequent feedback points).
 
 11. `convergence_by_map.pdf` — Convergence curves comparing depot vs warehouse. Warehouse should take longer to find initial solution and converge more slowly.
 
-12. `first_solution_iteration.pdf` — Bar chart: iteration at which first path was found, grouped by batch size × mode × threading. Shows how quickly the algorithm becomes useful.
+12. `first_solution_iteration.pdf` — Bar chart: iteration at which first path was found, grouped by block size × mode × threading. Shows how quickly the algorithm becomes useful.
 
-13. `best_cost_vs_batch_size.pdf` — Bar chart: best path cost at cancellation vs batch size. All configurations should achieve similar final costs (since the algorithm is anytime), but smaller batch sizes may have slightly worse costs due to overhead.
+13. `best_cost_vs_block_size.pdf` — Bar chart: best path cost at cancellation vs block size. All configurations should achieve similar final costs (since the algorithm is anytime), but smaller block sizes may have slightly worse costs due to overhead.
 
 14. `tree_size_vs_iterations.pdf` — Tree growth curve: tree size vs iterations. With pruning enabled, tree size should plateau. Without pruning, it grows linearly.
 
@@ -331,11 +331,11 @@ if (loop_count_ % convergence_log_interval_ == 0) {
 ```
 With `convergence_log_interval_` as a ROS parameter (default 100). At 100k iterations this gives 1000 trace events — very manageable.
 
-**(b) Feedback-based collection:** The action feedback already carries `best_path_cost_`. The feedback is sent after every batch. So for batch_size=256, we get a cost sample every 256 iterations. This is already enough for convergence curves at batch-level granularity. The evaluation script can extract cost samples from feedback tracepoints (if enabled) or from the per-batch `anytime_compute_exit` events combined with the cost at that point.
+**(b) Feedback-based collection:** The action feedback already carries `best_path_cost_`. The feedback is sent after every block. So for block_size=256, we get a cost sample every 256 iterations. This is already enough for convergence curves at block-level granularity. The evaluation script can extract cost samples from feedback tracepoints (if enabled) or from the per-block `anytime_compute_exit` events combined with the cost at that point.
 
-**(c) Dedicated convergence run:** Run a separate short experiment with `rrt_star_iteration` enabled and small batches (batch_size=1), purely to collect detailed convergence data. This doesn't need the full parameter sweep — just one run per map.
+**(c) Dedicated convergence run:** Run a separate short experiment with `rrt_star_iteration` enabled and small blocks (block_size=1), purely to collect detailed convergence data. This doesn't need the full parameter sweep — just one run per map.
 
-**Recommendation:** Use approach (a) with subsampled tracepoint (every 100 iterations) for the full sweep, and approach (c) with batch_size=1 for detailed convergence curves in a separate short run.
+**Recommendation:** Use approach (a) with subsampled tracepoint (every 100 iterations) for the full sweep, and approach (c) with block_size=1 for detailed convergence curves in a separate short run.
 
 ## 4. Experiment Configurations
 
@@ -358,7 +358,7 @@ With `convergence_log_interval_` as a ROS parameter (default 100). At 100k itera
 
 | Dimension | Values | Count |
 |---|---|---|
-| Batch size | 1, 16, 64, 256, 1024, 4096, 16384 | 7 |
+| Block size | 1, 16, 64, 256, 1024, 4096, 16384 | 7 |
 | Mode | reactive, proactive | 2 |
 | Threading | single, multi | 2 |
 | Map | depot, warehouse | 2 |
@@ -373,7 +373,7 @@ With `convergence_log_interval_` as a ROS parameter (default 100). At 100k itera
 
 | Dimension | Values | Count |
 |---|---|---|
-| Batch size | 1, 256, 4096 | 3 |
+| Block size | 1, 256, 4096 | 3 |
 | Mode | reactive, proactive | 2 |
 | Threading | single | 1 |
 | Map | depot | 1 |
@@ -387,7 +387,7 @@ Separate from the main sweep. Purpose: collect detailed cost vs. iteration data.
 
 | Parameter | Value |
 |---|---|
-| Batch size | 1 |
+| Block size | 1 |
 | Mode | reactive |
 | Threading | single |
 | Maps | depot, warehouse |
@@ -423,11 +423,11 @@ metrics = {
     # ... same framework metrics as Monte Carlo ...
 
     # Overhead metrics (from compute_entry/exit + send_feedback + calculate_result)
-    'per_batch_overheads': [],        # ms gaps: compute_exit[i] → compute_entry[i+1]
-    'overhead_ratios': [],            # per-batch: overhead / (overhead + compute_time) × 100
+    'per_block_overheads': [],        # ms gaps: compute_exit[i] → compute_entry[i+1]
+    'overhead_ratios': [],            # per-block: overhead / (overhead + compute_time) × 100
     'feedback_send_times': [],        # ms: send_feedback_entry → send_feedback_exit
     'result_compute_times': [],       # ms: calculate_result_entry → calculate_result_exit
-    'batch_times': [],                # ms: all individual batch compute times (for percentiles)
+    'block_times': [],                # ms: all individual block compute times (for percentiles)
 
     # RRT*-specific (from rrt_star_iteration events)
     'convergence_data': [],           # list of (iteration, best_cost, tree_size)
@@ -451,7 +451,7 @@ experiments/rrt_star/
     │   ├── depot_convergence.csv
     │   └── warehouse_convergence.csv
     └── plots/                        # all PDF plots
-        ├── batch_size_vs_time.pdf
+        ├── block_size_vs_time.pdf
         ├── throughput.pdf
         ├── cancellation_delay.pdf
         ├── goal_to_finish_latency.pdf
@@ -462,14 +462,14 @@ experiments/rrt_star/
         ├── convergence_curve.pdf
         ├── convergence_by_map.pdf
         ├── first_solution_iteration.pdf
-        ├── best_cost_vs_batch_size.pdf
+        ├── best_cost_vs_block_size.pdf
         ├── tree_size_vs_iterations.pdf
-        ├── per_batch_overhead.pdf
+        ├── per_block_overhead.pdf
         ├── overhead_ratio.pdf
         ├── feedback_send_time.pdf
         ├── result_compute_time.pdf
-        ├── batch_time_percentiles.pdf
-        ├── batch_time_trend.pdf
+        ├── block_time_percentiles.pdf
+        ├── block_time_trend.pdf
         └── legend.pdf
 ```
 

@@ -6,7 +6,7 @@ Generate all RRT* experiment configuration files
 import os
 
 # Configuration parameters
-batch_sizes = [1, 16, 64, 256, 1024, 4096]
+block_sizes = [1, 16, 64, 256, 1024, 4096]
 modes = ["reactive", "proactive"]
 threading = ["single", "multi"]
 maps = {
@@ -33,8 +33,8 @@ server_template = """anytime_server:
     # Threading configuration
     multi_threading: {multi_threading}  # Enable/disable multi-threading
 
-    # Batch processing configuration
-    batch_size: {batch_size}  # Number of iterations to compute per batch
+    # Block processing configuration
+    block_size: {block_size}  # Number of iterations to compute per block
 
     # Reproducibility
     random_seed: 42  # Seed for reproducible RRT* results
@@ -80,19 +80,19 @@ def main():
 
     # Generate all combinations
     config_count = 0
-    for batch_size in batch_sizes:
+    for block_size in block_sizes:
         for mode in modes:
             for thread_mode in threading:
                 for map_name, map_params in maps.items():
                     # Create config name
-                    config_name = f"batch_{batch_size}_{mode}_{thread_mode}_{map_name}"
+                    config_name = f"block_{block_size}_{mode}_{thread_mode}_{map_name}"
 
                     # Create server config
                     multi_threading_bool = "true" if thread_mode == "multi" else "false"
                     server_content = server_template.format(
                         mode=mode,
                         multi_threading=multi_threading_bool,
-                        batch_size=batch_size,
+                        block_size=block_size,
                         map_yaml_path=f"MAPS_DIR/{map_name}.yaml",
                         start_x=map_params["start_x"],
                         start_y=map_params["start_y"],

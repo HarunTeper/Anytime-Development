@@ -68,7 +68,7 @@ Three experimental evaluations reproduce the paper results:
 
 ### RRT* (Figures 5a, 5b)
 
-Evaluates batch size scaling, mode comparison (reactive vs proactive), and threading impact on anytime RRT* path planning.
+Evaluates block size scaling, mode comparison (reactive vs proactive), and threading impact on anytime RRT* path planning.
 
 ```bash
 ./scripts/reproduce_figure.sh 5a        # Full run (~10 min)
@@ -78,7 +78,7 @@ Evaluates batch size scaling, mode comparison (reactive vs proactive), and threa
 
 ### Interference (Figures 6a, 6b, Table I)
 
-Measures timing interference between anytime batch processing and periodic timer tasks.
+Measures timing interference between anytime block processing and periodic timer tasks.
 
 ```bash
 ./scripts/reproduce_figure.sh 6          # Full run (~7 min)
@@ -120,7 +120,7 @@ All experiments use LTTng for low-overhead tracing. Custom tracepoints are defin
 
 Key tracepoints:
 
-- `anytime:anytime_compute_entry/exit` — Batch computation timing
+- `anytime:anytime_compute_entry/exit` — Block computation timing
 - `anytime:anytime_client_send_goal` — Client request tracking
 - `anytime:yolo_layer_start/end` — YOLO layer processing
 - `anytime:interference_timer_callback_entry/exit` — Timer interference

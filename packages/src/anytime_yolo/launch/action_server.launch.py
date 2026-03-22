@@ -12,7 +12,7 @@ def include_launch_description(context: LaunchContext):
 
     config_file = LaunchConfiguration("config_file")
     is_reactive_proactive = LaunchConfiguration("is_reactive_proactive")
-    batch_size = LaunchConfiguration("batch_size")
+    block_size = LaunchConfiguration("block_size")
     is_passive_cooperative = LaunchConfiguration("is_passive_cooperative")
     is_sync_async = LaunchConfiguration("is_sync_async")
     weights_path = LaunchConfiguration("weights_path")
@@ -80,7 +80,7 @@ def include_launch_description(context: LaunchContext):
                     print(
                         f"  is_reactive_proactive: {params.get('is_reactive_proactive', 'N/A')} (from config file)")
                     print(
-                        f"  batch_size: {params.get('batch_size', 'N/A')} (from config file)")
+                        f"  block_size: {params.get('block_size', 'N/A')} (from config file)")
                     print(
                         f"  multi_threading: {params.get('multi_threading', 'N/A')} (from config file)")
                     print(
@@ -98,7 +98,7 @@ def include_launch_description(context: LaunchContext):
         overrides = {}
         reactive_proactive_value = context.launch_configurations.get(
             'is_reactive_proactive', '')
-        batch_size_value = context.launch_configurations.get('batch_size', '')
+        block_size_value = context.launch_configurations.get('block_size', '')
         sync_async_value = context.launch_configurations.get(
             'is_sync_async', '')
 
@@ -106,10 +106,10 @@ def include_launch_description(context: LaunchContext):
             overrides['is_reactive_proactive'] = reactive_proactive_value
             print(
                 f"  [Override] is_reactive_proactive: {reactive_proactive_value} (from command line)")
-        if batch_size_value and batch_size_value != '':
-            overrides['batch_size'] = int(batch_size_value)
+        if block_size_value and block_size_value != '':
+            overrides['block_size'] = int(block_size_value)
             print(
-                f"  [Override] batch_size: {batch_size_value} (from command line)")
+                f"  [Override] block_size: {block_size_value} (from command line)")
 
         multi_threading_cmd = context.launch_configurations.get(
             "multi_threading", "")
@@ -142,13 +142,13 @@ def include_launch_description(context: LaunchContext):
         # Use command line arguments
         reactive_proactive_value = context.launch_configurations.get(
             'is_reactive_proactive', '')
-        batch_size_value = context.launch_configurations.get('batch_size', '')
+        block_size_value = context.launch_configurations.get('block_size', '')
         sync_async_value = context.launch_configurations.get(
             'is_sync_async', '')
 
         print(
             f"  is_reactive_proactive: {reactive_proactive_value} (from command line)")
-        print(f"  batch_size: {batch_size_value} (from command line)")
+        print(f"  block_size: {block_size_value} (from command line)")
         print(
             f"  multi_threading: {multi_threading_value} (from command line)")
         print(
@@ -159,7 +159,7 @@ def include_launch_description(context: LaunchContext):
 
         parameters = [{
             "is_reactive_proactive": is_reactive_proactive,
-            "batch_size": batch_size,
+            "block_size": block_size,
             "is_single_multi": is_single_multi,
             "weights_path": weights_path_value,
             "is_sync_async": is_sync_async
@@ -239,8 +239,8 @@ def generate_launch_description():
         "is_reactive_proactive", default_value="", description="Anytime reactive (overrides config file)"
     )
 
-    batch_size_arg = DeclareLaunchArgument(
-        "batch_size", default_value="", description="Batch size for compute iterations (overrides config file)"
+    block_size_arg = DeclareLaunchArgument(
+        "block_size", default_value="", description="Block size for compute iterations (overrides config file)"
     )
 
     weights_path_arg = DeclareLaunchArgument(
@@ -263,7 +263,7 @@ def generate_launch_description():
     launch_description.add_action(config_file_arg)
     launch_description.add_action(threading_type_arg)
     launch_description.add_action(anytime_reactive_proactive_arg)
-    launch_description.add_action(batch_size_arg)
+    launch_description.add_action(block_size_arg)
     launch_description.add_action(weights_path_arg)
     launch_description.add_action(sync_async_arg)
     launch_description.add_action(log_level_arg)

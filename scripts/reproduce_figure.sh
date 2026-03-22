@@ -15,7 +15,7 @@
 #   7     Both Fig 7a + 7b                                    (GPU, ~35m)
 #
 # Options:
-#   --quick   Use quick experiments for CPU figures (fewer batch sizes, shorter runs)
+#   --quick   Use quick experiments for CPU figures (fewer block sizes, shorter runs)
 
 set -e
 
@@ -72,10 +72,10 @@ run_rrt_star() {
     echo ""
 
     if [ "${USE_QUICK}" = true ]; then
-        echo "Mode: quick (4 batch sizes, 5s runs)"
+        echo "Mode: quick (4 block sizes, 5s runs)"
         "${RRT_DIR}/run_quick.sh"
     else
-        echo "Mode: full (7 batch sizes, 10s runs)"
+        echo "Mode: full (7 block sizes, 10s runs)"
         "${RRT_DIR}/run_rrt_star_experiments.sh"
     fi
 
@@ -110,10 +110,10 @@ run_interference() {
     echo ""
 
     if [ "${USE_QUICK}" = true ]; then
-        echo "Mode: quick (4 batch sizes, 5s runs)"
+        echo "Mode: quick (4 block sizes, 5s runs)"
         "${IF_DIR}/run_quick.sh"
     else
-        echo "Mode: full (7 batch sizes, 10s runs)"
+        echo "Mode: full (7 block sizes, 10s runs)"
         "${IF_DIR}/run_interference_experiments.sh"
     fi
 
@@ -122,8 +122,8 @@ run_interference() {
     echo "Output files:"
     echo "========================================="
     IF_PLOTS="${IF_DIR}/results/plots"
-    echo "  Figure 6a: ${IF_PLOTS}/compute_time_vs_batch_size.pdf"
-    echo "  Figure 6b: ${IF_PLOTS}/timer_period_vs_batch_size.pdf"
+    echo "  Figure 6a: ${IF_PLOTS}/compute_time_vs_block_size.pdf"
+    echo "  Figure 6b: ${IF_PLOTS}/timer_period_vs_block_size.pdf"
     echo "  Table I:   ${IF_DIR}/results/table_1_skipped_firings.csv"
     echo "  All plots: ${IF_PLOTS}/"
 }

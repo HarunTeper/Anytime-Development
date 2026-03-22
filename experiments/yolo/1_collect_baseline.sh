@@ -3,7 +3,7 @@
 # Step 1: Collect Baseline Data
 #
 # Purpose: Run baseline configuration to collect layer-wise detection and timing data
-# Configuration: batch_size=1, proactive, single-threaded, all 22 layers
+# Configuration: block_size=1, proactive, single-threaded, all 22 layers
 # Output: traces/phase1_baseline_trial{1,2,3,4,5}/
 #
 
@@ -31,7 +31,7 @@ echo -e "${GREEN}Step 1: Collect Baseline Data${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Configuration:"
-echo "  - Batch size: 1 (layer-by-layer)"
+echo "  - Block size: 1 (layer-by-layer)"
 echo "  - Mode: Proactive"
 echo "  - Threading: Single"
 echo "  - Layers: All 22 layers"
@@ -75,7 +75,7 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     
     # Launch YOLO server and client components with Phase 1 config
     echo -e "${BLUE}Launching YOLO server and client with baseline configuration...${NC}"
-    echo "  - Batch size: 1"
+    echo "  - Block size: 1"
     echo "  - Mode: Proactive"
     echo "  - Sync: sync"
     echo "  - Multi-threading: disabled"

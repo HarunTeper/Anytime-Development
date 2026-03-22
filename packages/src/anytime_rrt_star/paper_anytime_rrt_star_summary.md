@@ -219,8 +219,8 @@ Prune set: V' = { z ∈ V | Cost(z) + CostToGo(z) >= c_u }
    - CostToGo heuristic = Euclidean distance to goal (for 2D geometric case)
    - Periodically prune nodes where Cost(z) + CostToGo(z) >= best solution cost
 2. **Committed trajectory** (maps to our action server's execution model):
-   - Initial planning phase → corresponds to our initial batch before first feedback
-   - Iterative phase → corresponds to continuous batch processing with improving results
+   - Initial planning phase → corresponds to our initial block before first feedback
+   - Iterative phase → corresponds to continuous block processing with improving results
    - Re-rooting → in our framework, each new goal cycle starts fresh, so committed trajectory maps naturally to the action goal/cancel lifecycle
 
 ### 8.3 Steering Function
@@ -246,7 +246,7 @@ Prune set: V' = { z ∈ V | Cost(z) + CostToGo(z) >= c_u }
 
 ### 8.7 What the Paper Does NOT Cover (we handle separately)
 - Specific occupancy grid / PGM map loading
-- Batch processing architecture (our anytime framework contribution)
+- Block processing architecture (our anytime framework contribution)
 - Specific nearest-neighbor data structures (brute-force vs k-d tree)
 - Goal biasing strategy details
 - Informed sampling (that's Gammell et al. 2014, a different paper)

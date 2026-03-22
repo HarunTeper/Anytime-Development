@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-This package (`anytime_rrt_star`) implements an RRT* (Rapidly-exploring Random Tree Star) algorithm as an anytime workload for the Anytime framework, based on **Karaman et al. (ICRA 2011) — "Anytime Motion Planning using the RRT*"**. It replaces the Monte Carlo pi-estimation experiment in the scientific paper while preserving the same metrics, reactive/proactive modes, and batch-processing architecture.
+This package (`anytime_rrt_star`) implements an RRT* (Rapidly-exploring Random Tree Star) algorithm as an anytime workload for the Anytime framework, based on **Karaman et al. (ICRA 2011) — "Anytime Motion Planning using the RRT*"**. It replaces the Monte Carlo pi-estimation experiment in the scientific paper while preserving the same metrics, reactive/proactive modes, and block-processing architecture.
 
 **Key parallels with Monte Carlo experiment:**
 | Aspect | Monte Carlo | RRT* |
@@ -11,7 +11,7 @@ This package (`anytime_rrt_star`) implements an RRT* (Rapidly-exploring Random T
 | Result (improves over time) | Pi estimate converges to 3.14159... | Path cost converges toward optimal |
 | Feedback | Current total sample count | Current best path cost |
 | Anytime property | More samples → better estimate | More iterations → shorter path |
-| Batch processing | N random samples per batch | N tree extensions per batch |
+| Block processing | N random samples per block | N tree extensions per block |
 
 ## 2. Reference Paper Summary
 
@@ -73,8 +73,8 @@ The paper's committed trajectory mechanism (lock initial path segment, re-root t
 | Paper Concept | Anytime Architecture | Notes |
 |---|---|---|
 | RRT* main loop (Algo 1) | `compute_single_iteration()` | One call = one sample+extend+rewire cycle |
-| Batch of iterations | Base class batch loop | N calls to `compute_single_iteration()` between cancel checks |
-| Current best path cost | `populate_feedback()` → `feedback.feedback` | Sent to client after each batch |
+| Block of iterations | Base class block loop | N calls to `compute_single_iteration()` between cancel checks |
+| Current best path cost | `populate_feedback()` → `feedback.feedback` | Sent to client after each block |
 | Final best path cost | `populate_result()` → `result.result` | Sent when goal completes or is cancelled |
 | Iteration count (N) | `goal_handle_->get_goal()->goal` | Client requests N total iterations |
 | Tree reset between runs | `reset_domain_state()` | Clear tree, re-add start node |
@@ -86,14 +86,14 @@ The paper's two-phase operation maps naturally to our action server:
 
 | Paper Phase | Our Framework |
 |---|---|
-| **Phase 1 (initial planning):** RRT* runs until robot must move | Client sends goal, server runs batch loop |
+| **Phase 1 (initial planning):** RRT* runs until robot must move | Client sends goal, server runs block loop |
 | **Phase 2 (iterative replanning):** commit, execute, re-root, improve | Client cancels previous goal (gets current best), sends new goal (fresh tree) |
 | **Committed trajectory** (shielded from modification) | The result returned on cancel — that was the best path at cancel time |
 | **Re-root** (delete branches behind committed segment) | `reset_domain_state()` — each new goal starts fresh |
 
 **Key insight:** Our framework naturally provides anytime behavior without needing the committed trajectory mechanism. The client controls when to "harvest" the current best solution via cancel, and each new goal cycle allows the algorithm to converge further or start fresh.
 
-### 3.3 Branch-and-Bound Pruning → Inside Batch Loop
+### 3.3 Branch-and-Bound Pruning → Inside Block Loop
 
 Pruning is implemented inside `compute_single_iteration()`, triggered periodically (e.g., every 1000 iterations). This:
 - Removes nodes that cannot improve on the current best solution
@@ -144,7 +144,7 @@ Standard RRT* from Karaman & Frazzoli (2011) with the branch-and-bound pruning e
 ### Decision 4: Collision Checking — **DECIDED: Grid-based lookup**
 Convert world coordinates to pixel coordinates, check pixel values against `occupied_thresh` / `free_thresh`. Edge collision checking samples points along the line segment at map resolution intervals.
 
-### Decision 5: Batch Sizes — **DECIDED: [1, 16, 64, 256, 1024, 4096, 16384]**
+### Decision 5: Block Sizes — **DECIDED: [1, 16, 64, 256, 1024, 4096, 16384]**
 Smaller than Monte Carlo's [1024..65536] because RRT* iterations are more expensive (O(n) nearest-neighbor, O(k) rewiring). Start with these and adjust if needed.
 
 ### Decision 6: Nearest-Neighbor — **DECIDED: Brute-force linear scan**
@@ -154,7 +154,7 @@ O(n) per query. Simple and correct. For trees up to ~50k nodes in 2D, acceptable
 Return infinity as path cost if no path found. Choose start/goal positions and step sizes that guarantee a path is found within first 10-20% of iteration budget. Goal bias (5-10%) accelerates initial solution finding.
 
 ### Decision 8: Experiment Scope — **DECIDED: Moderate (2 maps, full sweep, convergence curves)**
-2 maps × batch sizes × modes × threading. Plus convergence curve analysis.
+2 maps × block sizes × modes × threading. Plus convergence curve analysis.
 
 ## 7. Implementation Specification
 
@@ -321,7 +321,7 @@ anytime_server:
   ros__parameters:
     is_reactive_proactive: "reactive"
     multi_threading: false
-    batch_size: 1024
+    block_size: 1024
     random_seed: 42
     log_level: "debug"
 
@@ -370,7 +370,7 @@ Update `test/test_rrt_star_management.cpp`:
 ### Primary Metrics (via existing tracing/evaluation infrastructure)
 - **Iterations completed** per goal cycle (matches MC's `loop_count_`)
 - **Best path cost** at cancellation (matches MC's pi estimate — the "result")
-- **Batch computation time** (matches MC's `batch_time`)
+- **Block computation time** (matches MC's `block_time`)
 - **Throughput**: iterations/second (matches MC's throughput)
 - **Cancellation delay**: time from cancel request to deactivation
 
@@ -381,7 +381,7 @@ Update `test/test_rrt_star_management.cpp`:
 - **Path cost improvement rate**: Δcost/Δiteration over time
 
 ### Experimental Variables (matching Monte Carlo's sweep)
-- **Batch sizes**: [1, 16, 64, 256, 1024, 4096, 16384] (tuned for RRT* per-iteration cost)
+- **Block sizes**: [1, 16, 64, 256, 1024, 4096, 16384] (tuned for RRT* per-iteration cost)
 - **Modes**: reactive, proactive
 - **Threading**: single, multi
 - **Map**: depot, warehouse (additional dimension vs Monte Carlo)

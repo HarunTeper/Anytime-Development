@@ -6,7 +6,7 @@ Generate all Monte Carlo experiment configuration files
 import os
 
 # Configuration parameters
-batch_sizes = [1024, 2048, 4096, 8192, 16384, 32768, 65536]
+block_sizes = [1024, 2048, 4096, 8192, 16384, 32768, 65536]
 modes = ["reactive", "proactive"]
 threading = ["single", "multi"]
 
@@ -23,8 +23,8 @@ server_template = """anytime_server:
     # Threading configuration
     multi_threading: {multi_threading}  # Enable/disable multi-threading
     
-    # Batch processing configuration
-    batch_size: {batch_size}  # Number of iterations to compute per batch
+    # Block processing configuration
+    block_size: {block_size}  # Number of iterations to compute per block
 
     # Reproducibility
     random_seed: 42  # Seed for reproducible Monte Carlo results
@@ -53,18 +53,18 @@ def main():
 
     # Generate all combinations
     config_count = 0
-    for batch_size in batch_sizes:
+    for block_size in block_sizes:
         for mode in modes:
             for thread_mode in threading:
                 # Create config name
-                config_name = f"batch_{batch_size}_{mode}_{thread_mode}"
+                config_name = f"block_{block_size}_{mode}_{thread_mode}"
 
                 # Create server config
                 multi_threading_bool = "true" if thread_mode == "multi" else "false"
                 server_content = server_template.format(
                     mode=mode,
                     multi_threading=multi_threading_bool,
-                    batch_size=batch_size
+                    block_size=block_size
                 )
 
                 server_file = os.path.join(

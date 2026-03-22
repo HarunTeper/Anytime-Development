@@ -1,13 +1,13 @@
 # Goal: number of RRT* iterations to perform
 int32 goal
 ---
-# Result: best path cost found, iterations completed, and batch metrics
+# Result: best path cost found, iterations completed, and block metrics
 float32 result
 int32 iterations
-int32 batch_size
+int32 block_size
 int32 tree_size
 int32 first_solution_iteration
-builtin_interfaces/Duration batch_time
+builtin_interfaces/Duration block_time
 builtin_interfaces/Time action_server_receive
 builtin_interfaces/Time action_server_accept
 builtin_interfaces/Time action_server_start

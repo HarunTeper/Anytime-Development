@@ -45,13 +45,13 @@ Three ROS 2 components form the processing pipeline:
 | Sync mode | sync, async | Sync blocks on each GPU layer; async pipelines submissions via CUDA callbacks |
 | Threading | single, multi | Single-threaded uses one executor thread; multi-threaded allows parallel callback processing |
 
-Phase 1 baseline uses fixed batch_size=1. Phase 3 throughput uses fixed batch_size=22.
+Phase 1 baseline uses fixed block_size=1. Phase 3 throughput uses fixed block_size=22.
 
 ### Phase 2 (Cancellation Experiments)
 
 | Variable | Values | Rationale |
 |----------|--------|-----------|
-| Block size | 1, 4, 5, 8, 15, 22 | Chosen to align with quality jump boundaries: BS4/8 hit the L8 (80%) and L16 (98%) jumps, BS5 lands on L15 (97% jump), BS15 has one checkpoint at the quality jump, BS1=max granularity, BS22=full batch baseline |
+| Block size | 1, 4, 5, 8, 15, 22 | Chosen to align with quality jump boundaries: BS4/8 hit the L8 (80%) and L16 (98%) jumps, BS5 lands on L15 (97% jump), BS15 has one checkpoint at the quality jump, BS1=max granularity, BS22=full block baseline |
 | Sync mode | sync, async | Same as Phase 1 |
 | Threading | single, multi | Same as Phase 1 |
 
@@ -102,7 +102,7 @@ introduced at the filtering boundary.
 ### Step 0: Setup and Config Generation (`0_test_setup.sh`)
 
 Quick environmental verification:
-- Launches YOLO components with default config (batch_size=1, proactive)
+- Launches YOLO components with default config (block_size=1, proactive)
 - Runs for 30 seconds maximum with LTTng tracing
 - Verifies trace events are captured
 - Also generates config files for Steps 1 and 3
@@ -113,7 +113,7 @@ Quick environmental verification:
 
 | Parameter | Value |
 |-----------|-------|
-| batch_size | 1 (layer-by-layer) |
+| block_size | 1 (layer-by-layer) |
 | Mode | proactive |
 | Sync | sync |
 | Threading | single |
@@ -253,7 +253,7 @@ Statistics computed: mean, std, min, max, median across all images (all trials p
 
 | Parameter | Value |
 |-----------|-------|
-| batch_size | 22 (all layers in one block) |
+| block_size | 22 (all layers in one block) |
 | Mode | proactive |
 | Cancellation | none |
 | Trials | 3 per config |
@@ -335,7 +335,7 @@ anytime_server:
   ros__parameters:
     is_reactive_proactive: "proactive"
     multi_threading: true/false
-    batch_size: 1/4/8/13/16/20/22
+    block_size: 1/4/8/13/16/20/22
     is_sync_async: "sync"/"async"
     weights_path: <absolute path to weights_32>
 ```
@@ -479,7 +479,7 @@ from `plt.cm.tab10` colormap.
 
 The proactive execution loop (`anytime_base.hpp`):
 1. Drain GPU completions (async mode)
-2. Compute batch (N layers, where N = block size)
+2. Compute block (N layers, where N = block size)
 3. Drain GPU completions again
 4. Check `goal_handle_->is_canceling()` and `should_finish()`
 5. If cancelling/finished: `calculate_result()`, return result, deactivate
@@ -521,11 +521,11 @@ On each feedback reception (`anytime_client.cpp:process_feedback()`):
 - Callback increments atomic `completion_signals_`
 - `process_gpu_completions()` drains signals on executor thread,
   incrementing `processed_layers` and emitting `yolo_layer_end` per completion
-- Feedback sent after draining all completions in the current batch
+- Feedback sent after draining all completions in the current block
 
 ### Why Proactive Mode Only
 
-Reactive mode (`anytime_base.hpp:54-100`) sends feedback AFTER computing a batch
+Reactive mode (`anytime_base.hpp:54-100`) sends feedback AFTER computing a block
 but does NOT call `calculate_result()` before feedback. The client receives stale
 intermediate results, making score-based cancellation unreliable. Proactive mode
 ensures fresh results in every feedback message.
@@ -551,7 +551,7 @@ ensures fresh results in every feedback message.
 | `anytime:yolo_exit_calculation_end` | layer_num, num_detections | Steps 2a, 2b, 4, 7: exit timing, detection count |
 | `anytime:yolo_detection` | layer_num, class_id, confidence, bbox | Step 2a: per-detection counting |
 | `anytime:yolo_result` | processed_layers, total_detections | Steps 2a, 4: final result |
-| `anytime:anytime_compute_exit` | iterations_completed, computation_time_ns | Step 4: batch completion |
+| `anytime:anytime_compute_exit` | iterations_completed, computation_time_ns | Step 4: block completion |
 | `anytime:anytime_client_cancel_sent` | timestamp_ns | Step 7: cancel timing |
 | `anytime:anytime_client_goal_finished` | timestamp_ns, result_code | Step 7: result timing |
 
@@ -626,7 +626,7 @@ included in timing statistics.
 | # | Decision | Rationale |
 |---|----------|-----------|
 | 1 | Proactive mode only for Phase 2 | Reactive mode does not call `calculate_result()` before `send_feedback()`, making score-based cancellation unreliable |
-| 2 | Block sizes [1, 4, 5, 8, 15, 22] | Aligned with quality jump boundaries: L8 (80%), L15 (97%), L16 (98%). BS4/8 hit L8+L16, BS5 lands on L15, BS15 checkpoints at the quality jump, BS1=max granularity, BS22=full batch |
+| 2 | Block sizes [1, 4, 5, 8, 15, 22] | Aligned with quality jump boundaries: L8 (80%), L15 (97%), L16 (98%). BS4/8 hit L8+L16, BS5 lands on L15, BS15 checkpoints at the quality jump, BS1=max granularity, BS22=full block |
 | 3 | cancel_after_layers = 22 (score-only) | Isolates score-based cancellation behavior without hard-deadline interference |
 | 4 | Score threshold 0.8, class 9 | Simulates targeted detection (traffic light) with high confidence requirement |
 | 5 | 5 warmup images, fixed count | GPU JIT completes within first few inferences; fixed count is simple and reproducible |

@@ -1,10 +1,10 @@
 #!/bin/bash
 # Test a single RRT* configuration for sanity checking
-# Usage: ./test_single_config.sh [batch_size] [mode] [threading] [map]
+# Usage: ./test_single_config.sh [block_size] [mode] [threading] [map]
 
 set -e
 
-BATCH_SIZE="${1:-256}"
+BLOCK_SIZE="${1:-256}"
 MODE="${2:-reactive}"
 THREADING="${3:-single}"
 MAP="${4:-depot}"
@@ -16,7 +16,7 @@ CONFIG_DIR="${SCRIPT_DIR}/configs"
 TRACE_DIR="${SCRIPT_DIR}/traces"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 
-config_name="batch_${BATCH_SIZE}_${MODE}_${THREADING}_${MAP}"
+config_name="block_${BLOCK_SIZE}_${MODE}_${THREADING}_${MAP}"
 
 echo "========================================="
 echo "Single Config Test: ${config_name}"

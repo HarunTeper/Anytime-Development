@@ -60,7 +60,7 @@ def create_server_config(block_size, mode, sync_mode, threading_mode):
             "ros__parameters": {
                 "is_reactive_proactive": mode,
                 "multi_threading": threading_mode == "multi",
-                "batch_size": block_size,
+                "block_size": block_size,
                 "is_sync_async": sync_mode,
                 "weights_path": WEIGHTS_PATH,
                 "log_level": "info"

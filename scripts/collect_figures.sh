@@ -40,13 +40,13 @@ copy_if_exists "${RRT_DIR}/results/plots/framework/total_iterations.pdf" \
 copy_if_exists "${RRT_DIR}/results/plots/framework/cancellation_latency.pdf" \
                "${OUTPUT_DIR}/figure_5b_cancellation_latency.pdf"
 
-# Figure 6a: Interference — compute time vs batch size
-copy_if_exists "${IF_DIR}/results/plots/compute_time_vs_batch_size.pdf" \
-               "${OUTPUT_DIR}/figure_6a_compute_time_vs_batch_size.pdf"
+# Figure 6a: Interference — compute time vs block size
+copy_if_exists "${IF_DIR}/results/plots/compute_time_vs_block_size.pdf" \
+               "${OUTPUT_DIR}/figure_6a_compute_time_vs_block_size.pdf"
 
-# Figure 6b: Interference — timer period vs batch size
-copy_if_exists "${IF_DIR}/results/plots/timer_period_vs_batch_size.pdf" \
-               "${OUTPUT_DIR}/figure_6b_timer_period_vs_batch_size.pdf"
+# Figure 6b: Interference — timer period vs block size
+copy_if_exists "${IF_DIR}/results/plots/timer_period_vs_block_size.pdf" \
+               "${OUTPUT_DIR}/figure_6b_timer_period_vs_block_size.pdf"
 
 # Table I: Interference — skipped timer firings
 copy_if_exists "${IF_DIR}/results/table_1_skipped_firings.csv" \

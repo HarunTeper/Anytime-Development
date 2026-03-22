@@ -39,7 +39,7 @@ RESULTS_DIR="${EXPERIMENT_DIR}/results"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 
 # Experiment parameters
-BATCH_SIZES=(1 16 64 256 1024 4096)
+BLOCK_SIZES=(1 16 64 256 1024 4096)
 MODES=("reactive" "proactive")
 THREADING=("single" "multi")
 MAPS=("depot" "warehouse")
@@ -53,7 +53,7 @@ echo "RRT* Experimental Evaluation"
 echo "========================================="
 echo ""
 echo "Configuration:"
-echo "  - Batch sizes: ${BATCH_SIZES[*]}"
+echo "  - Block sizes: ${BLOCK_SIZES[*]}"
 echo "  - Modes: ${MODES[*]}"
 echo "  - Threading: ${THREADING[*]}"
 echo "  - Maps: ${MAPS[*]}"
@@ -90,11 +90,11 @@ mkdir -p "${TRACE_DIR}"
 mkdir -p "${RESULTS_DIR}"
 
 # Counter for progress
-total_configs=$((${#BATCH_SIZES[@]} * ${#MODES[@]} * ${#THREADING[@]} * ${#MAPS[@]} * NUM_RUNS))
+total_configs=$((${#BLOCK_SIZES[@]} * ${#MODES[@]} * ${#THREADING[@]} * ${#MAPS[@]} * NUM_RUNS))
 current_config=0
 
 # Iterate through all configurations
-for batch_size in "${BATCH_SIZES[@]}"; do
+for block_size in "${BLOCK_SIZES[@]}"; do
     for mode in "${MODES[@]}"; do
         for thread_mode in "${THREADING[@]}"; do
             for map_name in "${MAPS[@]}"; do
@@ -102,7 +102,7 @@ for batch_size in "${BATCH_SIZES[@]}"; do
                     current_config=$((current_config + 1))
 
                     # Create config name
-                    config_name="batch_${batch_size}_${mode}_${thread_mode}_${map_name}"
+                    config_name="block_${block_size}_${mode}_${thread_mode}_${map_name}"
                     run_name="${config_name}_run${run}"
 
                     echo ""

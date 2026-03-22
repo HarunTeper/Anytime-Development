@@ -6,7 +6,7 @@ Generate all Interference experiment configuration files
 import os
 
 # Configuration parameters
-batch_sizes = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
+block_sizes = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
 modes = ["reactive", "proactive"]
 threading = ["single"]
 
@@ -27,8 +27,8 @@ server_template = """anytime_server:
     # Threading configuration
     multi_threading: {multi_threading}  # Enable/disable multi-threading
     
-    # Batch processing configuration
-    batch_size: {batch_size}  # Number of iterations to compute per batch
+    # Block processing configuration
+    block_size: {block_size}  # Number of iterations to compute per block
     
     # Logging configuration
     log_level: "info"  # Options: "debug", "info", "warn", "error", "fatal"
@@ -67,18 +67,18 @@ def main():
 
     # Generate all combinations
     config_count = 0
-    for batch_size in batch_sizes:
+    for block_size in block_sizes:
         for mode in modes:
             for thread_mode in threading:
                 # Create config name
-                config_name = f"batch_{batch_size}_{mode}_{thread_mode}"
+                config_name = f"block_{block_size}_{mode}_{thread_mode}"
 
                 # Create server config
                 multi_threading_bool = "true" if thread_mode == "multi" else "false"
                 server_content = server_template.format(
                     mode=mode,
                     multi_threading=multi_threading_bool,
-                    batch_size=batch_size
+                    block_size=block_size
                 )
 
                 server_file = os.path.join(

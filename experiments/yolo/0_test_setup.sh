@@ -57,7 +57,7 @@ lttng start
 
 # Launch YOLO server and client components
 echo -e "${BLUE}Launching YOLO server and client...${NC}"
-echo "  - Batch size: 1 (default)"
+echo "  - Block size: 1 (default)"
 echo "  - Mode: Proactive (default)"
 
 ros2 launch experiments yolo.launch.py \

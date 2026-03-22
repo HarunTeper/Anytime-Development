@@ -52,9 +52,9 @@ template<bool isReactiveProactive>
 class AnytimeManagement : public anytime_core::AnytimeBase<Anytime, AnytimeGoalHandle>
 {
 public:
-  explicit AnytimeManagement(rclcpp::Node * node, int batch_size = 1)
+  explicit AnytimeManagement(rclcpp::Node * node, int block_size = 1)
   {
-    this->template initialize_anytime_base<isReactiveProactive>(node, batch_size);
+    this->template initialize_anytime_base<isReactiveProactive>(node, block_size);
 
     // Initialize reproducible RNG from ROS parameter
     if (!node->has_parameter("random_seed")) {
@@ -131,7 +131,7 @@ public:
       node->get_logger(), "RRT* start=(%.2f, %.2f), goal=(%.2f, %.2f)",
       start_.x, start_.y, goal_.x, goal_.y);
 
-    TRACE_RRT_STAR_INIT(node, batch_size, isReactiveProactive);
+    TRACE_RRT_STAR_INIT(node, block_size, isReactiveProactive);
   }
 
   // --- Domain-Specific Implementations ---
@@ -258,8 +258,8 @@ public:
 
     result->result = static_cast<float>(best_path_cost_);
     result->iterations = loop_count_;
-    result->batch_time = this->average_computation_time_;
-    result->batch_size = this->batch_size_;
+    result->block_time = this->average_computation_time_;
+    result->block_size = this->block_size_;
     result->tree_size = static_cast<int32_t>(tree_.size());
     result->first_solution_iteration = first_solution_iteration_;
 

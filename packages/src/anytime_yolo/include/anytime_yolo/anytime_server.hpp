@@ -17,6 +17,6 @@ public:
 private:
   // factory function for creating anytime management
   std::shared_ptr<anytime_core::AnytimeBase<Anytime, GoalHandleType>> create_anytime_management(
-    rclcpp::Node * node, bool is_reactive_proactive, bool is_sync_async, int batch_size,
+    rclcpp::Node * node, bool is_reactive_proactive, bool is_sync_async, int block_size,
     const std::string & weights_path);
 };

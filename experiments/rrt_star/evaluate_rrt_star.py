@@ -3,8 +3,8 @@
 RRT* Experiment Evaluation Script
 
 This script parses LTTng traces from RRT* experiments and generates:
-- Framework metrics: time per batch, throughput, cancellation delay, latencies
-- Overhead metrics: per-batch overhead, overhead ratio, feedback/result times
+- Framework metrics: time per block, throughput, cancellation delay, latencies
+- Overhead metrics: per-block overhead, overhead ratio, feedback/result times
 - RRT*-specific metrics: convergence curves, first solution iteration, tree size
 - CSV/JSON exports and PDF plots
 """
@@ -143,20 +143,20 @@ def parse_trace_directory(trace_dir):
 def extract_metrics_from_events(events, config_name):
     """Extract all metrics from trace events"""
     config_parts = config_name.split('_')
-    batch_size = int(config_parts[1])
+    block_size = int(config_parts[1])
 
     metrics = {
         'config': config_name,
-        'batch_size': batch_size,
-        'total_batches': 0,
+        'block_size': block_size,
+        'total_blocks': 0,
         'total_iterations': 0,
-        'batch_times': [],
+        'block_times': [],
         'server_cancel_response_delays': [],
         'goal_to_finish_latencies': [],
         'goal_to_cancel_latencies': [],
         'cancel_to_finish_latencies': [],
         # Overhead metrics
-        'per_batch_overheads': [],
+        'per_block_overheads': [],
         'overhead_ratios': [],
         'feedback_send_times': [],
         'result_compute_times': [],
@@ -206,23 +206,23 @@ def extract_metrics_from_events(events, config_name):
 
         if name == 'anytime:anytime_compute_entry':
             current_compute_start = event.timestamp
-            metrics['total_batches'] += 1
-            # Per-batch overhead: gap from previous compute_exit to this compute_entry
+            metrics['total_blocks'] += 1
+            # Per-block overhead: gap from previous compute_exit to this compute_entry
             # Skip if this gap spans a cycle boundary (inter-goal idle time)
             if prev_compute_exit is not None and not in_cycle_gap:
                 overhead_ms = (event.timestamp - prev_compute_exit) / 1e6
-                metrics['per_batch_overheads'].append(overhead_ms)
-                # Compute overhead ratio using previous batch time
-                if metrics['batch_times']:
-                    prev_batch_time = metrics['batch_times'][-1]
-                    ratio = overhead_ms / (overhead_ms + prev_batch_time) * 100.0 if (overhead_ms + prev_batch_time) > 0 else 0
+                metrics['per_block_overheads'].append(overhead_ms)
+                # Compute overhead ratio using previous block time
+                if metrics['block_times']:
+                    prev_block_time = metrics['block_times'][-1]
+                    ratio = overhead_ms / (overhead_ms + prev_block_time) * 100.0 if (overhead_ms + prev_block_time) > 0 else 0
                     metrics['overhead_ratios'].append(ratio)
             in_cycle_gap = False
 
         elif name == 'anytime:anytime_compute_exit':
             if current_compute_start is not None:
-                batch_time_ms = (event.timestamp - current_compute_start) / 1e6
-                metrics['batch_times'].append(batch_time_ms)
+                block_time_ms = (event.timestamp - current_compute_start) / 1e6
+                metrics['block_times'].append(block_time_ms)
                 prev_compute_exit = event.timestamp
                 current_compute_start = None
 
@@ -315,7 +315,7 @@ def extract_metrics_from_events(events, config_name):
                 best_cost = float(event.fields.get('best_cost', 'inf'))
                 tree_size = int(event.fields.get('tree_size', 0))
                 total_iters = int(event.fields.get('total_iterations', 0))
-                # Track as latest result in this cycle (overwritten each batch
+                # Track as latest result in this cycle (overwritten each block
                 # in proactive mode; only committed at cycle boundary)
                 cycle_last_best_cost = best_cost
                 cycle_last_tree_size = tree_size
@@ -342,8 +342,8 @@ def extract_metrics_from_events(events, config_name):
     def safe_std(lst):
         return np.std(lst) if lst else 0
 
-    metrics['avg_time_per_batch'] = safe_mean(metrics['batch_times'])
-    metrics['std_time_per_batch'] = safe_std(metrics['batch_times'])
+    metrics['avg_time_per_block'] = safe_mean(metrics['block_times'])
+    metrics['std_time_per_block'] = safe_std(metrics['block_times'])
     metrics['avg_server_cancel_response'] = safe_mean(metrics['server_cancel_response_delays'])
     metrics['std_server_cancel_response'] = safe_std(metrics['server_cancel_response_delays'])
     metrics['avg_goal_to_finish_latency'] = safe_mean(metrics['goal_to_finish_latencies'])
@@ -354,8 +354,8 @@ def extract_metrics_from_events(events, config_name):
     metrics['std_cancel_to_finish_latency'] = safe_std(metrics['cancel_to_finish_latencies'])
 
     # Overhead summary statistics
-    metrics['avg_per_batch_overhead'] = safe_mean(metrics['per_batch_overheads'])
-    metrics['std_per_batch_overhead'] = safe_std(metrics['per_batch_overheads'])
+    metrics['avg_per_block_overhead'] = safe_mean(metrics['per_block_overheads'])
+    metrics['std_per_block_overhead'] = safe_std(metrics['per_block_overheads'])
     metrics['avg_overhead_ratio'] = safe_mean(metrics['overhead_ratios'])
     metrics['std_overhead_ratio'] = safe_std(metrics['overhead_ratios'])
     metrics['avg_feedback_send_time'] = safe_mean(metrics['feedback_send_times'])
@@ -370,15 +370,15 @@ def extract_metrics_from_events(events, config_name):
     metrics['avg_result_comm_time'] = safe_mean(metrics['result_comm_times'])
     metrics['std_result_comm_time'] = safe_std(metrics['result_comm_times'])
 
-    # Batch time percentiles
-    if metrics['batch_times']:
-        metrics['batch_time_p50'] = np.percentile(metrics['batch_times'], 50)
-        metrics['batch_time_p95'] = np.percentile(metrics['batch_times'], 95)
-        metrics['batch_time_p99'] = np.percentile(metrics['batch_times'], 99)
+    # Block time percentiles
+    if metrics['block_times']:
+        metrics['block_time_p50'] = np.percentile(metrics['block_times'], 50)
+        metrics['block_time_p95'] = np.percentile(metrics['block_times'], 95)
+        metrics['block_time_p99'] = np.percentile(metrics['block_times'], 99)
     else:
-        metrics['batch_time_p50'] = 0
-        metrics['batch_time_p95'] = 0
-        metrics['batch_time_p99'] = 0
+        metrics['block_time_p50'] = 0
+        metrics['block_time_p95'] = 0
+        metrics['block_time_p99'] = 0
 
     # RRT*-specific summary (filter inf values from costs)
     finite_costs = [c for c in metrics['final_best_costs'] if np.isfinite(c)]
@@ -409,10 +409,10 @@ def aggregate_runs(all_metrics):
         agg = {
             'config': base_config,
             'num_runs': len(runs),
-            'total_batches': np.mean([r['total_batches'] for r in runs]),
+            'total_blocks': np.mean([r['total_blocks'] for r in runs]),
             'total_iterations': np.mean([r['total_iterations'] for r in runs]),
-            'avg_time_per_batch': np.mean([r['avg_time_per_batch'] for r in runs]),
-            'std_time_per_batch': combined_std(runs, 'avg_time_per_batch', 'std_time_per_batch'),
+            'avg_time_per_block': np.mean([r['avg_time_per_block'] for r in runs]),
+            'std_time_per_block': combined_std(runs, 'avg_time_per_block', 'std_time_per_block'),
             'avg_server_cancel_response': np.mean([r['avg_server_cancel_response'] for r in runs if r['avg_server_cancel_response'] > 0]) if any(r['avg_server_cancel_response'] > 0 for r in runs) else 0,
             'std_server_cancel_response': combined_std([r for r in runs if r['avg_server_cancel_response'] > 0], 'avg_server_cancel_response', 'std_server_cancel_response') if any(r['avg_server_cancel_response'] > 0 for r in runs) else 0,
             'avg_goal_to_finish_latency': np.mean([r['avg_goal_to_finish_latency'] for r in runs if r['avg_goal_to_finish_latency'] > 0]) if any(r['avg_goal_to_finish_latency'] > 0 for r in runs) else 0,
@@ -422,8 +422,8 @@ def aggregate_runs(all_metrics):
             'avg_cancel_to_finish_latency': np.mean([r['avg_cancel_to_finish_latency'] for r in runs if r['avg_cancel_to_finish_latency'] > 0]) if any(r['avg_cancel_to_finish_latency'] > 0 for r in runs) else 0,
             'std_cancel_to_finish_latency': combined_std([r for r in runs if r['avg_cancel_to_finish_latency'] > 0], 'avg_cancel_to_finish_latency', 'std_cancel_to_finish_latency') if any(r['avg_cancel_to_finish_latency'] > 0 for r in runs) else 0,
             # Overhead metrics
-            'avg_per_batch_overhead': np.mean([r['avg_per_batch_overhead'] for r in runs]),
-            'std_per_batch_overhead': combined_std(runs, 'avg_per_batch_overhead', 'std_per_batch_overhead'),
+            'avg_per_block_overhead': np.mean([r['avg_per_block_overhead'] for r in runs]),
+            'std_per_block_overhead': combined_std(runs, 'avg_per_block_overhead', 'std_per_block_overhead'),
             'avg_overhead_ratio': np.mean([r['avg_overhead_ratio'] for r in runs]),
             'std_overhead_ratio': combined_std(runs, 'avg_overhead_ratio', 'std_overhead_ratio'),
             'avg_feedback_send_time': np.mean([r['avg_feedback_send_time'] for r in runs]),
@@ -437,9 +437,9 @@ def aggregate_runs(all_metrics):
             'std_feedback_total_time': combined_std([r for r in runs if r['avg_feedback_total_time'] > 0], 'avg_feedback_total_time', 'std_feedback_total_time') if any(r['avg_feedback_total_time'] > 0 for r in runs) else 0,
             'avg_result_comm_time': np.mean([r['avg_result_comm_time'] for r in runs if r['avg_result_comm_time'] > 0]) if any(r['avg_result_comm_time'] > 0 for r in runs) else 0,
             'std_result_comm_time': combined_std([r for r in runs if r['avg_result_comm_time'] > 0], 'avg_result_comm_time', 'std_result_comm_time') if any(r['avg_result_comm_time'] > 0 for r in runs) else 0,
-            'batch_time_p50': np.mean([r['batch_time_p50'] for r in runs]),
-            'batch_time_p95': np.mean([r['batch_time_p95'] for r in runs]),
-            'batch_time_p99': np.mean([r['batch_time_p99'] for r in runs]),
+            'block_time_p50': np.mean([r['block_time_p50'] for r in runs]),
+            'block_time_p95': np.mean([r['block_time_p95'] for r in runs]),
+            'block_time_p99': np.mean([r['block_time_p99'] for r in runs]),
             # RRT*-specific (filter inf values from cost averages)
             'avg_final_best_cost': np.mean([r['avg_final_best_cost'] for r in runs if np.isfinite(r['avg_final_best_cost']) and r['avg_final_best_cost'] > 0]) if any(np.isfinite(r['avg_final_best_cost']) and r['avg_final_best_cost'] > 0 for r in runs) else 0,
             'avg_final_tree_size': np.mean([r['avg_final_tree_size'] for r in runs if np.isfinite(r['avg_final_tree_size']) and r['avg_final_tree_size'] > 0]) if any(np.isfinite(r['avg_final_tree_size']) and r['avg_final_tree_size'] > 0 for r in runs) else 0,
@@ -451,12 +451,12 @@ def aggregate_runs(all_metrics):
 
 def parse_config_name(config_name):
     """Parse configuration name into components"""
-    # Format: batch_<size>_<mode>_<threading>_<map>
+    # Format: block_<size>_<mode>_<threading>_<map>
     parts = config_name.split('_')
     offset = 1 if parts[0] == 'test' else 0
 
     return {
-        'batch_size': int(parts[1 + offset]),
+        'block_size': int(parts[1 + offset]),
         'mode': parts[2 + offset],
         'threading': parts[3 + offset],
         'map': parts[4 + offset] if len(parts) > 4 + offset else 'unknown',
@@ -548,14 +548,14 @@ def make_grouped_bar_chart(df, y_col, ylabel, filename, yerr_col=None,
         return
 
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
-    all_batch_sizes = sorted(plot_df['batch_size'].unique())
-    x = np.arange(len(all_batch_sizes))
+    all_block_sizes = sorted(plot_df['block_size'].unique())
+    x = np.arange(len(all_block_sizes))
     width = 0.2
 
     for i, mode in enumerate(['reactive', 'proactive']):
         for j, threading in enumerate(['single', 'multi']):
             data = plot_df[(plot_df['mode'] == mode) & (plot_df['threading'] == threading)]
-            data = data.sort_values('batch_size')
+            data = data.sort_values('block_size')
 
             if data.empty:
                 continue
@@ -563,13 +563,13 @@ def make_grouped_bar_chart(df, y_col, ylabel, filename, yerr_col=None,
             y_values = []
             yerr_values = []
             x_positions = []
-            for bs in all_batch_sizes:
-                bd = data[data['batch_size'] == bs]
+            for bs in all_block_sizes:
+                bd = data[data['block_size'] == bs]
                 if not bd.empty:
                     y_values.append(bd[y_col].iloc[0])
                     if yerr_col and yerr_col in bd.columns:
                         yerr_values.append(bd[yerr_col].iloc[0])
-                    x_positions.append(all_batch_sizes.index(bs))
+                    x_positions.append(all_block_sizes.index(bs))
 
             if y_values:
                 offset = (i * 2 + j - 1.5) * width
@@ -581,10 +581,10 @@ def make_grouped_bar_chart(df, y_col, ylabel, filename, yerr_col=None,
                 ax.bar(np.array(x_positions) + offset, y_values, width,
                        color=f'C{i*2+j}', **kwargs)
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel(ylabel, fontsize=FONT_SIZE_LABEL)
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
     ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
@@ -615,25 +615,25 @@ def generate_plots(aggregated_metrics, all_metrics):
 
     # ==================== Framework Metrics ====================
 
-    # 1. Batch size vs time per batch
-    print("  - Batch size vs time per batch")
+    # 1. Block size vs time per block
+    print("  - Block size vs time per block")
     for map_name in all_maps:
-        make_grouped_bar_chart(df, 'avg_time_per_batch',
-                               'Average Time per Batch (ms)',
-                               f'batch_size_vs_time_{map_name}.pdf',
-                               yerr_col='std_time_per_batch',
+        make_grouped_bar_chart(df, 'avg_time_per_block',
+                               'Average Time per Block (ms)',
+                               f'block_size_vs_time_{map_name}.pdf',
+                               yerr_col='std_time_per_block',
                                map_filter=map_name,
                                output_dir=FRAMEWORK_PLOTS_DIR)
-    make_grouped_bar_chart(df, 'avg_time_per_batch',
-                           'Average Time per Batch (ms)',
-                           'batch_size_vs_time.pdf',
-                           yerr_col='std_time_per_batch',
+    make_grouped_bar_chart(df, 'avg_time_per_block',
+                           'Average Time per Block (ms)',
+                           'block_size_vs_time.pdf',
+                           yerr_col='std_time_per_block',
                            output_dir=FRAMEWORK_PLOTS_DIR)
 
     # 2. Throughput
     print("  - Throughput")
-    df['throughput'] = df['batch_size'] / (df['avg_time_per_batch'] / 1000.0)
-    df.loc[df['avg_time_per_batch'] == 0, 'throughput'] = 0
+    df['throughput'] = df['block_size'] / (df['avg_time_per_block'] / 1000.0)
+    df.loc[df['avg_time_per_block'] == 0, 'throughput'] = 0
     for map_name in all_maps:
         make_grouped_bar_chart(df, 'throughput',
                                'Throughput (iterations/second)',
@@ -699,19 +699,19 @@ def generate_plots(aggregated_metrics, all_metrics):
 
     # ==================== Overhead Metrics ====================
 
-    # 15. Per-batch overhead
-    print("  - Per-batch overhead")
+    # 15. Per-block overhead
+    print("  - Per-block overhead")
     for map_name in all_maps:
-        make_grouped_bar_chart(df, 'avg_per_batch_overhead',
-                               'Per-Batch Overhead (ms)',
-                               f'per_batch_overhead_{map_name}.pdf',
-                               yerr_col='std_per_batch_overhead',
+        make_grouped_bar_chart(df, 'avg_per_block_overhead',
+                               'Per-Block Overhead (ms)',
+                               f'per_block_overhead_{map_name}.pdf',
+                               yerr_col='std_per_block_overhead',
                                map_filter=map_name,
                                output_dir=OVERHEAD_PLOTS_DIR)
-    make_grouped_bar_chart(df, 'avg_per_batch_overhead',
-                           'Per-Batch Overhead (ms)',
-                           'per_batch_overhead.pdf',
-                           yerr_col='std_per_batch_overhead',
+    make_grouped_bar_chart(df, 'avg_per_block_overhead',
+                           'Per-Block Overhead (ms)',
+                           'per_block_overhead.pdf',
+                           yerr_col='std_per_block_overhead',
                            output_dir=OVERHEAD_PLOTS_DIR)
 
     # 16. Overhead ratio
@@ -804,39 +804,39 @@ def generate_plots(aggregated_metrics, all_metrics):
                            yerr_col='std_result_comm_time',
                            output_dir=OVERHEAD_PLOTS_DIR)
 
-    # 22. Batch time percentiles (broken out by mode/threading)
-    print("  - Batch time percentiles")
+    # 22. Block time percentiles (broken out by mode/threading)
+    print("  - Block time percentiles")
     for pct_col, pct_label in [
-        ('batch_time_p50', 'p50'), ('batch_time_p95', 'p95'), ('batch_time_p99', 'p99')
+        ('block_time_p50', 'p50'), ('block_time_p95', 'p95'), ('block_time_p99', 'p99')
     ]:
         for map_name in all_maps:
             make_grouped_bar_chart(df, pct_col,
-                                   f'Batch Time {pct_label} (ms)',
-                                   f'batch_time_{pct_label}_{map_name}.pdf',
+                                   f'Block Time {pct_label} (ms)',
+                                   f'block_time_{pct_label}_{map_name}.pdf',
                                    map_filter=map_name,
                                    output_dir=OVERHEAD_PLOTS_DIR)
         make_grouped_bar_chart(df, pct_col,
-                               f'Batch Time {pct_label} (ms)',
-                               f'batch_time_{pct_label}.pdf',
+                               f'Block Time {pct_label} (ms)',
+                               f'block_time_{pct_label}.pdf',
                                output_dir=OVERHEAD_PLOTS_DIR)
 
-    # 20. Batch time trend (aggregated by config)
-    print("  - Batch time trend")
+    # 20. Block time trend (aggregated by config)
+    print("  - Block time trend")
     for map_name in all_maps:
         fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
         has_data = False
 
-        config_batchtimes = defaultdict(list)
+        config_blocktimes = defaultdict(list)
         for m in all_metrics:
             parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
             if parsed['map'] != map_name:
                 continue
-            config_key = f"bs={parsed['batch_size']},{parsed['mode']}-{parsed['threading']}"
-            config_batchtimes[config_key].append(m['batch_times'])
+            config_key = f"bs={parsed['block_size']},{parsed['mode']}-{parsed['threading']}"
+            config_blocktimes[config_key].append(m['block_times'])
 
         color_idx = 0
-        for config_key, runs_batchtimes in sorted(config_batchtimes.items()):
-            non_empty = [bt for bt in runs_batchtimes if bt]
+        for config_key, runs_blocktimes in sorted(config_blocktimes.items()):
+            non_empty = [bt for bt in runs_blocktimes if bt]
             if not non_empty:
                 continue
             min_len = min(len(bt) for bt in non_empty)
@@ -854,32 +854,32 @@ def generate_plots(aggregated_metrics, all_metrics):
             color_idx += 1
 
         if has_data:
-            ax.set_xlabel('Batch Number', fontsize=FONT_SIZE_LABEL)
-            ax.set_ylabel('Batch Compute Time (ms)', fontsize=FONT_SIZE_LABEL)
+            ax.set_xlabel('Block Number', fontsize=FONT_SIZE_LABEL)
+            ax.set_ylabel('Block Compute Time (ms)', fontsize=FONT_SIZE_LABEL)
             ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
             ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
             ax.grid(True)
             plt.tight_layout(pad=0)
-            plt.savefig(OVERHEAD_PLOTS_DIR / f'batch_time_trend_{map_name}.pdf',
+            plt.savefig(OVERHEAD_PLOTS_DIR / f'block_time_trend_{map_name}.pdf',
                         dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
         plt.close()
 
-    # Combined batch time trend (aggregated by config across maps)
+    # Combined block time trend (aggregated by config across maps)
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
     has_data = False
-    config_batchtimes = defaultdict(list)
+    config_blocktimes = defaultdict(list)
     for m in all_metrics:
-        if m['batch_times']:
+        if m['block_times']:
             parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
-            config_key = f"bs={parsed['batch_size']},{parsed['map']}"
-            config_batchtimes[config_key].append(m['batch_times'])
+            config_key = f"bs={parsed['block_size']},{parsed['map']}"
+            config_blocktimes[config_key].append(m['block_times'])
 
     color_idx = 0
-    for config_key, runs_batchtimes in sorted(config_batchtimes.items()):
-        min_len = min((len(bt) for bt in runs_batchtimes if bt), default=0)
+    for config_key, runs_blocktimes in sorted(config_blocktimes.items()):
+        min_len = min((len(bt) for bt in runs_blocktimes if bt), default=0)
         if min_len == 0:
             continue
-        arr = np.array([bt[:min_len] for bt in runs_batchtimes])
+        arr = np.array([bt[:min_len] for bt in runs_blocktimes])
         mean_bt = arr.mean(axis=0)
         color = f'C{color_idx % 10}'
         ax.plot(range(min_len), mean_bt, label=config_key, color=color,
@@ -887,12 +887,12 @@ def generate_plots(aggregated_metrics, all_metrics):
         has_data = True
         color_idx += 1
 
-    ax.set_xlabel('Batch Number', fontsize=FONT_SIZE_LABEL)
-    ax.set_ylabel('Batch Compute Time (ms)', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Number', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Block Compute Time (ms)', fontsize=FONT_SIZE_LABEL)
     ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
     ax.grid(True)
     plt.tight_layout(pad=0)
-    plt.savefig(OVERHEAD_PLOTS_DIR / 'batch_time_trend.pdf',
+    plt.savefig(OVERHEAD_PLOTS_DIR / 'block_time_trend.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
@@ -904,13 +904,13 @@ def generate_plots(aggregated_metrics, all_metrics):
         fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
         has_data = False
 
-        # Group metrics by config (batch_size, mode, threading)
+        # Group metrics by config (block_size, mode, threading)
         config_curves = defaultdict(list)
         for m in all_metrics:
             parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
             if parsed['map'] != map_name:
                 continue
-            config_key = (parsed['batch_size'], parsed['mode'], parsed['threading'])
+            config_key = (parsed['block_size'], parsed['mode'], parsed['threading'])
             for cycle in m['convergence_data']:
                 config_curves[config_key].append(cycle)
 
@@ -1007,7 +1007,7 @@ def generate_plots(aggregated_metrics, all_metrics):
     if first_sol_data:
         fsi_df = pd.DataFrame(first_sol_data)
         # Average by config
-        fsi_agg = fsi_df.groupby(['batch_size', 'mode', 'threading', 'map']).agg(
+        fsi_agg = fsi_df.groupby(['block_size', 'mode', 'threading', 'map']).agg(
             avg_first_sol=('first_solution_iteration', 'mean')
         ).reset_index()
 
@@ -1016,8 +1016,8 @@ def generate_plots(aggregated_metrics, all_metrics):
             if map_data.empty:
                 continue
             fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
-            all_batch_sizes = sorted(map_data['batch_size'].unique())
-            x = np.arange(len(all_batch_sizes))
+            all_block_sizes = sorted(map_data['block_size'].unique())
+            x = np.arange(len(all_block_sizes))
             width = 0.2
 
             for i, mode in enumerate(['reactive', 'proactive']):
@@ -1027,20 +1027,20 @@ def generate_plots(aggregated_metrics, all_metrics):
                         continue
                     y_values = []
                     x_positions = []
-                    for bs in all_batch_sizes:
-                        bd = data[data['batch_size'] == bs]
+                    for bs in all_block_sizes:
+                        bd = data[data['block_size'] == bs]
                         if not bd.empty:
                             y_values.append(bd['avg_first_sol'].iloc[0])
-                            x_positions.append(all_batch_sizes.index(bs))
+                            x_positions.append(all_block_sizes.index(bs))
                     if y_values:
                         offset = (i * 2 + j - 1.5) * width
                         ax.bar(np.array(x_positions) + offset, y_values, width,
                                color=f'C{i*2+j}', label=f'{mode}-{threading}')
 
-            ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+            ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
             ax.set_ylabel('First Solution Iteration', fontsize=FONT_SIZE_LABEL)
             ax.set_xticks(x)
-            ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+            ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
             ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
             ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
             ax.grid(True, axis='y')
@@ -1049,16 +1049,16 @@ def generate_plots(aggregated_metrics, all_metrics):
                         dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
             plt.close()
 
-    # 13. Best cost vs batch size
-    print("  - Best cost vs batch size")
+    # 13. Best cost vs block size
+    print("  - Best cost vs block size")
     make_grouped_bar_chart(df, 'avg_final_best_cost',
                            'Best Path Cost at Cancellation',
-                           'best_cost_vs_batch_size.pdf',
+                           'best_cost_vs_block_size.pdf',
                            output_dir=RRT_STAR_PLOTS_DIR)
     for map_name in all_maps:
         make_grouped_bar_chart(df, 'avg_final_best_cost',
                                'Best Path Cost at Cancellation',
-                               f'best_cost_vs_batch_size_{map_name}.pdf',
+                               f'best_cost_vs_block_size_{map_name}.pdf',
                                map_filter=map_name,
                                output_dir=RRT_STAR_PLOTS_DIR)
 
@@ -1073,7 +1073,7 @@ def generate_plots(aggregated_metrics, all_metrics):
             parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
             if parsed['map'] != map_name:
                 continue
-            config_key = (parsed['batch_size'], parsed['mode'], parsed['threading'])
+            config_key = (parsed['block_size'], parsed['mode'], parsed['threading'])
             for cycle in m['convergence_data']:
                 config_curves[config_key].append(cycle)
 
@@ -1123,19 +1123,19 @@ def run_statistical_tests(all_metrics, results_dir):
 
     results = []
 
-    # Group raw batch_times by config dimensions
+    # Group raw block_times by config dimensions
     groups = defaultdict(list)
     for m in all_metrics:
         parsed = parse_config_name(m['config'].rsplit('_run', 1)[0])
-        key = (parsed['batch_size'], parsed['map'], parsed['mode'], parsed['threading'])
-        groups[key].extend(m['batch_times'])
+        key = (parsed['block_size'], parsed['map'], parsed['mode'], parsed['threading'])
+        groups[key].extend(m['block_times'])
 
-    # Test reactive vs proactive (for each batch_size, map, threading)
-    for batch_size in sorted(set(k[0] for k in groups)):
+    # Test reactive vs proactive (for each block_size, map, threading)
+    for block_size in sorted(set(k[0] for k in groups)):
         for map_name in sorted(set(k[1] for k in groups)):
             for threading in ['single', 'multi']:
-                reactive_key = (batch_size, map_name, 'reactive', threading)
-                proactive_key = (batch_size, map_name, 'proactive', threading)
+                reactive_key = (block_size, map_name, 'reactive', threading)
+                proactive_key = (block_size, map_name, 'proactive', threading)
                 if reactive_key in groups and proactive_key in groups:
                     r_data = groups[reactive_key]
                     p_data = groups[proactive_key]
@@ -1143,7 +1143,7 @@ def run_statistical_tests(all_metrics, results_dir):
                         stat, pval = mannwhitneyu(r_data, p_data, alternative='two-sided')
                         results.append({
                             'comparison': 'reactive_vs_proactive',
-                            'batch_size': batch_size,
+                            'block_size': block_size,
                             'map': map_name,
                             'threading': threading,
                             'n_reactive': len(r_data),
@@ -1153,12 +1153,12 @@ def run_statistical_tests(all_metrics, results_dir):
                             'significant_005': pval < 0.05,
                         })
 
-    # Test single vs multi (for each batch_size, map, mode)
-    for batch_size in sorted(set(k[0] for k in groups)):
+    # Test single vs multi (for each block_size, map, mode)
+    for block_size in sorted(set(k[0] for k in groups)):
         for map_name in sorted(set(k[1] for k in groups)):
             for mode in ['reactive', 'proactive']:
-                single_key = (batch_size, map_name, mode, 'single')
-                multi_key = (batch_size, map_name, mode, 'multi')
+                single_key = (block_size, map_name, mode, 'single')
+                multi_key = (block_size, map_name, mode, 'multi')
                 if single_key in groups and multi_key in groups:
                     s_data = groups[single_key]
                     m_data = groups[multi_key]
@@ -1166,7 +1166,7 @@ def run_statistical_tests(all_metrics, results_dir):
                         stat, pval = mannwhitneyu(s_data, m_data, alternative='two-sided')
                         results.append({
                             'comparison': 'single_vs_multi',
-                            'batch_size': batch_size,
+                            'block_size': block_size,
                             'map': map_name,
                             'mode': mode,
                             'n_single': len(s_data),
@@ -1199,7 +1199,7 @@ def main():
     # Find all trace directories
     trace_dirs = sorted([
         d for d in TRACE_DIR.iterdir()
-        if d.is_dir() and d.name.startswith('batch_')
+        if d.is_dir() and d.name.startswith('block_')
     ])
 
     print(f"Looking for traces in: {TRACE_DIR}\n")
@@ -1225,9 +1225,9 @@ def main():
         metrics = extract_metrics_from_events(events, config_name)
         all_metrics.append(metrics)
 
-        print(f"    Batches: {metrics['total_batches']}, "
+        print(f"    Blocks: {metrics['total_blocks']}, "
               f"Iterations: {metrics['total_iterations']}, "
-              f"Avg time/batch: {metrics['avg_time_per_batch']:.2f}ms, "
+              f"Avg time/block: {metrics['avg_time_per_block']:.2f}ms, "
               f"Overhead ratio: {metrics['avg_overhead_ratio']:.2f}%")
 
     if not all_metrics:
@@ -1237,9 +1237,9 @@ def main():
     # Save individual run metrics (exclude list columns that don't serialize to CSV)
     print(f"\nSaving individual run metrics...")
     list_columns = [
-        'batch_times', 'server_cancel_response_delays',
+        'block_times', 'server_cancel_response_delays',
         'goal_to_finish_latencies', 'goal_to_cancel_latencies',
-        'cancel_to_finish_latencies', 'per_batch_overheads', 'overhead_ratios',
+        'cancel_to_finish_latencies', 'per_block_overheads', 'overhead_ratios',
         'feedback_send_times', 'result_compute_times',
         'goal_startup_latencies', 'feedback_total_times', 'result_comm_times',
         'convergence_data',
@@ -1305,12 +1305,12 @@ def main():
     print(f"\nTotal configurations tested: {len(aggregated)}")
     print(f"Total experiment runs: {len(all_metrics)}")
 
-    print("\nBatch Size Performance:")
-    for batch_size in sorted(aggregated_df['batch_size'].unique()):
-        data = aggregated_df[aggregated_df['batch_size'] == batch_size]
-        avg_throughput = (data['batch_size'] / (data['avg_time_per_batch'] / 1000.0)).mean()
+    print("\nBlock Size Performance:")
+    for block_size in sorted(aggregated_df['block_size'].unique()):
+        data = aggregated_df[aggregated_df['block_size'] == block_size]
+        avg_throughput = (data['block_size'] / (data['avg_time_per_block'] / 1000.0)).mean()
         avg_overhead = data['avg_overhead_ratio'].mean()
-        print(f"  Batch {batch_size:6d}: {avg_throughput:10.2f} iter/sec, "
+        print(f"  Block {block_size:6d}: {avg_throughput:10.2f} iter/sec, "
               f"overhead ratio: {avg_overhead:.2f}%")
 
     print("\n========================================")

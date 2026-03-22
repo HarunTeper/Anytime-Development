@@ -3,8 +3,8 @@
 Monte Carlo Experiment Evaluation Script
 
 This script parses LTTng traces from Monte Carlo experiments and generates:
-- Metrics: iterations per batch, batches completed, time per batch, cancellation delay
-- Plots: batch size comparisons, mode comparisons, threading comparisons
+- Metrics: iterations per block, blocks completed, time per block, cancellation delay
+- Plots: block size comparisons, mode comparisons, threading comparisons
 - CSV/JSON exports of results
 """
 
@@ -160,17 +160,17 @@ def extract_metrics_from_events(events, config_name):
     Returns:
         Dictionary with metrics
     """
-    # Parse batch_size from config_name (format: batch_<size>_<mode>_<threading>_run<N>)
+    # Parse block_size from config_name (format: block_<size>_<mode>_<threading>_run<N>)
     config_parts = config_name.split('_')
-    batch_size = int(config_parts[1])  # Extract batch size from config name
+    block_size = int(config_parts[1])  # Extract block size from config name
 
     metrics = {
         'config': config_name,
-        'batch_size': batch_size,
-        'total_batches': 0,
-        'total_iterations': 0,  # Will be calculated as total_batches * batch_size
-        'batch_times': [],  # Time per batch in ms
-        'iterations_per_batch': [],  # Will be set to batch_size
+        'block_size': block_size,
+        'total_blocks': 0,
+        'total_iterations': 0,  # Will be calculated as total_blocks * block_size
+        'block_times': [],  # Time per block in ms
+        'iterations_per_block': [],  # Will be set to block_size
         'server_cancel_response_delays': [],  # Time from cancel to deactivate in ms
         'compute_times': [],  # Time spent in compute
         'feedback_times': [],  # Time spent sending feedback
@@ -196,20 +196,20 @@ def extract_metrics_from_events(events, config_name):
     for event in events:
         event_name = event.event_name
 
-        # Track compute batches
+        # Track compute blocks
         if event_name == 'anytime:anytime_compute_entry':
             current_compute_start = event.timestamp
-            metrics['total_batches'] += 1
+            metrics['total_blocks'] += 1
 
         elif event_name == 'anytime:anytime_compute_exit':
             if current_compute_start is not None:
-                batch_time_ms = (event.timestamp - current_compute_start) / 1e6
-                metrics['batch_times'].append(batch_time_ms)
-                metrics['compute_times'].append(batch_time_ms)
+                block_time_ms = (event.timestamp - current_compute_start) / 1e6
+                metrics['block_times'].append(block_time_ms)
+                metrics['compute_times'].append(block_time_ms)
                 current_compute_start = None
 
         # Note: anytime_compute_iteration is no longer tracked
-        # Iterations are calculated as: total_batches * batch_size
+        # Iterations are calculated as: total_blocks * block_size
 
         # Track feedback timing
         elif event_name == 'anytime:anytime_send_feedback_entry':
@@ -274,18 +274,18 @@ def extract_metrics_from_events(events, config_name):
             cancel_sent_time = None
 
     # Compute summary statistics
-    if metrics['batch_times']:
-        metrics['avg_time_per_batch'] = np.mean(metrics['batch_times'])
-        metrics['std_time_per_batch'] = np.std(metrics['batch_times'])
+    if metrics['block_times']:
+        metrics['avg_time_per_block'] = np.mean(metrics['block_times'])
+        metrics['std_time_per_block'] = np.std(metrics['block_times'])
     else:
-        metrics['avg_time_per_batch'] = 0
-        metrics['std_time_per_batch'] = 0
+        metrics['avg_time_per_block'] = 0
+        metrics['std_time_per_block'] = 0
 
-    # Calculate iterations from batch_size * total_batches
-    metrics['total_iterations'] = metrics['total_batches'] * batch_size
-    metrics['avg_iterations_per_batch'] = batch_size
-    # No variation since it's the configured batch_size
-    metrics['std_iterations_per_batch'] = 0
+    # Calculate iterations from block_size * total_blocks
+    metrics['total_iterations'] = metrics['total_blocks'] * block_size
+    metrics['avg_iterations_per_block'] = block_size
+    # No variation since it's the configured block_size
+    metrics['std_iterations_per_block'] = 0
 
     if metrics['server_cancel_response_delays']:
         metrics['avg_server_cancel_response'] = np.mean(
@@ -347,12 +347,12 @@ def aggregate_runs(all_metrics):
         agg = {
             'config': base_config,
             'num_runs': len(runs),
-            'total_batches': np.mean([r['total_batches'] for r in runs]),
+            'total_blocks': np.mean([r['total_blocks'] for r in runs]),
             'total_iterations': np.mean([r['total_iterations'] for r in runs]),
-            'avg_time_per_batch': np.mean([r['avg_time_per_batch'] for r in runs]),
-            'std_time_per_batch': np.mean([r['std_time_per_batch'] for r in runs]),
-            'avg_iterations_per_batch': np.mean([r['avg_iterations_per_batch'] for r in runs]),
-            'std_iterations_per_batch': np.mean([r['std_iterations_per_batch'] for r in runs]),
+            'avg_time_per_block': np.mean([r['avg_time_per_block'] for r in runs]),
+            'std_time_per_block': np.mean([r['std_time_per_block'] for r in runs]),
+            'avg_iterations_per_block': np.mean([r['avg_iterations_per_block'] for r in runs]),
+            'std_iterations_per_block': np.mean([r['std_iterations_per_block'] for r in runs]),
             'avg_server_cancel_response': np.mean([r['avg_server_cancel_response'] for r in runs if r['avg_server_cancel_response'] > 0]) if any(r['avg_server_cancel_response'] > 0 for r in runs) else 0,
             'std_server_cancel_response': np.mean([r['std_server_cancel_response'] for r in runs if r['std_server_cancel_response'] > 0]) if any(r['std_server_cancel_response'] > 0 for r in runs) else 0,
             # New latency metrics
@@ -370,15 +370,15 @@ def aggregate_runs(all_metrics):
 
 def parse_config_name(config_name):
     """Parse configuration name into components"""
-    # Format: batch_<size>_<mode>_<threading>
-    # or test_batch_<size>_<mode>_<threading> for test runs
+    # Format: block_<size>_<mode>_<threading>
+    # or test_block_<size>_<mode>_<threading> for test runs
     parts = config_name.split('_')
 
     # Skip 'test' prefix if present
     offset = 1 if parts[0] == 'test' else 0
 
     return {
-        'batch_size': int(parts[1 + offset]),
+        'block_size': int(parts[1 + offset]),
         'mode': parts[2 + offset],
         'threading': parts[3 + offset]
     }
@@ -401,19 +401,19 @@ def generate_plots(aggregated_metrics):
     except OSError:
         plt.style.use('seaborn-darkgrid')
 
-    # Plot 1: Batch Size vs Average Iterations per Batch
-    print("  - Batch size vs iterations per batch")
+    # Plot 1: Block Size vs Average Iterations per Block
+    print("  - Block size vs iterations per block")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes present in the data
-    all_batch_sizes = sorted(df['batch_size'].unique())
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes present in the data
+    all_block_sizes = sorted(df['block_size'].unique())
+    x = np.arange(len(all_block_sizes))
     width = 0.2
 
     for i, mode in enumerate(['reactive', 'proactive']):
         for j, threading in enumerate(['single', 'multi']):
             data = df[(df['mode'] == mode) & (df['threading'] == threading)]
-            data = data.sort_values('batch_size')
+            data = data.sort_values('block_size')
 
             if data.empty:
                 continue
@@ -422,48 +422,48 @@ def generate_plots(aggregated_metrics):
             y_values = []
             yerr_values = []
             x_positions = []
-            for batch_size in all_batch_sizes:
-                batch_data = data[data['batch_size'] == batch_size]
-                if not batch_data.empty:
+            for block_size in all_block_sizes:
+                block_data = data[data['block_size'] == block_size]
+                if not block_data.empty:
                     y_values.append(
-                        batch_data['avg_iterations_per_batch'].iloc[0])
+                        block_data['avg_iterations_per_block'].iloc[0])
                     yerr_values.append(
-                        batch_data['std_iterations_per_batch'].iloc[0])
-                    x_positions.append(all_batch_sizes.index(batch_size))
+                        block_data['std_iterations_per_block'].iloc[0])
+                    x_positions.append(all_block_sizes.index(block_size))
 
             if y_values:
                 offset = (i * 2 + j - 1.5) * width
                 ax.bar(np.array(x_positions) + offset, y_values, width,
                        label=f'{mode}-{threading}', yerr=yerr_values, capsize=CAPSIZE)
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
-    ax.set_ylabel('Average Iterations per Batch', fontsize=FONT_SIZE_LABEL)
-    # ax.set_title('Batch Size vs Average Iterations per Batch', fontsize=FONT_SIZE_TITLE)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Average Iterations per Block', fontsize=FONT_SIZE_LABEL)
+    # ax.set_title('Block Size vs Average Iterations per Block', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
     # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, axis='y')
 
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / 'batch_size_vs_iterations.pdf',
+    plt.savefig(PLOTS_DIR / 'block_size_vs_iterations.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
-    # Plot 2: Batch Size vs Time per Batch
-    print("  - Batch size vs time per batch")
+    # Plot 2: Block Size vs Time per Block
+    print("  - Block size vs time per block")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes present in the data
-    all_batch_sizes = sorted(df['batch_size'].unique())
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes present in the data
+    all_block_sizes = sorted(df['block_size'].unique())
+    x = np.arange(len(all_block_sizes))
     width = 0.2
 
     for i, mode in enumerate(['reactive', 'proactive']):
         for j, threading in enumerate(['single', 'multi']):
             data = df[(df['mode'] == mode) & (df['threading'] == threading)]
-            data = data.sort_values('batch_size')
+            data = data.sort_values('block_size')
 
             if data.empty:
                 continue
@@ -472,31 +472,31 @@ def generate_plots(aggregated_metrics):
             y_values = []
             yerr_values = []
             x_positions = []
-            for batch_size in all_batch_sizes:
-                batch_data = data[data['batch_size'] == batch_size]
-                if not batch_data.empty:
-                    y_values.append(batch_data['avg_time_per_batch'].iloc[0])
+            for block_size in all_block_sizes:
+                block_data = data[data['block_size'] == block_size]
+                if not block_data.empty:
+                    y_values.append(block_data['avg_time_per_block'].iloc[0])
                     yerr_values.append(
-                        batch_data['std_time_per_batch'].iloc[0])
-                    x_positions.append(all_batch_sizes.index(batch_size))
+                        block_data['std_time_per_block'].iloc[0])
+                    x_positions.append(all_block_sizes.index(block_size))
 
             if y_values:
                 offset = (i * 2 + j - 1.5) * width
                 ax.bar(np.array(x_positions) + offset, y_values, width,
                        label=f'{mode}-{threading}', yerr=yerr_values, capsize=CAPSIZE)
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
-    ax.set_ylabel('Average Time per Batch (ms)', fontsize=FONT_SIZE_LABEL)
-    # ax.set_title('Batch Size vs Average Time per Batch', fontsize=FONT_SIZE_TITLE)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Average Time per Block (ms)', fontsize=FONT_SIZE_LABEL)
+    # ax.set_title('Block Size vs Average Time per Block', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
     # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, axis='y')
 
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / 'batch_size_vs_time.pdf',
+    plt.savefig(PLOTS_DIR / 'block_size_vs_time.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
@@ -504,9 +504,9 @@ def generate_plots(aggregated_metrics):
     print("  - Server cancel response delay comparison")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT_SMALL))
 
-    # Get all unique batch sizes present in the data
-    all_batch_sizes = sorted(df['batch_size'].unique())
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes present in the data
+    all_block_sizes = sorted(df['block_size'].unique())
+    x = np.arange(len(all_block_sizes))
     width = 0.2
 
     for i, mode in enumerate(['reactive', 'proactive']):
@@ -516,28 +516,28 @@ def generate_plots(aggregated_metrics):
             if data.empty:
                 continue
 
-            data = data.sort_values('batch_size')
+            data = data.sort_values('block_size')
 
             # Create aligned arrays for x positions and y values
             y_values = []
             x_positions = []
-            for batch_size in all_batch_sizes:
-                batch_data = data[data['batch_size'] == batch_size]
-                if not batch_data.empty:
+            for block_size in all_block_sizes:
+                block_data = data[data['block_size'] == block_size]
+                if not block_data.empty:
                     y_values.append(
-                        batch_data['avg_server_cancel_response'].iloc[0])
-                    x_positions.append(all_batch_sizes.index(batch_size))
+                        block_data['avg_server_cancel_response'].iloc[0])
+                    x_positions.append(all_block_sizes.index(block_size))
 
             if y_values:
                 offset = (i * 2 + j - 1.5) * width
                 ax.bar(np.array(x_positions) + offset, y_values, width,
                        label=f'{mode}-{threading}')
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Server Cancel Response Delay (ms)', fontsize=FONT_SIZE_LABEL)
     # ax.set_title('Server Cancel Response Delay Comparison', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
     # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
@@ -555,19 +555,19 @@ def generate_plots(aggregated_metrics):
     print("  - Throughput analysis")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Calculate throughput: iterations per batch / (time per batch / 1000)
-    df['throughput'] = df['avg_iterations_per_batch'] / \
-        (df['avg_time_per_batch'] / 1000.0)
+    # Calculate throughput: iterations per block / (time per block / 1000)
+    df['throughput'] = df['avg_iterations_per_block'] / \
+        (df['avg_time_per_block'] / 1000.0)
 
-    # Get all unique batch sizes present in the data
-    all_batch_sizes = sorted(df['batch_size'].unique())
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes present in the data
+    all_block_sizes = sorted(df['block_size'].unique())
+    x = np.arange(len(all_block_sizes))
     width = 0.2
 
     for i, mode in enumerate(['reactive', 'proactive']):
         for j, threading in enumerate(['single', 'multi']):
             data = df[(df['mode'] == mode) & (df['threading'] == threading)]
-            data = data.sort_values('batch_size')
+            data = data.sort_values('block_size')
 
             if data.empty:
                 continue
@@ -575,22 +575,22 @@ def generate_plots(aggregated_metrics):
             # Create aligned arrays for x positions and y values
             y_values = []
             x_positions = []
-            for batch_size in all_batch_sizes:
-                batch_data = data[data['batch_size'] == batch_size]
-                if not batch_data.empty:
-                    y_values.append(batch_data['throughput'].iloc[0])
-                    x_positions.append(all_batch_sizes.index(batch_size))
+            for block_size in all_block_sizes:
+                block_data = data[data['block_size'] == block_size]
+                if not block_data.empty:
+                    y_values.append(block_data['throughput'].iloc[0])
+                    x_positions.append(all_block_sizes.index(block_size))
 
             if y_values:
                 offset = (i * 2 + j - 1.5) * width
                 ax.bar(np.array(x_positions) + offset, y_values, width,
                        label=f'{mode}-{threading}')
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Throughput (iterations/second)', fontsize=FONT_SIZE_LABEL)
-    # ax.set_title('Batch Size vs Throughput', fontsize=FONT_SIZE_TITLE)
+    # ax.set_title('Block Size vs Throughput', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
     # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
@@ -605,15 +605,15 @@ def generate_plots(aggregated_metrics):
     print("  - Goal to finish latency")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes present in the data
-    all_batch_sizes = sorted(df['batch_size'].unique())
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes present in the data
+    all_block_sizes = sorted(df['block_size'].unique())
+    x = np.arange(len(all_block_sizes))
     width = 0.2
 
     for i, mode in enumerate(['reactive', 'proactive']):
         for j, threading in enumerate(['single', 'multi']):
             data = df[(df['mode'] == mode) & (df['threading'] == threading)]
-            data = data.sort_values('batch_size')
+            data = data.sort_values('block_size')
 
             if data.empty:
                 continue
@@ -622,26 +622,26 @@ def generate_plots(aggregated_metrics):
             y_values = []
             yerr_values = []
             x_positions = []
-            for batch_size in all_batch_sizes:
-                batch_data = data[data['batch_size'] == batch_size]
-                if not batch_data.empty:
+            for block_size in all_block_sizes:
+                block_data = data[data['block_size'] == block_size]
+                if not block_data.empty:
                     y_values.append(
-                        batch_data['avg_goal_to_finish_latency'].iloc[0])
+                        block_data['avg_goal_to_finish_latency'].iloc[0])
                     yerr_values.append(
-                        batch_data['std_goal_to_finish_latency'].iloc[0])
-                    x_positions.append(all_batch_sizes.index(batch_size))
+                        block_data['std_goal_to_finish_latency'].iloc[0])
+                    x_positions.append(all_block_sizes.index(block_size))
 
             if y_values:
                 offset = (i * 2 + j - 1.5) * width
                 ax.bar(np.array(x_positions) + offset, y_values, width,
                        label=f'{mode}-{threading}', yerr=yerr_values, capsize=CAPSIZE)
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Average Goal-to-Finish Latency (ms)',
                   fontsize=FONT_SIZE_LABEL)
-    # ax.set_title('Batch Size vs Goal-to-Finish Latency', fontsize=FONT_SIZE_TITLE)
+    # ax.set_title('Block Size vs Goal-to-Finish Latency', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
     # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
@@ -656,15 +656,15 @@ def generate_plots(aggregated_metrics):
     print("  - Goal to cancel latency")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes present in the data
-    all_batch_sizes = sorted(df['batch_size'].unique())
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes present in the data
+    all_block_sizes = sorted(df['block_size'].unique())
+    x = np.arange(len(all_block_sizes))
     width = 0.2
 
     for i, mode in enumerate(['reactive', 'proactive']):
         for j, threading in enumerate(['single', 'multi']):
             data = df[(df['mode'] == mode) & (df['threading'] == threading)]
-            data = data.sort_values('batch_size')
+            data = data.sort_values('block_size')
 
             if data.empty:
                 continue
@@ -673,26 +673,26 @@ def generate_plots(aggregated_metrics):
             y_values = []
             yerr_values = []
             x_positions = []
-            for batch_size in all_batch_sizes:
-                batch_data = data[data['batch_size'] == batch_size]
-                if not batch_data.empty:
+            for block_size in all_block_sizes:
+                block_data = data[data['block_size'] == block_size]
+                if not block_data.empty:
                     y_values.append(
-                        batch_data['avg_goal_to_cancel_latency'].iloc[0])
+                        block_data['avg_goal_to_cancel_latency'].iloc[0])
                     yerr_values.append(
-                        batch_data['std_goal_to_cancel_latency'].iloc[0])
-                    x_positions.append(all_batch_sizes.index(batch_size))
+                        block_data['std_goal_to_cancel_latency'].iloc[0])
+                    x_positions.append(all_block_sizes.index(block_size))
 
             if y_values:
                 offset = (i * 2 + j - 1.5) * width
                 ax.bar(np.array(x_positions) + offset, y_values, width,
                        label=f'{mode}-{threading}', yerr=yerr_values, capsize=CAPSIZE)
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Average Goal-to-Cancel Latency (ms)',
                   fontsize=FONT_SIZE_LABEL)
-    # ax.set_title('Batch Size vs Goal-to-Cancel Latency', fontsize=FONT_SIZE_TITLE)
+    # ax.set_title('Block Size vs Goal-to-Cancel Latency', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
     # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
@@ -707,15 +707,15 @@ def generate_plots(aggregated_metrics):
     print("  - Cancel to finish latency")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes present in the data
-    all_batch_sizes = sorted(df['batch_size'].unique())
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes present in the data
+    all_block_sizes = sorted(df['block_size'].unique())
+    x = np.arange(len(all_block_sizes))
     width = 0.2
 
     for i, mode in enumerate(['reactive', 'proactive']):
         for j, threading in enumerate(['single', 'multi']):
             data = df[(df['mode'] == mode) & (df['threading'] == threading)]
-            data = data.sort_values('batch_size')
+            data = data.sort_values('block_size')
 
             if data.empty:
                 continue
@@ -724,26 +724,26 @@ def generate_plots(aggregated_metrics):
             y_values = []
             yerr_values = []
             x_positions = []
-            for batch_size in all_batch_sizes:
-                batch_data = data[data['batch_size'] == batch_size]
-                if not batch_data.empty:
+            for block_size in all_block_sizes:
+                block_data = data[data['block_size'] == block_size]
+                if not block_data.empty:
                     y_values.append(
-                        batch_data['avg_cancel_to_finish_latency'].iloc[0])
+                        block_data['avg_cancel_to_finish_latency'].iloc[0])
                     yerr_values.append(
-                        batch_data['std_cancel_to_finish_latency'].iloc[0])
-                    x_positions.append(all_batch_sizes.index(batch_size))
+                        block_data['std_cancel_to_finish_latency'].iloc[0])
+                    x_positions.append(all_block_sizes.index(block_size))
 
             if y_values:
                 offset = (i * 2 + j - 1.5) * width
                 ax.bar(np.array(x_positions) + offset, y_values, width,
                        label=f'{mode}-{threading}', yerr=yerr_values, capsize=CAPSIZE)
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Cancellation Latency (ms)',
                   fontsize=FONT_SIZE_LABEL)
-    # ax.set_title('Batch Size vs Cancellation Latency', fontsize=FONT_SIZE_TITLE)
+    # ax.set_title('Block Size vs Cancellation Latency', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
     # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
@@ -754,19 +754,19 @@ def generate_plots(aggregated_metrics):
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
-    # Plot 8: Total Segments (batch_size * num_batches)
+    # Plot 8: Total Segments (block_size * num_blocks)
     print("  - Total Segments completed")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes present in the data
-    all_batch_sizes = sorted(df['batch_size'].unique())
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes present in the data
+    all_block_sizes = sorted(df['block_size'].unique())
+    x = np.arange(len(all_block_sizes))
     width = 0.2
 
     for i, mode in enumerate(['reactive', 'proactive']):
         for j, threading in enumerate(['single', 'multi']):
             data = df[(df['mode'] == mode) & (df['threading'] == threading)]
-            data = data.sort_values('batch_size')
+            data = data.sort_values('block_size')
 
             if data.empty:
                 continue
@@ -774,22 +774,22 @@ def generate_plots(aggregated_metrics):
             # Create aligned arrays for x positions and y values
             y_values = []
             x_positions = []
-            for batch_size in all_batch_sizes:
-                batch_data = data[data['batch_size'] == batch_size]
-                if not batch_data.empty:
-                    y_values.append(batch_data['total_iterations'].iloc[0])
-                    x_positions.append(all_batch_sizes.index(batch_size))
+            for block_size in all_block_sizes:
+                block_data = data[data['block_size'] == block_size]
+                if not block_data.empty:
+                    y_values.append(block_data['total_iterations'].iloc[0])
+                    x_positions.append(all_block_sizes.index(block_size))
 
             if y_values:
                 offset = (i * 2 + j - 1.5) * width
                 ax.bar(np.array(x_positions) + offset, y_values, width,
                        label=f'{mode}-{threading}')
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Total Segments Completed', fontsize=FONT_SIZE_LABEL)
-    # ax.set_title('Batch Size vs Total Segments Completed', fontsize=FONT_SIZE_TITLE)
+    # ax.set_title('Block Size vs Total Segments Completed', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
     # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
@@ -809,15 +809,15 @@ def generate_plots(aggregated_metrics):
 
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes present in the data
-    all_batch_sizes = sorted(df['batch_size'].unique())
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes present in the data
+    all_block_sizes = sorted(df['block_size'].unique())
+    x = np.arange(len(all_block_sizes))
     width = 0.2
 
     for i, mode in enumerate(['reactive', 'proactive']):
         for j, threading in enumerate(['single', 'multi']):
             data = df[(df['mode'] == mode) & (df['threading'] == threading)]
-            data = data.sort_values('batch_size')
+            data = data.sort_values('block_size')
 
             if data.empty:
                 continue
@@ -825,24 +825,24 @@ def generate_plots(aggregated_metrics):
             # Create aligned arrays for x positions and y values
             y_values = []
             x_positions = []
-            for batch_size in all_batch_sizes:
-                batch_data = data[data['batch_size'] == batch_size]
-                if not batch_data.empty:
+            for block_size in all_block_sizes:
+                block_data = data[data['block_size'] == block_size]
+                if not block_data.empty:
                     y_values.append(
-                        batch_data['total_cancellation_time'].iloc[0])
-                    x_positions.append(all_batch_sizes.index(batch_size))
+                        block_data['total_cancellation_time'].iloc[0])
+                    x_positions.append(all_block_sizes.index(block_size))
 
             if y_values:
                 offset = (i * 2 + j - 1.5) * width
                 ax.bar(np.array(x_positions) + offset, y_values, width,
                        label=f'{mode}-{threading}')
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Total Cancellation Time (ms)', fontsize=FONT_SIZE_LABEL)
     # ax.set_title(
-    #     'Batch Size vs Total Cancellation Time\n(Goal-to-Cancel + Server Cancel Response)', fontsize=FONT_SIZE_TITLE)
+    #     'Block Size vs Total Cancellation Time\n(Goal-to-Cancel + Server Cancel Response)', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
     # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
@@ -892,9 +892,9 @@ def process_single_trace(trace_dir):
         return None
 
     metrics = extract_metrics_from_events(events, config_name)
-    print(f"    {config_name}: Batches: {metrics['total_batches']}, "
+    print(f"    {config_name}: Blocks: {metrics['total_blocks']}, "
           f"Iterations: {metrics['total_iterations']}, "
-          f"Avg time/batch: {metrics['avg_time_per_batch']:.2f}ms")
+          f"Avg time/block: {metrics['avg_time_per_block']:.2f}ms")
 
     return metrics
 
@@ -905,10 +905,10 @@ def main():
     print("========================================")
     print()
 
-    # Find all trace directories (only batch_*_run* experiment traces)
+    # Find all trace directories (only block_*_run* experiment traces)
     trace_dirs = sorted([
         d for d in TRACE_DIR.iterdir()
-        if d.is_dir() and d.name.startswith('batch_')
+        if d.is_dir() and d.name.startswith('block_')
     ])
 
     print(f"Looking for traces in: {TRACE_DIR}\n")
@@ -934,9 +934,9 @@ def main():
         metrics = extract_metrics_from_events(events, config_name)
         all_metrics.append(metrics)
 
-        print(f"    Batches: {metrics['total_batches']}, "
+        print(f"    Blocks: {metrics['total_blocks']}, "
               f"Iterations: {metrics['total_iterations']}, "
-              f"Avg time/batch: {metrics['avg_time_per_batch']:.2f}ms")
+              f"Avg time/block: {metrics['avg_time_per_block']:.2f}ms")
 
     if not all_metrics:
         print("\nError: No metrics could be extracted from traces")
@@ -978,13 +978,13 @@ def main():
     print(f"\nTotal configurations tested: {len(aggregated)}")
     print(f"Total experiment runs: {len(all_metrics)}")
 
-    print("\nBatch Size Performance:")
-    for batch_size in sorted(aggregated_df['batch_size'].unique()):
-        data = aggregated_df[aggregated_df['batch_size'] == batch_size]
-        avg_throughput = (data['avg_iterations_per_batch'] /
-                          (data['avg_time_per_batch'] / 1000.0)).mean()
+    print("\nBlock Size Performance:")
+    for block_size in sorted(aggregated_df['block_size'].unique()):
+        data = aggregated_df[aggregated_df['block_size'] == block_size]
+        avg_throughput = (data['avg_iterations_per_block'] /
+                          (data['avg_time_per_block'] / 1000.0)).mean()
         print(
-            f"  Batch {batch_size:6d}: {avg_throughput:10.2f} iterations/sec (avg)")
+            f"  Block {block_size:6d}: {avg_throughput:10.2f} iterations/sec (avg)")
 
     print("\n========================================")
     print("Evaluation Complete!")

@@ -3,7 +3,7 @@
 Step 0: Generate Baseline Configurations
 
 Creates configuration files needed for Step 1 (baseline data collection):
-- phase1_server.yaml: Server config with batch_size=1, proactive, sync, single-threaded
+- phase1_server.yaml: Server config with block_size=1, proactive, sync, single-threaded
 - phase1_client.yaml: Client config with no cancellation (processes all 22 layers)
 
 These configs are used to collect baseline quality and timing data.
@@ -29,13 +29,13 @@ WEIGHTS_PATH = str(WORKSPACE_DIR / "packages" / "src" / "anytime_yolo" / "weight
 def create_phase1_configs():
     """Create Phase 1 baseline configuration files"""
 
-    # Server configuration: batch_size=1, proactive, sync, single-threaded
+    # Server configuration: block_size=1, proactive, sync, single-threaded
     server_config = {
         "anytime_server": {
             "ros__parameters": {
                 "is_reactive_proactive": "proactive",
                 "multi_threading": False,
-                "batch_size": 1,  # Process one layer at a time
+                "block_size": 1,  # Process one layer at a time
                 "is_sync_async": "sync",
                 "weights_path": WEIGHTS_PATH,
                 "log_level": "info"
@@ -81,13 +81,13 @@ def create_phase3_configs():
         for threading_mode in ["single", "multi"]:
             multi_threading = (threading_mode == "multi")
 
-            # Server configuration: batch_size=22, proactive, no cancellation
+            # Server configuration: block_size=22, proactive, no cancellation
             server_config = {
                 "anytime_server": {
                     "ros__parameters": {
                         "is_reactive_proactive": "proactive",
                         "multi_threading": multi_threading,
-                        "batch_size": 22,  # All layers at once
+                        "block_size": 22,  # All layers at once
                         "is_sync_async": sync_mode,
                         "weights_path": WEIGHTS_PATH,
                         "log_level": "info"
@@ -135,7 +135,7 @@ def main():
 
     # Create Phase 1 configs
     print("Phase 1 (Baseline) Configurations:")
-    print("  - Batch size: 1")
+    print("  - Block size: 1")
     print("  - Mode: Proactive")
     print("  - Sync: sync")
     print("  - Threading: single")
@@ -147,7 +147,7 @@ def main():
 
     # Create Phase 3 configs
     print("Phase 3 (Throughput) Configurations:")
-    print("  - Batch size: 22")
+    print("  - Block size: 22")
     print("  - Mode: Proactive")
     print("  - Sync modes: sync, async")
     print("  - Threading modes: single, multi")

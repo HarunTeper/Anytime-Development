@@ -35,7 +35,7 @@ public:
 
 private:
   std::shared_ptr<anytime_core::AnytimeBase<Anytime, GoalHandleType>> create_anytime_management(
-    rclcpp::Node * node, bool is_reactive_proactive, int batch_size);
+    rclcpp::Node * node, bool is_reactive_proactive, int block_size);
 };
 
 #endif  // ANYTIME_RRT_STAR__ANYTIME_SERVER_HPP_

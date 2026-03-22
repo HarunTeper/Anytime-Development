@@ -25,7 +25,7 @@ Quick test to verify your environment is working correctly.
 ```bash
 ./1_collect_baseline.sh
 ```
-- Runs 5 trials with batch_size=1, single-threaded
+- Runs 5 trials with block_size=1, single-threaded
 - Collects layer-wise detection quality and timing data
 - **Output:** `traces/phase1_baseline_trial{1,2,3,4,5}/`
 
@@ -50,7 +50,7 @@ python3 2b_analyze_blocks.py
 ./3_measure_throughput.sh
 ```
 - Tests 4 configurations: sync/async × single/multi-threaded
-- All use batch_size=22 (full model, no cancellation)
+- All use block_size=22 (full model, no cancellation)
 - **Output:** `traces/phase3_{sync|async}_{single|multi}_trial{1,2,3,4,5}/`
 
 ### Step 4: Analyze Throughput Results
@@ -132,7 +132,7 @@ python3 7_analyze_cancellation.py
 
 ### Baseline Collection (Step 1)
 - **Purpose:** Establish baseline performance and quality data
-- **Configuration:** Single-threaded, batch_size=1, all 22 layers
+- **Configuration:** Single-threaded, block_size=1, all 22 layers
 - **Duration:** ~30-60 minutes for 5 trials
 - **Use cases:** Understanding layer-wise quality progression, identifying when detections stabilize
 
@@ -193,7 +193,7 @@ python3 7_analyze_cancellation.py
 
 ### Configuration Files (YAML)
 Located in `configs/`, these specify:
-- **batch_size**: Number of layers processed per block (1, 4, 5, 8, 15, or 22)
+- **block_size**: Number of layers processed per block (1, 4, 5, 8, 15, or 22)
 - **is_reactive_proactive**: Mode ("reactive" or "proactive")
 - **is_sync_async**: Executor type ("sync" or "async")
 - **multi_threading**: Threading mode (true/false)

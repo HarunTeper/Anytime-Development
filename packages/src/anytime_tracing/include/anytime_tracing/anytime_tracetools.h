@@ -89,7 +89,7 @@ ANYTIME_TRACING_PUBLIC bool anytime_trace_compile_status();
 
 /// `anytime_base_init`
 ANYTIME_DECLARE_TRACEPOINT(
-  anytime_base_init, const void * node_handle, const int batch_size,
+  anytime_base_init, const void * node_handle, const int block_size,
   const bool is_reactive_proactive)
 
 /// `anytime_base_activate`
@@ -118,7 +118,7 @@ ANYTIME_DECLARE_TRACEPOINT(
   const bool should_cancel)
 
 /// `anytime_compute_entry`
-ANYTIME_DECLARE_TRACEPOINT(anytime_compute_entry, const void * node_handle, const int batch_size)
+ANYTIME_DECLARE_TRACEPOINT(anytime_compute_entry, const void * node_handle, const int block_size)
 
 /// `anytime_compute_exit`
 ANYTIME_DECLARE_TRACEPOINT(
@@ -198,7 +198,7 @@ ANYTIME_DECLARE_TRACEPOINT(
 
 /// `monte_carlo_init`
 ANYTIME_DECLARE_TRACEPOINT(
-  monte_carlo_init, const void * node_handle, const int batch_size,
+  monte_carlo_init, const void * node_handle, const int block_size,
   const bool is_reactive_proactive)
 
 /// `monte_carlo_iteration`
@@ -218,7 +218,7 @@ ANYTIME_DECLARE_TRACEPOINT(monte_carlo_reset, const void * node_handle)
 
 /// `rrt_star_init`
 ANYTIME_DECLARE_TRACEPOINT(
-  rrt_star_init, const void * node_handle, const int batch_size,
+  rrt_star_init, const void * node_handle, const int block_size,
   const bool is_reactive_proactive)
 
 /// `rrt_star_iteration`
@@ -238,7 +238,7 @@ ANYTIME_DECLARE_TRACEPOINT(rrt_star_reset, const void * node_handle)
 
 /// `yolo_init`
 ANYTIME_DECLARE_TRACEPOINT(
-  yolo_init, const void * node_handle, const int batch_size, const bool is_reactive_proactive,
+  yolo_init, const void * node_handle, const int block_size, const bool is_reactive_proactive,
   const bool is_sync_async, const char * weights_path)
 
 /// `yolo_layer_start`

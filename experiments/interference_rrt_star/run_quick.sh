@@ -43,7 +43,7 @@ RESULTS_DIR="${EXPERIMENT_DIR}/results"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 
 # Quick experiment parameters (subset of full run)
-BATCH_SIZES=(1 256 4096)
+BLOCK_SIZES=(1 256 4096)
 MODES=("reactive" "proactive")
 THREADING=("single" "multi")
 NUM_RUNS=1
@@ -60,7 +60,7 @@ echo "Interference RRT* Quick Experiments"
 echo "========================================="
 echo ""
 echo "Configuration (quick mode):"
-echo "  - Batch sizes: ${BATCH_SIZES[*]}"
+echo "  - Block sizes: ${BLOCK_SIZES[*]}"
 echo "  - Modes: ${MODES[*]}"
 echo "  - Threading: ${THREADING[*]}"
 echo "  - Runs per config: ${NUM_RUNS}"
@@ -100,18 +100,18 @@ mkdir -p "${TRACE_DIR}"
 mkdir -p "${RESULTS_DIR}"
 
 # Counter for progress
-total_configs=$((${#BATCH_SIZES[@]} * ${#MODES[@]} * ${#THREADING[@]} * NUM_RUNS))
+total_configs=$((${#BLOCK_SIZES[@]} * ${#MODES[@]} * ${#THREADING[@]} * NUM_RUNS))
 current_config=0
 
 # Iterate through all configurations
-for batch_size in "${BATCH_SIZES[@]}"; do
+for block_size in "${BLOCK_SIZES[@]}"; do
     for mode in "${MODES[@]}"; do
         for thread_mode in "${THREADING[@]}"; do
             for run in $(seq 1 ${NUM_RUNS}); do
                 current_config=$((current_config + 1))
 
                 # Create config name
-                config_name="batch_${batch_size}_${mode}_${thread_mode}"
+                config_name="block_${block_size}_${mode}_${thread_mode}"
                 run_name="${config_name}_run${run}"
 
                 echo ""
@@ -134,7 +134,7 @@ for batch_size in "${BATCH_SIZES[@]}"; do
                 # Enable selective tracepoints
                 echo "  [2/5] Enabling tracepoints..."
 
-                # Compute timing (only entry/exit for full compute batch)
+                # Compute timing (only entry/exit for full compute block)
                 lttng enable-event --userspace anytime:anytime_compute_entry
                 lttng enable-event --userspace anytime:anytime_compute_exit
 

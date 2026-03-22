@@ -119,7 +119,7 @@ echo "-----------------------------------------"
 
 CONFIG_DIR="${RRT_EXPERIMENT_DIR}/configs"
 TRACE_DIR="${RRT_EXPERIMENT_DIR}/traces"
-TEST_CONFIG="batch_256_reactive_single_depot"
+TEST_CONFIG="block_256_reactive_single_depot"
 RUN_DURATION=5
 
 test_trace="${TRACE_DIR}/smoke_test"
@@ -138,7 +138,7 @@ anytime_server:
   ros__parameters:
     is_reactive_proactive: "reactive"
     multi_threading: false
-    batch_size: 256
+    block_size: 256
     random_seed: 42
     log_level: "info"
     map_yaml_path: "${MAPS_DIR}/depot.yaml"

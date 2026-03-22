@@ -41,9 +41,9 @@ public:
   virtual void reset_domain_state() = 0;   // Reset domain-specific state
   virtual bool should_finish() const = 0;  // Check if computation should finish
 
-  // Optional: override to customize the number of batch iterations
-  // Default is batch_size_, but YOLO needs to limit by remaining layers
-  virtual int get_batch_iterations() const {return batch_size_;}
+  // Optional: override to customize the number of block iterations
+  // Default is block_size_, but YOLO needs to limit by remaining layers
+  virtual int get_block_iterations() const {return block_size_;}
 
   // Optional: process completed GPU operations (called on executor thread)
   // Override in GPU-accelerated domains to drain async completion signals
@@ -65,7 +65,7 @@ public:
       return;
     }
 
-    // Drain GPU completions from previous batch, compute, drain again
+    // Drain GPU completions from previous block, compute, drain again
     process_gpu_completions();
     compute();
     process_gpu_completions();
@@ -113,7 +113,7 @@ public:
       return;
     }
 
-    // Drain GPU completions from previous batch, compute, drain again
+    // Drain GPU completions from previous block, compute, drain again
     process_gpu_completions();
     compute();
     process_gpu_completions();
@@ -161,15 +161,15 @@ public:
       goal_handle_ ? rclcpp_action::to_string(goal_handle_->get_goal_id()) : "null";
     RCLCPP_DEBUG(node_->get_logger(), "[Goal ID: %s] Compute function called", goal_id_str.c_str());
 
-    // Get the number of iterations for this batch
-    int iterations = get_batch_iterations();
+    // Get the number of iterations for this block
+    int iterations = get_block_iterations();
 
     TRACE_ANYTIME_COMPUTE_ENTRY(node_, iterations);
 
     // Start timing
     auto start_time = node_->now();
 
-    // Execute batch iterations
+    // Execute block iterations
     for (int i = 0; i < iterations; i++) {
       // Check if we should stop processing
       if (goal_handle_->is_canceling() || !goal_handle_->is_executing() || !is_running()) {
@@ -180,7 +180,7 @@ public:
       }
 
       RCLCPP_DEBUG(
-        node_->get_logger(), "[Goal ID: %s] Computing batch iteration %d", goal_id_str.c_str(), i);
+        node_->get_logger(), "[Goal ID: %s] Computing block iteration %d", goal_id_str.c_str(), i);
 
       TRACE_ANYTIME_COMPUTE_ITERATION(node_, i);
 
@@ -188,19 +188,19 @@ public:
       compute_single_iteration();
 
       RCLCPP_DEBUG(
-        node_->get_logger(), "[Goal ID: %s] Finished batch iteration %d", goal_id_str.c_str(), i);
+        node_->get_logger(), "[Goal ID: %s] Finished block iteration %d", goal_id_str.c_str(), i);
     }
 
     // End timing
     auto end_time = node_->now();
 
-    // Calculate computation time for this batch
+    // Calculate computation time for this block
     rclcpp::Duration computation_time = end_time - start_time;
 
     // Update the average computation time using incremental averaging
     // Using double precision to avoid integer overflow
-    batch_count_++;
-    if (batch_count_ == 1) {
+    block_count_++;
+    if (block_count_ == 1) {
       average_computation_time_ = computation_time;
     } else {
       // Compute incremental average: avg_new = avg_old + (value - avg_old) / count
@@ -208,7 +208,7 @@ public:
       double avg_ns = static_cast<double>(average_computation_time_.nanoseconds());
       double new_ns = static_cast<double>(computation_time.nanoseconds());
       double delta = new_ns - avg_ns;
-      avg_ns = avg_ns + (delta / static_cast<double>(batch_count_));
+      avg_ns = avg_ns + (delta / static_cast<double>(block_count_));
 
       // Clamp to valid range to prevent overflow
       if (avg_ns < 0.0) {
@@ -282,7 +282,7 @@ public:
     // Reset domain-specific state
     reset_domain_state();
 
-    batch_count_ = 0;
+    block_count_ = 0;
     average_computation_time_ = rclcpp::Duration(0, 0);
   }
 
@@ -314,15 +314,15 @@ protected:
   // Initialize waitables and callback group
   // Call this from derived class constructor with is_reactive_proactive template parameter
   template<bool isReactiveProactive>
-  void initialize_anytime_base(rclcpp::Node * node, int batch_size)
+  void initialize_anytime_base(rclcpp::Node * node, int block_size)
   {
     node_ = node;
-    batch_size_ = batch_size;
+    block_size_ = block_size;
 
     // Store the mode
     is_reactive_proactive_ = isReactiveProactive;
 
-    TRACE_ANYTIME_BASE_INIT(node_, batch_size_, isReactiveProactive);
+    TRACE_ANYTIME_BASE_INIT(node_, block_size_, isReactiveProactive);
 
     // Create callback group
     compute_callback_group_ =
@@ -365,11 +365,11 @@ protected:
   // Callback group for compute operations
   rclcpp::CallbackGroup::SharedPtr compute_callback_group_;
 
-  // Batch size configuration
-  int batch_size_ = 1;
+  // Block size configuration
+  int block_size_ = 1;
 
   // Performance metrics
-  uint64_t batch_count_ = 0;
+  uint64_t block_count_ = 0;
   rclcpp::Duration average_computation_time_{0, 0};
 
   // Mode tracking

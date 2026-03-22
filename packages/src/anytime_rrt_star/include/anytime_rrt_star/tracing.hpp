@@ -21,10 +21,10 @@
 
 // Helper macros for tracing in anytime_rrt_star
 
-#define TRACE_RRT_STAR_INIT(node, batch_size, is_reactive_proactive) \
+#define TRACE_RRT_STAR_INIT(node, block_size, is_reactive_proactive) \
   ANYTIME_TRACEPOINT( \
     rrt_star_init, static_cast<const void *>(node->get_node_base_interface().get()), \
-    batch_size, is_reactive_proactive)
+    block_size, is_reactive_proactive)
 
 #define TRACE_RRT_STAR_ITERATION(node, iteration_num, tree_size, best_cost) \
   ANYTIME_TRACEPOINT( \
