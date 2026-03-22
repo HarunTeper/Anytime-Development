@@ -78,7 +78,7 @@ cd ..
 ./scripts/run_all.sh --full --gpu-only
 
 # Run specific experiment groups
-./scripts/run_all.sh --full --monte-carlo
+./scripts/run_all.sh --full --rrt-star
 ./scripts/run_all.sh --full --interference
 ./scripts/run_all.sh --full --yolo
 
@@ -157,7 +157,7 @@ Then run experiments:
 ./scripts/run_all.sh --full --gpu-only
 
 # Run specific experiment groups
-./scripts/run_all.sh --full --monte-carlo
+./scripts/run_all.sh --full --rrt-star
 ./scripts/run_all.sh --full --interference
 ./scripts/run_all.sh --full --yolo
 
@@ -268,20 +268,20 @@ The full experiment results (including additional diagnostic plots and raw data)
 
 | Figure / Data | Output File |
 | ------------- | ----------- |
-| Figure 5a | `experiments/monte_carlo/results/plots/total_iterations.pdf` |
-| Figure 5b | `experiments/monte_carlo/results/plots/cancel_to_finish_latency.pdf` |
-| Figure 6a | `experiments/interference/results/plots/compute_time_vs_batch_size.pdf` |
-| Figure 6b | `experiments/interference/results/plots/timer_period_vs_batch_size.pdf` |
+| Figure 5a | `experiments/rrt_star/results/plots/total_iterations.pdf` |
+| Figure 5b | `experiments/rrt_star/results/plots/cancel_to_finish_latency.pdf` |
+| Figure 6a | `experiments/interference_rrt_star/results/plots/compute_time_vs_batch_size.pdf` |
+| Figure 6b | `experiments/interference_rrt_star/results/plots/timer_period_vs_batch_size.pdf` |
 | Figure 7a | `experiments/yolo/results/quality_analysis/quality_ratio_progression.pdf` |
 | Figure 7b | `experiments/yolo/results/phase4_analysis/total_runtime_comparison.pdf` |
-| Table I (CSV) | `experiments/interference/results/table_1_missed_periods.csv` |
+| Table I (CSV) | `experiments/interference_rrt_star/results/table_1_missed_periods.csv` |
 
 ### Additional diagnostic plots
 
 Each experiment generates additional plots beyond the paper figures:
 
-- **Monte Carlo:** `experiments/monte_carlo/results/plots/` — throughput, latency breakdowns, timing distributions
-- **Interference:** `experiments/interference/results/plots/` — timer period distributions, missed period rates
+- **RRT\*:** `experiments/rrt_star/results/plots/` — throughput, latency breakdowns, timing distributions
+- **Interference:** `experiments/interference_rrt_star/results/plots/` — timer period distributions, missed period rates
 - **YOLO quality:** `experiments/yolo/results/quality_analysis/` — detection progression, layer timing, cancellation histograms
 - **YOLO throughput:** `experiments/yolo/results/runtime_analysis/` — per-config stacked timing, cumulative runtime
 - **YOLO cancellation:** `experiments/yolo/results/phase4_analysis/` — cancellation delay, layers processed, block size metrics
@@ -312,9 +312,9 @@ cd ../../../
 
 ## Experiment Details
 
-### Monte Carlo (Figures 5a, 5b)
+### RRT* (Figures 5a, 5b)
 
-**What it does:** Launches a ROS 2 anytime action server that computes Monte Carlo batches and a client that periodically sends goals and cancels them after 200 ms. Each configuration runs for a fixed duration while LTTng traces record batch computation times, cancellation delays, and throughput. The evaluation script parses the traces and plots segment counts and cancellation delays across batch sizes and modes.
+**What it does:** Launches a ROS 2 anytime action server that computes RRT* path planning iterations and a client that periodically sends goals and cancels them after 200 ms. Each configuration runs for a fixed duration while LTTng traces record batch computation times, cancellation delays, and throughput. The evaluation script parses the traces and plots iteration counts and cancellation delays across batch sizes and modes.
 
 **Why it takes this long:** Each of the 28 (full) or 12 (quick) configurations runs sequentially for the configured duration, plus ~10 s overhead per config for LTTng session setup/teardown and node startup/cleanup. Trace parsing and plot generation add a few more minutes at the end.
 
@@ -329,11 +329,11 @@ cd ../../../
 
 ### Interference (Figure 6, Table I)
 
-**What it does:** Runs the same Monte Carlo action server alongside a periodic interference timer node that performs a 10 ms busy-wait every 100 ms, both in a single-threaded ROS 2 executor. This creates CPU contention: larger batch sizes block the executor longer, causing the timer to miss its 100 ms period. LTTng traces record timer callback timestamps and compute batch durations. The evaluation script measures timer jitter (deviation from the expected 100 ms period), missed-period rates, and compute times per batch size.
+**What it does:** Runs the same RRT* action server alongside a periodic interference timer node that performs a 10 ms busy-wait every 100 ms, both in a single-threaded ROS 2 executor. This creates CPU contention: larger batch sizes block the executor longer, causing the timer to miss its 100 ms period. LTTng traces record timer callback timestamps and compute batch durations. The evaluation script measures timer jitter (deviation from the expected 100 ms period), missed-period rates, and compute times per batch size.
 
 **Note on batch sizes:** The paper uses batch sizes up to 65,536 for the interference experiment. The artifact extends the range to 262,144 because software and firmware updates to the Jetson Orin NX board have improved its performance since the paper experiments were conducted, and larger batch sizes are needed to observe the same interference effects. The additional data points (131,072 and 262,144) reinforce the same trend shown in the paper.
 
-**Why it takes this long:** 18 (full) or 8 (quick) configurations run sequentially. Each config has the same per-config overhead as Monte Carlo (~10 s for LTTng and node lifecycle), plus the run duration itself.
+**Why it takes this long:** 18 (full) or 8 (quick) configurations run sequentially. Each config has the same per-config overhead as RRT* (~10 s for LTTng and node lifecycle), plus the run duration itself.
 
 | Parameter | Full | Quick |
 | --------- | ---- | ----- |
@@ -415,7 +415,7 @@ lttng destroy
 **Permission denied on scripts:**
 
 ```bash
-chmod +x scripts/*.sh experiments/monte_carlo/*.sh experiments/interference/*.sh experiments/yolo/*.sh
+chmod +x scripts/*.sh experiments/rrt_star/*.sh experiments/interference_rrt_star/*.sh experiments/yolo/*.sh
 ```
 
 **Docker compose not found:**
@@ -476,7 +476,7 @@ Anytime-Development/
 ├── packages/src/
 │   ├── anytime_core/           # Base anytime computation framework
 │   ├── anytime_interfaces/     # ROS 2 action type definitions
-│   ├── anytime_monte_carlo/    # Monte Carlo pi estimation (CPU)
+│   ├── anytime_rrt_star/       # RRT* path planning (CPU)
 │   ├── anytime_yolo/           # Anytime YOLO object detection (GPU)
 │   ├── anytime_tracing/        # LTTng tracepoint definitions
 │   ├── experiments/            # Launch files and default configs
@@ -484,8 +484,8 @@ Anytime-Development/
 │   ├── video_publisher/        # Video frame publisher for YOLO
 │   └── test_action/            # Test action for executor testing
 ├── experiments/
-│   ├── monte_carlo/            # MC experiment scripts and evaluation
-│   ├── interference/           # Interference experiment scripts and evaluation
+│   ├── rrt_star/               # RRT* experiment scripts and evaluation
+│   ├── interference_rrt_star/  # Interference experiment scripts and evaluation
 │   └── yolo/                   # YOLO pipeline (9 steps)
 └── scripts/
     ├── smoke_test.sh           # Quick validation (< 2 min)

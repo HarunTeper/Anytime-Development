@@ -84,9 +84,13 @@ public:
             while (!token.empty() && token.front() == ' ') {token.erase(0, 1);}
             while (!token.empty() && token.back() == ' ') {token.pop_back();}
             double val = std::stod(token);
-            if (idx == 0) {origin_x_ = val;}
-            else if (idx == 1) {origin_y_ = val;}
-            else if (idx == 2) {origin_yaw = val;}
+            if (idx == 0) {
+              origin_x_ = val;
+            } else if (idx == 1) {
+              origin_y_ = val;
+            } else if (idx == 2) {
+              origin_yaw = val;
+            }
             idx++;
           }
         }
@@ -213,7 +217,7 @@ private:
   {
     gx = static_cast<int>(std::floor((wx - origin_x_) / resolution_));
     gy = static_cast<int>(std::floor((wy - origin_y_) / resolution_));
-    return (gx >= 0 && gx < width_ && gy >= 0 && gy < height_);
+    return gx >= 0 && gx < width_ && gy >= 0 && gy < height_;
   }
 
   uint8_t getPixel(int gx, int gy) const

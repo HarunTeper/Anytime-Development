@@ -51,7 +51,9 @@ AnytimeRrtActionServer::AnytimeRrtActionServer(rclcpp::NodeOptions options)
 AnytimeRrtActionServer::~AnytimeRrtActionServer() {}
 
 std::shared_ptr<
-  anytime_core::AnytimeBase<AnytimeRrtActionServer::Anytime, AnytimeRrtActionServer::GoalHandleType>>
+  anytime_core::AnytimeBase<
+    AnytimeRrtActionServer::Anytime,
+    AnytimeRrtActionServer::GoalHandleType>>
 AnytimeRrtActionServer::create_anytime_management(
   rclcpp::Node * node, bool is_reactive_proactive, int batch_size)
 {

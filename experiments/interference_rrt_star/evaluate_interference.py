@@ -369,8 +369,49 @@ def parse_config_name(config_name):
     }
 
 
+def _bar_plot(df, ax, all_batch_sizes, y_col, yerr_col=None):
+    """Helper: draw grouped bars for all mode × threading combinations."""
+    x = np.arange(len(all_batch_sizes))
+    width = 0.2
+
+    for i, mode in enumerate(['reactive', 'proactive']):
+        for j, threading in enumerate(['single', 'multi']):
+            data = df[(df['mode'] == mode) & (df['threading'] == threading)]
+            data = data.sort_values('batch_size')
+
+            if data.empty:
+                continue
+
+            y_values = []
+            yerr_values = []
+            x_positions = []
+            for bs in all_batch_sizes:
+                bd = data[data['batch_size'] == bs]
+                if not bd.empty:
+                    y_values.append(bd[y_col].iloc[0])
+                    if yerr_col and yerr_col in bd.columns:
+                        yerr_values.append(bd[yerr_col].iloc[0])
+                    x_positions.append(all_batch_sizes.index(bs))
+
+            if y_values:
+                offset = (i * 2 + j - 1.5) * width
+                kwargs = {'label': f'{mode}-{threading}'}
+                if yerr_values:
+                    lower = [min(e, v) for e, v in zip(yerr_values, y_values)]
+                    kwargs['yerr'] = [lower, yerr_values]
+                    kwargs['capsize'] = CAPSIZE
+                ax.bar(np.array(x_positions) + offset, y_values, width,
+                       color=f'C{i*2+j}', **kwargs)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
+    ax.grid(True, axis='y', alpha=0.3)
+
+
 def generate_plots(aggregated_metrics):
-    """Generate all plots from aggregated metrics"""
+    """Generate all plots from aggregated metrics with all mode × threading
+    combinations on the same axes (matching RRT* and YOLO plot style)."""
 
     print("\nGenerating plots...")
 
@@ -386,45 +427,18 @@ def generate_plots(aggregated_metrics):
     except OSError:
         plt.style.use('seaborn-darkgrid')
 
+    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
+
     # Plot 1: Timer Period vs Batch Size
     print("  - Timer period vs batch size")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
-
-    # Get all unique batch sizes (reversed: high to low)
-    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
-    x = np.arange(len(all_batch_sizes))
-    width = 0.35
-
-    for i, mode in enumerate(['reactive', 'proactive']):
-        threading = 'single'  # Only single-threaded
-        offset = (i - 0.5) * width
-        mask = (df['mode'] == mode) & (df['threading'] == threading)
-        data = df[mask].sort_values('batch_size')
-
-        if len(data) > 0:
-            label = f"{mode.capitalize()}"
-            # Align with all_batch_sizes
-            y_values = [data[data['batch_size'] == bs]['avg_timer_period'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
-            y_errors = [data[data['batch_size'] == bs]['std_timer_period'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
-
-            ax.bar(x + offset, y_values, width, yerr=y_errors,
-                   label=label, capsize=CAPSIZE)
-
-    # Add expected period line
+    _bar_plot(df, ax, all_batch_sizes, 'avg_timer_period', 'std_timer_period')
     ax.axhline(y=EXPECTED_TIMER_PERIOD_MS, color='red',
-               linestyle=':', linewidth=LINE_WIDTH, label=f'Expected ({EXPECTED_TIMER_PERIOD_MS} ms)')
-
+               linestyle=':', linewidth=LINE_WIDTH,
+               label=f'Expected ({EXPECTED_TIMER_PERIOD_MS} ms)')
     ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Average Timer Period (ms)', fontsize=FONT_SIZE_LABEL)
-    ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
-    ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.grid(True, axis='y', alpha=0.3)
-
+    ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
     plt.tight_layout(pad=0)
     plt.savefig(PLOTS_DIR / 'timer_period_vs_batch_size.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
@@ -433,38 +447,10 @@ def generate_plots(aggregated_metrics):
     # Plot 2: Absolute Jitter vs Batch Size
     print("  - Jitter vs batch size")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
-
-    # Get all unique batch sizes (reversed: high to low)
-    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
-    x = np.arange(len(all_batch_sizes))
-    width = 0.35
-
-    for i, mode in enumerate(['reactive', 'proactive']):
-        threading = 'single'  # Only single-threaded
-        offset = (i - 0.5) * width
-        mask = (df['mode'] == mode) & (df['threading'] == threading)
-        data = df[mask].sort_values('batch_size')
-
-        if len(data) > 0:
-            label = f"{mode.capitalize()}"
-            # Align with all_batch_sizes
-            y_values = [data[data['batch_size'] == bs]['max_abs_jitter'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
-            y_errors = [data[data['batch_size'] == bs]['max_abs_jitter_std'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
-
-            ax.bar(x + offset, y_values, width, yerr=y_errors,
-                   label=label, capsize=CAPSIZE)
-
+    _bar_plot(df, ax, all_batch_sizes, 'max_abs_jitter', 'max_abs_jitter_std')
     ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Mean Max Absolute Jitter (ms)', fontsize=FONT_SIZE_LABEL)
-    ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
-    ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.grid(True, axis='y', alpha=0.3)
-
+    ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
     plt.tight_layout(pad=0)
     plt.savefig(PLOTS_DIR / 'jitter_vs_batch_size.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
@@ -473,34 +459,10 @@ def generate_plots(aggregated_metrics):
     # Plot 3: Skipped Firings Percentage
     print("  - Skipped firings analysis")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT_SMALL))
-
-    # Get all unique batch sizes (reversed: high to low)
-    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
-    x = np.arange(len(all_batch_sizes))
-    width = 0.35
-
-    for i, mode in enumerate(['reactive', 'proactive']):
-        threading = 'single'  # Only single-threaded
-        offset = (i - 0.5) * width
-        mask = (df['mode'] == mode) & (df['threading'] == threading)
-        data = df[mask].sort_values('batch_size')
-
-        if len(data) > 0:
-            label = f"{mode.capitalize()}"
-            # Align with all_batch_sizes
-            y_values = [data[data['batch_size'] == bs]['skipped_firings_percent'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
-
-            ax.bar(x + offset, y_values, width, label=label)
-
+    _bar_plot(df, ax, all_batch_sizes, 'skipped_firings_percent')
     ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Skipped Firings (%)', fontsize=FONT_SIZE_LABEL)
-    ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
-    ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.grid(True, axis='y', alpha=0.3)
-
+    ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
     plt.tight_layout(pad=0)
     plt.savefig(PLOTS_DIR / 'skipped_firings_percentage.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
@@ -509,55 +471,23 @@ def generate_plots(aggregated_metrics):
     # Plot 4: Compute Time vs Batch Size
     print("  - Compute time vs batch size")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
-
-    # Get all unique batch sizes (reversed: high to low)
-    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
-    x = np.arange(len(all_batch_sizes))
-    width = 0.35
-
-    for i, mode in enumerate(['reactive', 'proactive']):
-        threading = 'single'  # Only single-threaded
-        offset = (i - 0.5) * width
-        mask = (df['mode'] == mode) & (df['threading'] == threading)
-        data = df[mask].sort_values('batch_size')
-
-        if len(data) > 0:
-            label = f"{mode.capitalize()}"
-            # Align with all_batch_sizes
-            y_values = [data[data['batch_size'] == bs]['avg_compute_time'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
-            y_errors = [data[data['batch_size'] == bs]['std_compute_time'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
-
-            ax.bar(x + offset, y_values, width, yerr=y_errors,
-                   label=label, capsize=CAPSIZE)
-
+    _bar_plot(df, ax, all_batch_sizes, 'avg_compute_time', 'std_compute_time')
     ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Average Compute Batch Time (ms)', fontsize=FONT_SIZE_LABEL)
-    ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
-    ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax.grid(True, axis='y', alpha=0.3)
-
+    ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
     plt.tight_layout(pad=0)
     plt.savefig(PLOTS_DIR / 'compute_time_vs_batch_size.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
-    # Plot 5: Timer Period Distribution (Box Plot)
-    # Uses raw timer period data propagated through aggregation
+    # Plot 5: Timer Period Distribution (Box Plot) — 2×2 grid
     print("  - Timer period distribution")
-    fig, axes = plt.subplots(1, 2, figsize=(16, 8))
+    combos = [('reactive', 'single'), ('reactive', 'multi'),
+              ('proactive', 'single'), ('proactive', 'multi')]
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
 
-    threading = 'single'  # Only single-threaded
-    algorithm_modes = ['reactive', 'proactive']
-
-    for j, mode in enumerate(algorithm_modes):
-        ax = axes[j]
-
-        # Look up raw data from aggregated_metrics directly (not from df)
+    for idx, (mode, threading) in enumerate(combos):
+        ax = axes[idx // 2][idx % 2]
         batch_labels = []
         period_data = []
 
@@ -574,17 +504,15 @@ def generate_plots(aggregated_metrics):
         if period_data:
             bp = ax.boxplot(period_data, labels=batch_labels,
                             patch_artist=True, showmeans=True)
-
-            # Color boxes
             for patch in bp['boxes']:
-                patch.set_facecolor('lightblue')
-
-            # Add expected period line
+                patch.set_facecolor(f'C{combos.index((mode, threading))}')
+                patch.set_alpha(0.6)
             ax.axhline(y=EXPECTED_TIMER_PERIOD_MS, color='red',
                        linestyle=':', linewidth=LINE_WIDTH, label='Expected')
 
-        ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
-        ax.set_ylabel('Timer Period (ms)', fontsize=FONT_SIZE_LABEL)
+        ax.set_title(f'{mode}-{threading}', fontsize=FONT_SIZE_LABEL)
+        ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_TICK_LABELS)
+        ax.set_ylabel('Timer Period (ms)', fontsize=FONT_SIZE_TICK_LABELS)
         ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
         ax.grid(True, alpha=0.3)
 
@@ -595,28 +523,24 @@ def generate_plots(aggregated_metrics):
 
     # Create separate legend file
     print("  - Creating separate legend")
-
-    # Create legend entries with correct colors matching the plots
     from matplotlib.patches import Patch
     legend_elements = []
     for i, mode in enumerate(['reactive', 'proactive']):
-        label = f"{mode.capitalize()}"
-        legend_elements.append(Patch(facecolor=f'C{i}', label=label))
-
-    # Add expected period line to legend
+        for j, threading in enumerate(['single', 'multi']):
+            legend_elements.append(
+                Patch(facecolor=f'C{i*2+j}', label=f'{mode}-{threading}'))
     legend_elements.append(plt.Line2D([0], [0], color='red', linestyle=':',
-                                      linewidth=LINE_WIDTH, label=f'Expected ({EXPECTED_TIMER_PERIOD_MS} ms)'))
+                                      linewidth=LINE_WIDTH,
+                                      label=f'Expected ({EXPECTED_TIMER_PERIOD_MS} ms)'))
 
-    # Create a minimal figure just for the legend
     fig_legend = plt.figure(figsize=(PLOT_WIDTH, 0.5))
-    legend = fig_legend.legend(
+    fig_legend.legend(
         handles=legend_elements,
         loc='center',
-        ncol=3,
+        ncol=5,
         fontsize=LEGEND_SIZE,
         frameon=False
     )
-
     plt.savefig(PLOTS_DIR / 'legend.pdf', dpi=PLOT_DPI,
                 bbox_inches='tight', pad_inches=0)
     plt.close()
@@ -625,37 +549,65 @@ def generate_plots(aggregated_metrics):
 
 
 def run_statistical_tests(all_metrics, results_dir):
-    """Run Mann-Whitney U tests comparing reactive vs proactive timer jitter."""
+    """Run Mann-Whitney U tests: reactive vs proactive (per threading)
+    and single vs multi (per mode)."""
     from scipy.stats import mannwhitneyu
 
     results = []
 
-    # Group raw timer periods by (batch_size, mode)
+    # Group raw timer periods by (batch_size, mode, threading)
     groups = defaultdict(list)
     for m in all_metrics:
         base_config = re.sub(r'_run\d+$', '', m['config'])
         parsed = parse_config_name(base_config)
-        key = (parsed['batch_size'], parsed['mode'])
+        key = (parsed['batch_size'], parsed['mode'], parsed['threading'])
         groups[key].extend(m['timer_periods'])
 
-    # Test reactive vs proactive for each batch size
-    for batch_size in sorted(set(k[0] for k in groups)):
-        reactive_key = (batch_size, 'reactive')
-        proactive_key = (batch_size, 'proactive')
-        if reactive_key in groups and proactive_key in groups:
-            r_data = groups[reactive_key]
-            p_data = groups[proactive_key]
-            if len(r_data) >= 5 and len(p_data) >= 5:
-                stat, pval = mannwhitneyu(r_data, p_data, alternative='two-sided')
-                results.append({
-                    'comparison': 'reactive_vs_proactive',
-                    'batch_size': batch_size,
-                    'n_reactive': len(r_data),
-                    'n_proactive': len(p_data),
-                    'U_statistic': stat,
-                    'p_value': pval,
-                    'significant_005': pval < 0.05,
-                })
+    all_batch_sizes = sorted(set(k[0] for k in groups))
+    all_threading = sorted(set(k[2] for k in groups))
+
+    # Test 1: reactive vs proactive for each (batch_size, threading)
+    for threading in all_threading:
+        for batch_size in all_batch_sizes:
+            reactive_key = (batch_size, 'reactive', threading)
+            proactive_key = (batch_size, 'proactive', threading)
+            if reactive_key in groups and proactive_key in groups:
+                r_data = groups[reactive_key]
+                p_data = groups[proactive_key]
+                if len(r_data) >= 5 and len(p_data) >= 5:
+                    stat, pval = mannwhitneyu(r_data, p_data, alternative='two-sided')
+                    results.append({
+                        'comparison': 'reactive_vs_proactive',
+                        'threading': threading,
+                        'batch_size': batch_size,
+                        'n_a': len(r_data),
+                        'n_b': len(p_data),
+                        'U_statistic': stat,
+                        'p_value': pval,
+                        'significant_005': pval < 0.05,
+                    })
+
+    # Test 2: single vs multi for each (batch_size, mode)
+    if 'single' in all_threading and 'multi' in all_threading:
+        for mode in ['reactive', 'proactive']:
+            for batch_size in all_batch_sizes:
+                single_key = (batch_size, mode, 'single')
+                multi_key = (batch_size, mode, 'multi')
+                if single_key in groups and multi_key in groups:
+                    s_data = groups[single_key]
+                    m_data = groups[multi_key]
+                    if len(s_data) >= 5 and len(m_data) >= 5:
+                        stat, pval = mannwhitneyu(s_data, m_data, alternative='two-sided')
+                        results.append({
+                            'comparison': 'single_vs_multi',
+                            'threading': f"{mode}",
+                            'batch_size': batch_size,
+                            'n_a': len(s_data),
+                            'n_b': len(m_data),
+                            'U_statistic': stat,
+                            'p_value': pval,
+                            'significant_005': pval < 0.05,
+                        })
 
     if results:
         stat_df = pd.DataFrame(results)
@@ -745,22 +697,21 @@ def main():
         json.dump(aggregated, f, indent=2, default=str)
     print(f"  Saved: {RESULTS_DIR / 'aggregated_results.json'}")
 
-    # Save condensed Table I: skipped firings % by mode and batch size
-    table_batch_sizes = [1, 16, 64, 256, 1024, 4096, 16384]
+    # Save condensed Table I: skipped firings % by mode, threading and batch size
+    table_batch_sizes = [1, 64, 256, 1024, 4096]
     table_rows = {}
     for config, metrics in aggregated.items():
         parsed = parse_config_name(config)
-        mode = parsed['mode'].capitalize()
+        label = f"{parsed['mode'].capitalize()} ({parsed['threading']})"
         bs = parsed['batch_size']
         if bs in table_batch_sizes:
-            table_rows.setdefault(mode, {})[bs] = metrics['skipped_firings_percent']
+            table_rows.setdefault(label, {})[bs] = metrics['skipped_firings_percent']
     table1_rows = []
-    for mode in ['Proactive', 'Reactive']:
-        if mode in table_rows:
-            row = {'Configuration': mode}
-            for bs in table_batch_sizes:
-                row[str(bs)] = f"{table_rows[mode].get(bs, 0):.2f}%"
-            table1_rows.append(row)
+    for label in sorted(table_rows.keys()):
+        row = {'Configuration': label}
+        for bs in table_batch_sizes:
+            row[str(bs)] = f"{table_rows[label].get(bs, 0):.2f}%"
+        table1_rows.append(row)
     table1_df = pd.DataFrame(table1_rows)
     table1_df.to_csv(RESULTS_DIR / 'table_1_skipped_firings.csv', index=False)
     print(f"  Saved: {RESULTS_DIR / 'table_1_skipped_firings.csv'}")

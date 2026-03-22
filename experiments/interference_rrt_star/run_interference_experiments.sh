@@ -42,13 +42,13 @@ RESULTS_DIR="${EXPERIMENT_DIR}/results"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 
 # Experiment parameters
-BATCH_SIZES=(1 16 64 256 1024 4096 16384)
+BATCH_SIZES=(1 64 256 1024 4096)
 MODES=("reactive" "proactive")
-THREADING=("single")
-NUM_RUNS=5  # Number of trials per configuration
+THREADING=("single" "multi")
+NUM_RUNS=10  # Number of trials per configuration
 
 # Duration for each experiment run (in seconds)
-RUN_DURATION=10
+RUN_DURATION=30
 
 # Interference timer parameters (fixed)
 TIMER_PERIOD_MS=100

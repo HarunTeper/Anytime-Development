@@ -162,6 +162,7 @@ protected:
     node_->declare_parameter("goal_bias", 0.1);
     node_->declare_parameter("gamma_rrt_star", 50.0);
     node_->declare_parameter("prune_interval", 0);  // disabled for basic tests
+    node_->declare_parameter("convergence_log_interval", 100);
   }
 
   void TearDown() override
@@ -317,8 +318,8 @@ TEST_F(RrtStarManagementTest, FindNearestInTree)
   n2.parent_index = 0;
   management->tree_.push_back(n2);
 
-  // Nearest to (4,4) should be n2 at (3,3)
-  Point2D query{4.0, 4.0};
+  // Nearest to (3.5,3.5) should be n2 at (3,3)
+  Point2D query{3.5, 3.5};
   int nearest = management->find_nearest(query);
   EXPECT_EQ(nearest, 2);  // index 2 = n2
 }
@@ -378,6 +379,7 @@ protected:
     node_->declare_parameter("goal_bias", 0.05);
     node_->declare_parameter("gamma_rrt_star", 0.0);  // auto-compute
     node_->declare_parameter("prune_interval", 0);
+    node_->declare_parameter("convergence_log_interval", 100);
   }
 
   void TearDown() override

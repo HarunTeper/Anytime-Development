@@ -43,9 +43,9 @@ RESULTS_DIR="${EXPERIMENT_DIR}/results"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 
 # Quick experiment parameters (subset of full run)
-BATCH_SIZES=(1 256 4096 16384)
+BATCH_SIZES=(1 256 4096)
 MODES=("reactive" "proactive")
-THREADING=("single")
+THREADING=("single" "multi")
 NUM_RUNS=1
 
 # Shorter duration

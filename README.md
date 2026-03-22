@@ -46,7 +46,7 @@ cd ..
 ./scripts/run_all.sh --full
 
 # Run specific experiment groups
-./scripts/run_all.sh --full --monte-carlo
+./scripts/run_all.sh --full --rrt-star
 ./scripts/run_all.sh --full --interference
 ./scripts/run_all.sh --full --yolo
 
@@ -66,9 +66,9 @@ Alternatively, open this folder in VS Code with the Dev Containers extension. Th
 
 Three experimental evaluations reproduce the paper results:
 
-### Monte Carlo (Figures 5a, 5b)
+### RRT* (Figures 5a, 5b)
 
-Evaluates batch size scaling, mode comparison (reactive vs proactive), and threading impact on anytime Monte Carlo pi estimation.
+Evaluates batch size scaling, mode comparison (reactive vs proactive), and threading impact on anytime RRT* path planning.
 
 ```bash
 ./scripts/reproduce_figure.sh 5a        # Full run (~10 min)
@@ -143,7 +143,7 @@ Anytime-Development/
 ├── packages/src/
 │   ├── anytime_core/           # Base anytime computation framework
 │   ├── anytime_interfaces/     # ROS 2 action type definitions
-│   ├── anytime_monte_carlo/    # Monte Carlo pi estimation (CPU)
+│   ├── anytime_rrt_star/       # RRT* path planning (CPU)
 │   ├── anytime_yolo/           # Anytime YOLO object detection (GPU)
 │   ├── anytime_tracing/        # LTTng tracepoint definitions
 │   ├── experiments/            # Launch files and default configs
@@ -151,8 +151,8 @@ Anytime-Development/
 │   ├── test_action/            # Test action for executor testing
 │   └── video_publisher/        # Video frame publisher for YOLO
 ├── experiments/
-│   ├── monte_carlo/            # MC experiment scripts and evaluation
-│   ├── interference/           # Interference experiment scripts and evaluation
+│   ├── rrt_star/               # RRT* experiment scripts and evaluation
+│   ├── interference_rrt_star/  # Interference experiment scripts and evaluation
 │   └── yolo/                   # YOLO pipeline (9 steps)
 └── scripts/
     ├── smoke_test.sh           # Quick validation (< 2 min)

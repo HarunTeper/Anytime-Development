@@ -311,7 +311,7 @@ def extract_metrics_from_events(events, config_name):
     metrics['total_iterations'] = (
         sum(metrics['exact_total_iterations'])
         if metrics['exact_total_iterations']
-        else metrics['total_batches'] * batch_size
+        else 0
     )
 
     def safe_mean(lst):
@@ -351,8 +351,9 @@ def extract_metrics_from_events(events, config_name):
         metrics['batch_time_p95'] = 0
         metrics['batch_time_p99'] = 0
 
-    # RRT*-specific summary
-    metrics['avg_final_best_cost'] = safe_mean(metrics['final_best_costs'])
+    # RRT*-specific summary (filter inf values from costs)
+    finite_costs = [c for c in metrics['final_best_costs'] if np.isfinite(c)]
+    metrics['avg_final_best_cost'] = np.mean(finite_costs) if finite_costs else 0
     metrics['avg_final_tree_size'] = safe_mean(metrics['final_tree_sizes'])
 
     return metrics
@@ -403,9 +404,9 @@ def aggregate_runs(all_metrics):
             'batch_time_p50': np.mean([r['batch_time_p50'] for r in runs]),
             'batch_time_p95': np.mean([r['batch_time_p95'] for r in runs]),
             'batch_time_p99': np.mean([r['batch_time_p99'] for r in runs]),
-            # RRT*-specific
-            'avg_final_best_cost': np.mean([r['avg_final_best_cost'] for r in runs if r['avg_final_best_cost'] > 0]) if any(r['avg_final_best_cost'] > 0 for r in runs) else 0,
-            'avg_final_tree_size': np.mean([r['avg_final_tree_size'] for r in runs if r['avg_final_tree_size'] > 0]) if any(r['avg_final_tree_size'] > 0 for r in runs) else 0,
+            # RRT*-specific (filter inf values from cost averages)
+            'avg_final_best_cost': np.mean([r['avg_final_best_cost'] for r in runs if np.isfinite(r['avg_final_best_cost']) and r['avg_final_best_cost'] > 0]) if any(np.isfinite(r['avg_final_best_cost']) and r['avg_final_best_cost'] > 0 for r in runs) else 0,
+            'avg_final_tree_size': np.mean([r['avg_final_tree_size'] for r in runs if np.isfinite(r['avg_final_tree_size']) and r['avg_final_tree_size'] > 0]) if any(np.isfinite(r['avg_final_tree_size']) and r['avg_final_tree_size'] > 0 for r in runs) else 0,
         }
         aggregated[base_config] = agg
 
@@ -538,7 +539,8 @@ def make_grouped_bar_chart(df, y_col, ylabel, filename, yerr_col=None,
                 offset = (i * 2 + j - 1.5) * width
                 kwargs = {'label': f'{mode}-{threading}'}
                 if yerr_values:
-                    kwargs['yerr'] = yerr_values
+                    lower = [min(e, v) for e, v in zip(yerr_values, y_values)]
+                    kwargs['yerr'] = [lower, yerr_values]
                     kwargs['capsize'] = CAPSIZE
                 ax.bar(np.array(x_positions) + offset, y_values, width,
                        color=f'C{i*2+j}', **kwargs)
@@ -753,16 +755,19 @@ def generate_plots(aggregated_metrics, all_metrics):
 
         color_idx = 0
         for config_key, runs_batchtimes in sorted(config_batchtimes.items()):
-            min_len = min((len(bt) for bt in runs_batchtimes if bt), default=0)
+            non_empty = [bt for bt in runs_batchtimes if bt]
+            if not non_empty:
+                continue
+            min_len = min(len(bt) for bt in non_empty)
             if min_len == 0:
                 continue
-            arr = np.array([bt[:min_len] for bt in runs_batchtimes])
+            arr = np.array([bt[:min_len] for bt in non_empty])
             mean_bt = arr.mean(axis=0)
             std_bt = arr.std(axis=0)
             color = f'C{color_idx % 10}'
             ax.plot(range(min_len), mean_bt, label=config_key, color=color,
                     alpha=0.7, linewidth=1.5)
-            ax.fill_between(range(min_len), mean_bt - std_bt, mean_bt + std_bt,
+            ax.fill_between(range(min_len), np.maximum(mean_bt - std_bt, 0), mean_bt + std_bt,
                             alpha=0.15, color=color)
             has_data = True
             color_idx += 1
@@ -835,7 +840,7 @@ def generate_plots(aggregated_metrics, all_metrics):
                 label = f"bs={config_key[0]},{config_key[1]}-{config_key[2]}"
                 color = f'C{color_idx % 10}'
                 ax.plot(iters, means, label=label, color=color, linewidth=1.5)
-                ax.fill_between(iters, means - stds, means + stds,
+                ax.fill_between(iters, np.maximum(means - stds, 0), means + stds,
                                 alpha=0.2, color=color)
                 has_data = True
                 color_idx += 1
@@ -888,7 +893,7 @@ def generate_plots(aggregated_metrics, all_metrics):
             if iters is not None and len(iters) > 0:
                 color = map_colors.get(map_name, 'C2')
                 ax.plot(iters, means, color=color, linewidth=1.5)
-                ax.fill_between(iters, means - stds, means + stds,
+                ax.fill_between(iters, np.maximum(means - stds, 0), means + stds,
                                 alpha=0.2, color=color)
                 has_data = True
 
@@ -998,7 +1003,7 @@ def generate_plots(aggregated_metrics, all_metrics):
                 label = f"bs={config_key[0]},{config_key[1]}-{config_key[2]}"
                 color = f'C{color_idx % 10}'
                 ax.plot(iters, means, label=label, color=color, linewidth=1.5)
-                ax.fill_between(iters, means - stds, means + stds,
+                ax.fill_between(iters, np.maximum(means - stds, 0), means + stds,
                                 alpha=0.2, color=color)
                 has_data = True
                 color_idx += 1

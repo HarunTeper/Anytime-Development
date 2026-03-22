@@ -22,6 +22,8 @@
 #include <memory>
 #include <queue>
 #include <random>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "anytime_core/anytime_base.hpp"

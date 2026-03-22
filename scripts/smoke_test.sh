@@ -124,17 +124,43 @@ RUN_DURATION=5
 
 test_trace="${TRACE_DIR}/smoke_test"
 rm -rf "${test_trace}"
-mkdir -p "${test_trace}"
+mkdir -p "${test_trace}" "${CONFIG_DIR}"
 
 # Source workspace again (we changed directory)
 cd "${PACKAGES_DIR}"
 source install/setup.bash
 
-# Resolve map directory and update configs
+# Resolve map directory and generate smoke test configs
 MAPS_DIR="$(ros2 pkg prefix anytime_rrt_star)/share/anytime_rrt_star/maps"
-if [ -d "${CONFIG_DIR}" ]; then
-    find "${CONFIG_DIR}" -name "*_server.yaml" -exec sed -i "s|MAPS_DIR|${MAPS_DIR}|g" {} \;
-fi
+
+cat > "${CONFIG_DIR}/${TEST_CONFIG}_server.yaml" <<EOF
+anytime_server:
+  ros__parameters:
+    is_reactive_proactive: "reactive"
+    multi_threading: false
+    batch_size: 256
+    random_seed: 42
+    log_level: "info"
+    map_yaml_path: "${MAPS_DIR}/depot.yaml"
+    start_x: 5.0
+    start_y: 12.0
+    goal_x: 25.0
+    goal_y: 2.0
+    step_size: 0.5
+    goal_threshold: 0.5
+    goal_bias: 0.05
+    gamma_rrt_star: 0.0
+    prune_interval: 1000
+    convergence_log_interval: 100
+EOF
+
+cat > "${CONFIG_DIR}/${TEST_CONFIG}_client.yaml" <<EOF
+anytime_client:
+  ros__parameters:
+    goal_timer_period_ms: 500
+    cancel_timeout_period_ms: 200
+    log_level: "info"
+EOF
 
 # Restart lttng-sessiond to ensure clean tracing state
 pkill lttng-sessiond 2>/dev/null || true
