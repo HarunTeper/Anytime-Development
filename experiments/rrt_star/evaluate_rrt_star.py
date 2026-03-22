@@ -160,6 +160,10 @@ def extract_metrics_from_events(events, config_name):
         'overhead_ratios': [],
         'feedback_send_times': [],
         'result_compute_times': [],
+        # Communication overhead metrics
+        'goal_startup_latencies': [],
+        'feedback_total_times': [],
+        'result_comm_times': [],
         # RRT*-specific
         'convergence_data': [],
         'final_best_costs': [],
@@ -176,6 +180,7 @@ def extract_metrics_from_events(events, config_name):
     cancel_request_time = None
     goal_sent_time = None
     cancel_sent_time = None
+    last_calculate_result_exit = None
     current_cycle_convergence = []
     # Track whether we're in an inter-cycle gap (reset/deactivate to next compute_entry)
     # so we can exclude the idle gap from overhead measurements
@@ -238,6 +243,23 @@ def extract_metrics_from_events(events, config_name):
                 result_ms = (event.timestamp - current_result_start) / 1e6
                 metrics['result_compute_times'].append(result_ms)
                 current_result_start = None
+            last_calculate_result_exit = event.timestamp
+
+        elif name == 'anytime:anytime_server_handle_accepted':
+            if goal_sent_time is not None:
+                latency_ms = (event.timestamp - goal_sent_time) / 1e6
+                metrics['goal_startup_latencies'].append(latency_ms)
+
+        elif name == 'anytime:anytime_client_feedback':
+            if current_feedback_start is not None:
+                total_ms = (event.timestamp - current_feedback_start) / 1e6
+                metrics['feedback_total_times'].append(total_ms)
+
+        elif name == 'anytime:anytime_client_result':
+            if last_calculate_result_exit is not None:
+                comm_ms = (event.timestamp - last_calculate_result_exit) / 1e6
+                metrics['result_comm_times'].append(comm_ms)
+                last_calculate_result_exit = None
 
         elif name == 'anytime:anytime_server_handle_cancel':
             cancel_request_time = event.timestamp
@@ -340,6 +362,13 @@ def extract_metrics_from_events(events, config_name):
     metrics['std_feedback_send_time'] = safe_std(metrics['feedback_send_times'])
     metrics['avg_result_compute_time'] = safe_mean(metrics['result_compute_times'])
     metrics['std_result_compute_time'] = safe_std(metrics['result_compute_times'])
+    # Communication overhead summary statistics
+    metrics['avg_goal_startup_latency'] = safe_mean(metrics['goal_startup_latencies'])
+    metrics['std_goal_startup_latency'] = safe_std(metrics['goal_startup_latencies'])
+    metrics['avg_feedback_total_time'] = safe_mean(metrics['feedback_total_times'])
+    metrics['std_feedback_total_time'] = safe_std(metrics['feedback_total_times'])
+    metrics['avg_result_comm_time'] = safe_mean(metrics['result_comm_times'])
+    metrics['std_result_comm_time'] = safe_std(metrics['result_comm_times'])
 
     # Batch time percentiles
     if metrics['batch_times']:
@@ -401,6 +430,13 @@ def aggregate_runs(all_metrics):
             'std_feedback_send_time': combined_std(runs, 'avg_feedback_send_time', 'std_feedback_send_time'),
             'avg_result_compute_time': np.mean([r['avg_result_compute_time'] for r in runs]),
             'std_result_compute_time': combined_std(runs, 'avg_result_compute_time', 'std_result_compute_time'),
+            # Communication overhead metrics
+            'avg_goal_startup_latency': np.mean([r['avg_goal_startup_latency'] for r in runs if r['avg_goal_startup_latency'] > 0]) if any(r['avg_goal_startup_latency'] > 0 for r in runs) else 0,
+            'std_goal_startup_latency': combined_std([r for r in runs if r['avg_goal_startup_latency'] > 0], 'avg_goal_startup_latency', 'std_goal_startup_latency') if any(r['avg_goal_startup_latency'] > 0 for r in runs) else 0,
+            'avg_feedback_total_time': np.mean([r['avg_feedback_total_time'] for r in runs if r['avg_feedback_total_time'] > 0]) if any(r['avg_feedback_total_time'] > 0 for r in runs) else 0,
+            'std_feedback_total_time': combined_std([r for r in runs if r['avg_feedback_total_time'] > 0], 'avg_feedback_total_time', 'std_feedback_total_time') if any(r['avg_feedback_total_time'] > 0 for r in runs) else 0,
+            'avg_result_comm_time': np.mean([r['avg_result_comm_time'] for r in runs if r['avg_result_comm_time'] > 0]) if any(r['avg_result_comm_time'] > 0 for r in runs) else 0,
+            'std_result_comm_time': combined_std([r for r in runs if r['avg_result_comm_time'] > 0], 'avg_result_comm_time', 'std_result_comm_time') if any(r['avg_result_comm_time'] > 0 for r in runs) else 0,
             'batch_time_p50': np.mean([r['batch_time_p50'] for r in runs]),
             'batch_time_p95': np.mean([r['batch_time_p95'] for r in runs]),
             'batch_time_p99': np.mean([r['batch_time_p99'] for r in runs]),
@@ -723,7 +759,52 @@ def generate_plots(aggregated_metrics, all_metrics):
                            yerr_col='std_result_compute_time',
                            output_dir=OVERHEAD_PLOTS_DIR)
 
-    # 19. Batch time percentiles (broken out by mode/threading)
+    # 19. Goal startup latency (client goal sent → server handle accepted)
+    print("  - Goal startup latency")
+    for map_name in all_maps:
+        make_grouped_bar_chart(df, 'avg_goal_startup_latency',
+                               'Goal Startup Latency (ms)',
+                               f'goal_startup_latency_{map_name}.pdf',
+                               yerr_col='std_goal_startup_latency',
+                               map_filter=map_name,
+                               output_dir=OVERHEAD_PLOTS_DIR)
+    make_grouped_bar_chart(df, 'avg_goal_startup_latency',
+                           'Goal Startup Latency (ms)',
+                           'goal_startup_latency.pdf',
+                           yerr_col='std_goal_startup_latency',
+                           output_dir=OVERHEAD_PLOTS_DIR)
+
+    # 20. Feedback total time (send_feedback_entry → client_feedback)
+    print("  - Feedback total time")
+    for map_name in all_maps:
+        make_grouped_bar_chart(df, 'avg_feedback_total_time',
+                               'Feedback Total Time (ms)',
+                               f'feedback_total_time_{map_name}.pdf',
+                               yerr_col='std_feedback_total_time',
+                               map_filter=map_name,
+                               output_dir=OVERHEAD_PLOTS_DIR)
+    make_grouped_bar_chart(df, 'avg_feedback_total_time',
+                           'Feedback Total Time (ms)',
+                           'feedback_total_time.pdf',
+                           yerr_col='std_feedback_total_time',
+                           output_dir=OVERHEAD_PLOTS_DIR)
+
+    # 21. Result communication time (calculate_result_exit → client_result)
+    print("  - Result communication time")
+    for map_name in all_maps:
+        make_grouped_bar_chart(df, 'avg_result_comm_time',
+                               'Result Communication Time (ms)',
+                               f'result_comm_time_{map_name}.pdf',
+                               yerr_col='std_result_comm_time',
+                               map_filter=map_name,
+                               output_dir=OVERHEAD_PLOTS_DIR)
+    make_grouped_bar_chart(df, 'avg_result_comm_time',
+                           'Result Communication Time (ms)',
+                           'result_comm_time.pdf',
+                           yerr_col='std_result_comm_time',
+                           output_dir=OVERHEAD_PLOTS_DIR)
+
+    # 22. Batch time percentiles (broken out by mode/threading)
     print("  - Batch time percentiles")
     for pct_col, pct_label in [
         ('batch_time_p50', 'p50'), ('batch_time_p95', 'p95'), ('batch_time_p99', 'p99')
@@ -1159,7 +1240,9 @@ def main():
         'batch_times', 'server_cancel_response_delays',
         'goal_to_finish_latencies', 'goal_to_cancel_latencies',
         'cancel_to_finish_latencies', 'per_batch_overheads', 'overhead_ratios',
-        'feedback_send_times', 'result_compute_times', 'convergence_data',
+        'feedback_send_times', 'result_compute_times',
+        'goal_startup_latencies', 'feedback_total_times', 'result_comm_times',
+        'convergence_data',
         'final_best_costs', 'final_tree_sizes', 'first_solution_iterations',
         'exact_total_iterations',
     ]
