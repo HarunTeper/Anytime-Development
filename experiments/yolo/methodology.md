@@ -51,11 +51,11 @@ Phase 1 baseline uses fixed batch_size=1. Phase 3 throughput uses fixed batch_si
 
 | Variable | Values | Rationale |
 |----------|--------|-----------|
-| Block size | 1, 4, 8, 13, 16, 20, 22 | 1=max responsiveness, 22=max throughput (all layers), 4 fills the steep 1→8 curve, 20 fills the 16→22 gap, 8/13/16 cover the transition to 2-block plateau |
+| Block size | 1, 4, 5, 8, 15, 22 | Chosen to align with quality jump boundaries: BS4/8 hit the L8 (80%) and L16 (98%) jumps, BS5 lands on L15 (97% jump), BS15 has one checkpoint at the quality jump, BS1=max granularity, BS22=full batch baseline |
 | Sync mode | sync, async | Same as Phase 1 |
 | Threading | single, multi | Same as Phase 1 |
 
-Total Phase 2 configurations: 7 block sizes x 2 sync modes x 2 threading modes = 28.
+Total Phase 2 configurations: 6 block sizes x 2 sync modes x 2 threading modes = 24.
 
 ## 4. Controlled Variables
 
@@ -626,7 +626,7 @@ included in timing statistics.
 | # | Decision | Rationale |
 |---|----------|-----------|
 | 1 | Proactive mode only for Phase 2 | Reactive mode does not call `calculate_result()` before `send_feedback()`, making score-based cancellation unreliable |
-| 2 | Block sizes [1, 4, 8, 13, 16, 20, 22] | 1 and 22 are boundary cases (22 = all layers); 4 fills the steep 1→8 overhead curve; 8 and 16 are powers of 2; 13 is the first 2-block size; 20 fills the 16→22 gap |
+| 2 | Block sizes [1, 4, 5, 8, 15, 22] | Aligned with quality jump boundaries: L8 (80%), L15 (97%), L16 (98%). BS4/8 hit L8+L16, BS5 lands on L15, BS15 checkpoints at the quality jump, BS1=max granularity, BS22=full batch |
 | 3 | cancel_after_layers = 22 (score-only) | Isolates score-based cancellation behavior without hard-deadline interference |
 | 4 | Score threshold 0.8, class 9 | Simulates targeted detection (traffic light) with high confidence requirement |
 | 5 | 5 warmup images, fixed count | GPU JIT completes within first few inferences; fixed count is simple and reproducible |
