@@ -3,12 +3,12 @@
 Step 5: Generate Cancellation Experiment Configurations
 
 Creates configuration files for all combinations:
-- Block sizes: 1, 8, 13, 15, 16, 25
+- Block sizes: 1, 4, 8, 13, 16, 20, 25
 - Mode: proactive
 - Sync modes: sync, async
 - Threading: single, multi
 
-Total: 6 × 1 × 2 × 2 = 24 server configs + 1 client config
+Total: 7 × 1 × 2 × 2 = 28 server configs + 1 client config
 
 Client cancellation settings:
 - Cancel after 25 layers (no hard deadline — score-only cancellation)
@@ -30,7 +30,7 @@ WORKSPACE_DIR = SCRIPT_DIR.parent.parent
 CONFIG_DIR.mkdir(exist_ok=True)
 
 # Configuration parameters
-BLOCK_SIZES = [1, 8, 13, 15, 16, 25]
+BLOCK_SIZES = [1, 4, 8, 13, 16, 20, 25]
 MODES = ["proactive"]
 SYNC_MODES = ["sync", "async"]
 THREADING_MODES = ["single", "multi"]

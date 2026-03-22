@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
 EXPERIMENT_DIR="${SCRIPT_DIR}"
 TRACE_DIR="${EXPERIMENT_DIR}/traces/phase1_baseline"
-NUM_TRIALS=3
+NUM_TRIALS=5
 
 # Check prerequisites
 "${WORKSPACE_DIR}/scripts/check_yolo_prerequisites.sh"

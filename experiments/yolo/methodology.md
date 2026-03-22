@@ -51,11 +51,11 @@ Phase 1 baseline uses fixed batch_size=1. Phase 3 throughput uses fixed batch_si
 
 | Variable | Values | Rationale |
 |----------|--------|-----------|
-| Block size | 1, 8, 13, 15, 16, 25 | 1=max responsiveness, 25=max throughput, intermediates explore the trade-off curve |
+| Block size | 1, 4, 8, 13, 16, 20, 25 | 1=max responsiveness, 25=max throughput, 4 fills the steep 1→8 curve, 20 fills the 16→25 gap, 8/13/16 cover the transition to 2-block plateau |
 | Sync mode | sync, async | Same as Phase 1 |
 | Threading | single, multi | Same as Phase 1 |
 
-Total Phase 2 configurations: 6 block sizes x 2 sync modes x 2 threading modes = 24.
+Total Phase 2 configurations: 7 block sizes x 2 sync modes x 2 threading modes = 28.
 
 ## 4. Controlled Variables
 
@@ -69,7 +69,7 @@ Total Phase 2 configurations: 6 block sizes x 2 sync modes x 2 threading modes =
 | Score threshold | 0.8 | Detection confidence required to trigger early cancellation |
 | cancel_after_layers | 25 | Hard deadline equals total layers, so score-only cancellation in Phase 2 |
 | Warmup images | 5 per trial | Skipped in analysis to exclude GPU JIT compilation overhead |
-| Trials | 3 per configuration | For statistical variance estimation |
+| Trials | 5 per configuration | For statistical variance estimation; consistent with RRT* experiment |
 | Weights | `packages/src/anytime_yolo/weights_32/` | TensorRT FP32 weights, engines cached after first build |
 | Init wait | 3 seconds | Delay between YOLO launch and video publisher start |
 | Between-trial pause | 5 seconds | |
@@ -626,11 +626,11 @@ included in timing statistics.
 | # | Decision | Rationale |
 |---|----------|-----------|
 | 1 | Proactive mode only for Phase 2 | Reactive mode does not call `calculate_result()` before `send_feedback()`, making score-based cancellation unreliable |
-| 2 | Block sizes [1, 8, 13, 15, 16, 25] | 1 and 25 are boundary cases; 8 and 16 are powers of 2; 13 and 15 add resolution in the interesting mid-range |
+| 2 | Block sizes [1, 4, 8, 13, 16, 20, 25] | 1 and 25 are boundary cases; 4 fills the steep 1→8 overhead curve; 8 and 16 are powers of 2; 13 is the first 2-block size; 20 fills the 16→25 gap |
 | 3 | cancel_after_layers = 25 (score-only) | Isolates score-based cancellation behavior without hard-deadline interference |
 | 4 | Score threshold 0.8, class 9 | Simulates targeted detection (traffic light) with high confidence requirement |
 | 5 | 5 warmup images, fixed count | GPU JIT completes within first few inferences; fixed count is simple and reproducible |
-| 6 | 3 trials per config | Balances statistical power with experiment duration (~3 hours for Phase 2) |
+| 6 | 5 trials per config | Consistent with RRT* experiment; provides tighter confidence intervals (~935 goals per config) |
 | 7 | Sequential image processing | Isolates per-image cancellation from pipeline effects; ensures measurement independence |
 | 8 | Population separation (score-cancelled vs hard-deadline) | Prevents blending early-exit responsiveness metrics with full-run images |
 | 9 | Detection count at cancellation from `yolo_exit_calculation_end` | Captures quality at the actual cancellation point for quality-latency trade-off analysis |

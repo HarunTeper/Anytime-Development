@@ -3,9 +3,9 @@
 # Step 6: Run Cancellation Experiments
 #
 # Purpose: Test cancellation performance across different configurations
-# Configurations: 6 block sizes × 1 mode × 2 sync × 2 threading = 24 configs
+# Configurations: 7 block sizes × 1 mode × 2 sync × 2 threading = 28 configs
 # Client cancellation: Score-based early exit OR hard deadline (values read from config)
-# Output: traces/phase4_bs{1,8,13,15,16,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/
+# Output: traces/phase4_bs{1,4,8,13,16,20,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3,4,5}/
 #
 
 set -e  # Exit on error
@@ -15,13 +15,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
 EXPERIMENT_DIR="${SCRIPT_DIR}"
 TRACE_BASE_DIR="${EXPERIMENT_DIR}/traces"
-NUM_TRIALS=3
+NUM_TRIALS=5
 
 # Check prerequisites
 "${WORKSPACE_DIR}/scripts/check_yolo_prerequisites.sh"
 
 # Test parameters
-BLOCK_SIZES=(1 8 13 15 16 25)
+BLOCK_SIZES=(1 4 8 13 16 20 25)
 MODES=("proactive")
 SYNC_MODES=("sync" "async")
 THREADING_MODES=("single" "multi")
