@@ -408,11 +408,18 @@ def plot_quality_ratio_progression(metrics):
     means = [np.mean(metrics['layer_quality_ratio'][l]) for l in layers]
     stds = [np.std(metrics['layer_quality_ratio'][l]) for l in layers]
 
+    # Cap error bars so they don't exceed 1.0 (100% quality)
+    means_arr = np.array(means)
+    stds_arr = np.array(stds)
+    upper_err = np.minimum(stds_arr, 1.0 - means_arr)
+    lower_err = stds_arr  # lower bars are fine as-is
+    yerr_capped = [lower_err, upper_err]
+
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
     # Use bar chart instead of line plot
     x = np.arange(len(layers))
-    ax.bar(x, means, yerr=stds, capsize=CAPSIZE, alpha=0.8,
+    ax.bar(x, means, yerr=yerr_capped, capsize=CAPSIZE, alpha=0.8,
            color='#1f77b4', error_kw={'linewidth': LINE_WIDTH})
 
     # Add threshold lines
