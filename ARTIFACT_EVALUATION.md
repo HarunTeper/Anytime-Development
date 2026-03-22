@@ -316,58 +316,59 @@ cd ../../../
 
 **What it does:** Launches a ROS 2 anytime action server that computes RRT* path planning iterations and a client that periodically sends goals and cancels them after 200 ms. Each configuration runs for a fixed duration while LTTng traces record batch computation times, cancellation delays, and throughput. The evaluation script parses the traces and plots iteration counts and cancellation delays across batch sizes and modes.
 
-**Why it takes this long:** Each of the 28 (full) or 12 (quick) configurations runs sequentially for the configured duration, plus ~10 s overhead per config for LTTng session setup/teardown and node startup/cleanup. Trace parsing and plot generation add a few more minutes at the end.
+**Why it takes this long:** Each of the 48 (full) or 6 (quick) configurations runs sequentially for the configured duration, plus ~10 s overhead per config for LTTng session setup/teardown and node startup/cleanup. Trace parsing and plot generation add a few more minutes at the end.
 
 | Parameter | Full | Quick |
 | --------- | ---- | ----- |
-| Batch sizes | 1024, 2048, 4096, 8192, 16384, 32768, 65536 | 1024, 16384, 65536 |
+| Batch sizes | 1, 16, 64, 256, 1024, 4096 | 1, 256, 4096 |
 | Modes | reactive, proactive | reactive, proactive |
-| Threading | single, multi | single, multi |
+| Threading | single, multi | single |
+| Maps | depot, warehouse | depot |
+| Runs per config | 5 | 1 |
 | Run duration | 10 seconds per config | 5 seconds per config |
-| Total configs | 28 | 12 |
+| Total configs | 48 | 6 |
 | **Estimated time** | **~10 min** | **~3 min** |
 
 ### Interference (Figure 6, Table I)
 
 **What it does:** Runs the same RRT* action server alongside a periodic interference timer node that performs a 10 ms busy-wait every 100 ms, both in a single-threaded ROS 2 executor. This creates CPU contention: larger batch sizes block the executor longer, causing the timer to miss its 100 ms period. LTTng traces record timer callback timestamps and compute batch durations. The evaluation script measures timer jitter (deviation from the expected 100 ms period), missed-period rates, and compute times per batch size.
 
-**Note on batch sizes:** The paper uses batch sizes up to 65,536 for the interference experiment. The artifact extends the range to 262,144 because software and firmware updates to the Jetson Orin NX board have improved its performance since the paper experiments were conducted, and larger batch sizes are needed to observe the same interference effects. The additional data points (131,072 and 262,144) reinforce the same trend shown in the paper.
-
-**Why it takes this long:** 18 (full) or 8 (quick) configurations run sequentially. Each config has the same per-config overhead as RRT* (~10 s for LTTng and node lifecycle), plus the run duration itself.
+**Why it takes this long:** 20 (full) or 12 (quick) configurations run sequentially. Each config has the same per-config overhead as RRT* (~10 s for LTTng and node lifecycle), plus the run duration itself.
 
 | Parameter | Full | Quick |
 | --------- | ---- | ----- |
-| Batch sizes | 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144 | 1024, 16384, 65536, 262144 |
+| Batch sizes | 1, 64, 256, 1024, 4096 | 1, 256, 4096 |
 | Modes | reactive, proactive | reactive, proactive |
-| Threading | single | single |
+| Threading | single, multi | single, multi |
 | Timer period | 100 ms | 100 ms |
 | Timer execution time | 10 ms | 10 ms |
-| Run duration | 10 seconds per config | 5 seconds per config |
-| Total configs | 18 | 8 |
+| Runs per config | 10 | 1 |
+| Run duration | 30 seconds per config | 5 seconds per config |
+| Total configs | 20 | 12 |
 | **Estimated time** | **~7 min** | **~3 min** |
 
 ### YOLO (Figures 7a, 7b)
 
-**What it does:** Runs a YOLOv3 object detection pipeline split into 25 individually-executable neural network layers on the GPU using TensorRT. The experiment proceeds in phases:
+**What it does:** Runs a YOLOv3 object detection pipeline split into 22 individually-executable neural network layers on the GPU using TensorRT. The experiment proceeds in phases:
 
-1. **Baseline collection (Step 1):** Processes 192 test images through all 25 layers one at a time (batch size 1) over 3 trials, recording per-layer computation times and detection quality via LTTng.
+1. **Baseline collection (Step 1):** Processes 191 test images through all 22 layers one at a time (batch size 1) over 5 trials, recording per-layer computation times and detection quality via LTTng.
 2. **Quality analysis (Step 2a):** Parses baseline traces to determine how detection quality progresses as more layers execute — showing at which layer the model reaches 50 %, 70 %, 90 % of final quality. Produces Figure 7a.
-3. **Throughput measurement (Step 3):** Processes all 192 images with batch size 25 (all layers at once) across 4 configurations (sync/async × single/multi-threaded), measuring end-to-end throughput.
+3. **Throughput measurement (Step 3):** Processes all 191 images with batch size 22 (all layers at once) across 4 configurations (sync/async × single/multi-threaded), measuring end-to-end throughput.
 4. **Throughput analysis (Step 4):** Parses throughput traces and produces Figure 7b comparing images/second across configurations.
 
-**Why it takes this long:** The baseline collection (3 trials × 192 images × 25 layers of GPU inference) dominates the time for Figure 7a. The throughput measurement (4 configurations × 192 images) adds another pass for Figure 7b. Trace parsing for thousands of layer-level events takes additional minutes per phase.
+**Why it takes this long:** The baseline collection (5 trials × 191 images × 22 layers of GPU inference) dominates the time for Figure 7a. The throughput measurement (4 configurations × 191 images) adds another pass for Figure 7b. Trace parsing for thousands of layer-level events takes additional minutes per phase.
 
 | Parameter | Value |
 | --------- | ----- |
-| Network | YOLOv3 with 25 layers |
-| Test images | 192 |
-| Block sizes | 1, 8, 16, 25 |
+| Network | YOLOv3 with 22 layers |
+| Test images | 191 |
+| Block sizes | 1, 4, 5, 8, 15, 22 |
 | Sync modes | sync, async |
 | Threading | single, multi |
 | Mode | proactive |
-| Baseline trials | 3 |
-| Cancellation: cancel_after_layers | 25 |
-| Cancellation: score_threshold | 0.7 |
+| Baseline trials | 5 |
+| Cancellation: cancel_after_layers | 22 |
+| Cancellation: score_threshold | 0.8 |
 | **Estimated time (Figure 7a)** | **~15 min** |
 | **Estimated time (Figure 7b)** | **~25 min** |
 | **Estimated time (both)** | **~35 min** |

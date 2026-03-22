@@ -39,7 +39,7 @@ RESULTS_DIR="${EXPERIMENT_DIR}/results"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 
 # Experiment parameters
-BATCH_SIZES=(1 16 64 256 1024 4096 16384)
+BATCH_SIZES=(1 16 64 256 1024 4096)
 MODES=("reactive" "proactive")
 THREADING=("single" "multi")
 MAPS=("depot" "warehouse")

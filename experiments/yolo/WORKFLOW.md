@@ -23,8 +23,8 @@ Quick test to verify environment is working.
 ```bash
 ./1_collect_baseline.sh
 ```
-**Duration:** ~30-60 minutes (3 trials)  
-**Output:** `traces/phase1_baseline_trial{1,2,3}/`
+**Duration:** ~30-60 minutes (5 trials)
+**Output:** `traces/phase1_baseline_trial{1,2,3,4,5}/`
 
 ### 2️⃣a Analyze Detection Quality
 ```bash
@@ -44,8 +44,8 @@ python3 2b_analyze_blocks.py
 ```bash
 ./3_measure_throughput.sh
 ```
-**Duration:** ~20-40 minutes (4 configs × 3 trials)  
-**Output:** `traces/phase3_{sync|async}_{single|multi}_trial{1,2,3}/`
+**Duration:** ~20-40 minutes (4 configs × 5 trials)
+**Output:** `traces/phase3_{sync|async}_{single|multi}_trial{1,2,3,4,5}/`
 
 ### 4️⃣ Analyze Throughput
 ```bash
@@ -70,8 +70,8 @@ python3 5_generate_configs.py
 ```bash
 ./6_run_experiments.sh
 ```
-**Duration:** ~1.5-3 hours (24 configs × 3 trials = 72 experiments)
-**Output:** `traces/phase4_bs{1,4,8,13,16,20,22}_proactive_{sync|async}_{single|multi}_trial{1,2,3,4,5}/`
+**Duration:** ~1.5-3 hours (24 configs × 5 trials = 120 experiments)
+**Output:** `traces/phase4_bs{1,4,5,8,15,22}_proactive_{sync|async}_{single|multi}_trial{1,2,3,4,5}/`
 
 **To test single config:**
 ```bash

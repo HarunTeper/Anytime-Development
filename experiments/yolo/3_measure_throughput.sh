@@ -5,7 +5,7 @@
 # Purpose: Test different configurations to find maximum throughput
 # Configurations: sync/async × single/multi-threaded (4 total)
 # Each uses batch_size=22 (all layers, no cancellation)
-# Output: traces/phase3_{sync|async}_{single|multi}_trial{1,2,3}/
+# Output: traces/phase3_{sync|async}_{single|multi}_trial{1,2,3,4,5}/
 #
 
 set -e  # Exit on error

@@ -10,7 +10,7 @@ For each block size (1-22 layers), calculates total delay by summing:
 
 This helps choose optimal block sizes for Step 6 (cancellation experiments).
 
-Input:  traces/phase1_baseline_trial{1,2,3}/
+Input:  traces/phase1_baseline_trial{1,2,3,4,5}/
 Output: results/block_analysis/
 """
 

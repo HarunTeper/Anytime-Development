@@ -12,7 +12,7 @@ Metrics analyzed:
 - Complete computation time (layer + exit stacked)
 - Throughput comparison (images/second)
 
-Input:  traces/phase3_{sync|async}_{single|multi}_trial{1,2,3}/
+Input:  traces/phase3_{sync|async}_{single|multi}_trial{1,2,3,4,5}/
 Output: results/runtime_analysis/
 """
 

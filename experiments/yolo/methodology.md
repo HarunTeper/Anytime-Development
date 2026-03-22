@@ -118,11 +118,11 @@ Quick environmental verification:
 | Sync | sync |
 | Threading | single |
 | Cancellation | none |
-| Trials | 3 |
+| Trials | 5 |
 
 **Config files:** `configs/phase1_server.yaml`, `configs/phase1_client.yaml`
 
-**Output:** `traces/phase1_baseline_trial{1,2,3}/`
+**Output:** `traces/phase1_baseline_trial{1,2,3,4,5}/`
 
 **LTTng setup:**
 - Session name: `yolo_phase1_baseline`
@@ -270,7 +270,7 @@ Statistics computed: mean, std, min, max, median across all images (all trials p
 **Config files:** `configs/phase3_server_{sync|async}_{single|multi}.yaml`,
 `configs/phase3_client.yaml`
 
-**Output:** `traces/phase3_{sync|async}_{single|multi}_trial{1,2,3}/`
+**Output:** `traces/phase3_{sync|async}_{single|multi}_trial{1,2,3,4,5}/`
 
 **LTTng setup:** Same pattern as Step 1. Session name: `yolo_phase3`.
 
@@ -362,7 +362,7 @@ and `configs/phase4_client.yaml` (1 file).
 3. Warm up TensorRT engines (`warmup_yolo_engines.sh`)
 4. Write results summary header with client config values
 
-**Experiment loop:** For each (block_size, mode, sync_mode, threading) x 3 trials:
+**Experiment loop:** For each (block_size, mode, sync_mode, threading) x 5 trials:
 
 1. Create LTTng session (`yolo_phase4`) with per-trial output directory
 2. Enable events: `lttng enable-event -u 'anytime:*'`
@@ -376,7 +376,7 @@ and `configs/phase4_client.yaml` (1 file).
 10. Destroy LTTng session
 11. Log trial completion to results file
 
-**Output:** `traces/phase4_bs{N}_proactive_{sync}_{threading}_trial{1,2,3}/`
+**Output:** `traces/phase4_bs{N}_proactive_{sync}_{threading}_trial{1,2,3,4,5}/`
 
 **Process management:** Explicit kill of `component_container`, `anytime_yolo`,
 `video_publisher`, and `ros2` processes. Two-stage termination: SIGTERM first,
@@ -430,7 +430,7 @@ This separation prevents blending early-exit images (where cancellation is meani
 with full-run images (where cancellation delay is simply total runtime).
 
 **Aggregation:** Metrics grouped by configuration key
-(`bs{N}_{mode}_{sync}_{threading}`), pooling all goals across 3 trials.
+(`bs{N}_{mode}_{sync}_{threading}`), pooling all goals across 5 trials.
 
 **Statistics per configuration:**
 
@@ -580,7 +580,7 @@ analysis scripts.
 ## 10. Statistical Methodology
 
 ### Aggregation Across Trials
-- Goals from all 3 trials per configuration are **pooled** into a single list.
+- Goals from all 5 trials per configuration are **pooled** into a single list.
 - Summary statistics (mean, std, min, max, median) computed on the pooled data.
 - This provides larger sample sizes (~555 goals per config after warmup removal)
   at the cost of masking trial-to-trial variability.
@@ -617,9 +617,9 @@ included in timing statistics.
 
 | Directory pattern | Content |
 |-------------------|---------|
-| `traces/phase1_baseline_trial{1,2,3}/` | Baseline layer-by-layer traces |
-| `traces/phase3_{sync\|async}_{single\|multi}_trial{1,2,3}/` | Throughput traces |
-| `traces/phase4_bs{N}_proactive_{sync}_{threading}_trial{1,2,3}/` | Cancellation traces |
+| `traces/phase1_baseline_trial{1,2,3,4,5}/` | Baseline layer-by-layer traces |
+| `traces/phase3_{sync\|async}_{single\|multi}_trial{1,2,3,4,5}/` | Throughput traces |
+| `traces/phase4_bs{N}_proactive_{sync}_{threading}_trial{1,2,3,4,5}/` | Cancellation traces |
 
 ## 12. Design Decisions Log
 

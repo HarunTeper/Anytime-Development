@@ -6,7 +6,7 @@
 #
 # Mode flags:
 #   --quick           Use quick experiment scripts (3 batch sizes, 5s runs) [default]
-#   --full            Use full experiment scripts (7 batch sizes, 10s runs)
+#   --full            Use full experiment scripts (all batch sizes, 10s+ runs)
 #
 # Experiment selection:
 #   --cpu-only        Run only CPU experiments (RRT* + Interference)
@@ -107,7 +107,7 @@ for arg in "$@"; do
             echo ""
             echo "Mode flags:"
             echo "  --quick               Quick experiments (3 batch sizes, 5s) [default]"
-            echo "  --full                Full experiments (7 batch sizes, 10s)"
+            echo "  --full                Full experiments (all batch sizes, 10s+ runs)"
             echo ""
             echo "Experiment selection:"
             echo "  --cpu-only            Run only CPU experiments (RRT* + Interference)"

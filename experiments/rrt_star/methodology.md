@@ -46,7 +46,7 @@ This is a **framework evaluation**, not an algorithm benchmark. RRT* is the work
 
 ### Config File Generation
 
-For each of the 112 configurations, `generate_configs.py` produces two YAML files:
+For each of the 96 configurations, `generate_configs.py` produces two YAML files:
 
 - **Server config** (`batch_X_mode_threading_map_server.yaml`): Sets `is_reactive_proactive`, `multi_threading`, `batch_size`, `random_seed`, map path (placeholder `MAPS_DIR`), start/goal coordinates, and all RRT* algorithm parameters.
 - **Client config** (`batch_X_mode_threading_map_client.yaml`): Sets `goal_timer_period_ms` and `cancel_timeout_period_ms`.

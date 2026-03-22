@@ -13,7 +13,7 @@ Configuration:
 - FILTER_BY_CLASS: Set to True to filter by TARGET_CLASS_ID, False for all detections
 - TARGET_CLASS_ID: 9 = traffic light in COCO dataset
 
-Input:  traces/phase1_baseline_trial{1,2,3}/
+Input:  traces/phase1_baseline_trial{1,2,3,4,5}/
 Output: results/quality_analysis/
 """
 

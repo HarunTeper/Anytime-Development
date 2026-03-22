@@ -4,7 +4,7 @@
 #
 # Purpose: Run baseline configuration to collect layer-wise detection and timing data
 # Configuration: batch_size=1, proactive, single-threaded, all 22 layers
-# Output: traces/phase1_baseline_trial{1,2,3}/
+# Output: traces/phase1_baseline_trial{1,2,3,4,5}/
 #
 
 set -e  # Exit on error
