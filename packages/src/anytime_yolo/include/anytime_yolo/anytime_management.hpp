@@ -122,11 +122,7 @@ public:
   {
     RCLCPP_DEBUG(this->node_->get_logger(), "YOLO result populated");
 
-    result_processed_layers_ = processed_layers_;
     std::vector<float> yolo_result;
-
-    // Trace exit calculation start
-    TRACE_YOLO_EXIT_CALCULATION_START(this->node_, processed_layers_);
 
     if constexpr (isReactiveProactive) {
       RCLCPP_DEBUG(this->node_->get_logger(), "Calculating latest exit");
@@ -135,6 +131,14 @@ public:
       RCLCPP_DEBUG(this->node_->get_logger(), "Finishing early");
       yolo_result = yolo_.finishEarly(*yolo_state_);
     }
+
+    // After calculateLatestExit/finishEarly, the CUDA stream is synchronized.
+    // Drain any remaining GPU completion signals so processed_layers_ is accurate.
+    process_gpu_completions();
+    result_processed_layers_ = processed_layers_;
+
+    // Trace exit calculation start (after drain so layer_num matches end event)
+    TRACE_YOLO_EXIT_CALCULATION_START(this->node_, processed_layers_);
 
     // Count valid detections (confidence > 0)
     int detection_count = 0;
