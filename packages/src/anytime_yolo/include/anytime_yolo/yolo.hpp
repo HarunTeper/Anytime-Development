@@ -1055,6 +1055,8 @@ public:
 
   InferenceState createInferenceState() { return InferenceState(chunks.size()); }
 
+  size_t getLayerCount() const { return chunks.size(); }
+
   bool inferStep(
     InferenceState & state, bool async = true, void (*callback)(void *) = nullptr,
     void * userData = nullptr)

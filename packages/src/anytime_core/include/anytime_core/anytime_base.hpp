@@ -125,8 +125,11 @@ public:
     if ((should_finish_now || should_cancel) && is_running()) {
       // Finish the goal
       if (should_cancel) {
+        // Cancel: send last computed result without recomputing
         goal_handle_->canceled(result_);
       } else {
+        // Normal finish: compute fresh result with all completed work
+        calculate_result();
         goal_handle_->succeed(result_);
       }
 
