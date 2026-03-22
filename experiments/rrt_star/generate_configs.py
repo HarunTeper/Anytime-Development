@@ -6,7 +6,7 @@ Generate all RRT* experiment configuration files
 import os
 
 # Configuration parameters
-batch_sizes = [1, 16, 64, 256, 1024, 4096, 16384]
+batch_sizes = [1, 16, 64, 256, 1024, 4096]
 modes = ["reactive", "proactive"]
 threading = ["single", "multi"]
 maps = {

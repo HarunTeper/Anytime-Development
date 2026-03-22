@@ -20,12 +20,12 @@ This is a **framework evaluation**, not an algorithm benchmark. RRT* is the work
 
 | Variable | Values | Count | Rationale |
 |----------|--------|-------|-----------|
-| Batch size | 1, 16, 64, 256, 1024, 4096, 16384 | 7 | Spans single-iteration (isolates per-iteration framework overhead) to large batches (approaches continuous computation). Roughly powers-of-4 progression. |
+| Batch size | 1, 16, 64, 256, 1024, 4096 | 6 | Spans single-iteration (isolates per-iteration framework overhead) to large batches (approaches continuous computation). Roughly powers-of-4 progression. |
 | Cancellation mode | reactive, proactive | 2 | The two scheduling strategies the framework provides. |
 | Threading model | single, multi | 2 | Tests whether multi-threaded executors affect overhead or responsiveness. |
 | Map | depot, warehouse | 2 | Structurally different environments to check that framework behavior is algorithm-independent. |
 
-**Total:** 7 x 2 x 2 x 2 = **112 unique configurations**
+**Total:** 6 x 2 x 2 x 2 = **96 unique configurations**
 
 ### Fixed Parameters
 
@@ -77,7 +77,7 @@ Maps are Nav2-format PGM occupancy grids with YAML metadata. Collision checking 
 5. **Regenerate configs** by calling `generate_configs.py` (ensures configs are never stale after parameter changes), then substitute the `MAPS_DIR` placeholder with the actual path.
 6. Clean old traces and results directories.
 
-### 3.2 Per-Run Execution (repeated 560 times)
+### 3.2 Per-Run Execution (repeated 480 times)
 
 For each (batch_size, mode, threading, map, run_number):
 
@@ -197,7 +197,7 @@ for (int i = 0; i < iterations; i++) {
 TRACE_ANYTIME_COMPUTE_EXIT(node_, iterations, computation_time_ns, avg_time_ns);
 ```
 
-**Cancellation is per-iteration, not per-batch.** Even with batch_size=16384, the cancel check runs before every single RRT* iteration. Cancel response delay is bounded by one iteration's time (microseconds to low milliseconds), regardless of batch size. The `batch_size` parameter controls **overhead-to-compute ratio** and **feedback frequency**, not cancellation responsiveness.
+**Cancellation is per-iteration, not per-batch.** Even with batch_size=4096, the cancel check runs before every single RRT* iteration. Cancel response delay is bounded by one iteration's time (microseconds to low milliseconds), regardless of batch size. The `batch_size` parameter controls **overhead-to-compute ratio** and **feedback frequency**, not cancellation responsiveness.
 
 **Missing exit trace on cancellation:** When cancellation occurs mid-batch, the `return` at the check skips `TRACE_ANYTIME_COMPUTE_EXIT`. This creates an unmatched `compute_entry` event. The evaluation script handles this by overwriting `current_compute_start` on the next entry — the interrupted batch produces no `batch_time` measurement. This affects the last batch of every goal cycle equally across all configurations.
 
@@ -338,8 +338,8 @@ This produces a single averaged convergence curve per configuration, rather than
 
 | File | Contents |
 |------|----------|
-| `results/individual_runs.csv` | All per-run metrics (one row per run, 560 rows) |
-| `results/aggregated_results.csv` | Aggregated per-config metrics with parsed dimensions (one row per config, 112 rows) |
+| `results/individual_runs.csv` | All per-run metrics (one row per run, 480 rows) |
+| `results/aggregated_results.csv` | Aggregated per-config metrics with parsed dimensions (one row per config, 96 rows) |
 | `results/aggregated_results.json` | Same aggregated data in JSON format |
 | `results/convergence_data/{map}_convergence.csv` | Raw convergence data with config, cycle, iteration, best_cost, tree_size columns |
 | `results/statistical_tests.csv` | Mann-Whitney U test results for all comparisons |
@@ -385,9 +385,9 @@ All grouped bar charts use **explicit color assignment** (`C0`=reactive-single, 
 
 Batch size does **not** control cancellation responsiveness (which is per-iteration). It controls:
 
-- **Overhead-to-compute ratio**: At batch_size=1, the framework overhead path (feedback send, timer checks, waitable rescheduling) runs after every single iteration. At batch_size=16384, it runs once per 16384 iterations. The overhead ratio should decrease with larger batch sizes.
+- **Overhead-to-compute ratio**: At batch_size=1, the framework overhead path (feedback send, timer checks, waitable rescheduling) runs after every single iteration. At batch_size=4096, it runs once per 4096 iterations. The overhead ratio should decrease with larger batch sizes.
 - **Feedback frequency**: The client receives feedback (current best cost, tree size) once per batch. Smaller batches = more frequent feedback.
-- **Convergence tracepoint resolution**: With convergence_log_interval=100, a batch of 1 emits a tracepoint every 100 batches, while a batch of 16384 emits one every ~0.006 batches.
+- **Convergence tracepoint resolution**: With convergence_log_interval=100, a batch of 1 emits a tracepoint every 100 batches, while a batch of 4096 emits one every ~0.024 batches.
 
 ### What the Convergence Plots Show
 
@@ -411,7 +411,7 @@ The depot and warehouse maps have very different characteristics (open vs. const
 
 3. **Percentile aggregation is approximate.** Per-run percentiles are averaged across runs rather than computed from pooled data. For most practical purposes the difference is negligible with 5 runs.
 
-4. **Convergence subsampling.** The `rrt_star_iteration` tracepoint fires every 100 iterations. At large batch sizes, this means very few tracepoints per batch, giving coarse convergence resolution. At batch_size=16384, a single batch contains ~164 tracepoint emissions (16384/100), but if a goal cycle only lasts a few batches, total data points per cycle are sparse.
+4. **Convergence subsampling.** The `rrt_star_iteration` tracepoint fires every 100 iterations. At large batch sizes, this means very few tracepoints per batch, giving coarse convergence resolution. At batch_size=4096, a single batch contains ~41 tracepoint emissions (4096/100), but if a goal cycle only lasts a few batches, total data points per cycle are sparse.
 
 5. **RNG reproducibility is limited.** The seed is set once; RNG state diverges across goal cycles due to OS timing. The 5 repeated runs capture this variability, but individual cycles within a run are not independently reproducible.
 

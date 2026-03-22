@@ -40,13 +40,13 @@ ls experiments/rrt_star/results/plots/
 
 The experiment matrix covers:
 
-- **Batch sizes**: 1, 16, 64, 256, 1024, 4096, 16384
+- **Batch sizes**: 1, 16, 64, 256, 1024, 4096
 - **Modes**: reactive, proactive
 - **Threading**: single, multi
 - **Maps**: depot, warehouse
 - **Runs per config**: 5 (configurable)
 - **Run duration**: 10 seconds per config (configurable)
-- **Total**: 560 runs (112 configurations × 5 runs)
+- **Total**: 480 runs (96 configurations × 5 runs)
 
 ### Maps
 
@@ -180,7 +180,7 @@ RUN_DURATION=10  # seconds per configuration
 
 Edit `generate_configs.py`:
 ```python
-batch_sizes = [1, 16, 64, 256, 1024, 4096, 16384]
+batch_sizes = [1, 16, 64, 256, 1024, 4096]
 ```
 Then regenerate: `python3 generate_configs.py`
 
