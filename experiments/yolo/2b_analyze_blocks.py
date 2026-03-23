@@ -41,11 +41,12 @@ WARMUP_IMAGES = 5
 PLOT_WIDTH = 14
 PLOT_HEIGHT = 7
 PLOT_DPI = 300
-FONT_SIZE_TITLE = 20
-FONT_SIZE_LABEL = 20
-FONT_SIZE_LEGEND = 20
-FONT_SIZE_TICK_LABELS = 18
-LEGEND_SIZE = 20
+# ── Plot font sizes (adjust these to rescale all text) ──
+FONT_SIZE_TITLE = 30
+FONT_SIZE_LABEL = 30
+FONT_SIZE_TICK_LABELS = 30
+FONT_SIZE_OFFSET = 30   # scientific notation offset text (e.g. "×1e6")
+LEGEND_SIZE = 30
 MARKER_SIZE = 8
 CAPSIZE = 5
 LINE_WIDTH = 2
@@ -281,10 +282,10 @@ def plot_block_size_delays(block_size_stats):
 
     ax.errorbar(block_sizes, mean_delays, yerr=std_delays, marker='o',
                 capsize=5, linewidth=2, markersize=6)
-    ax.set_xlabel('Block Size (layers per block)', fontsize=12)
-    ax.set_ylabel('Total Delay (ms)', fontsize=12)
+    ax.set_xlabel('Block Size (layers per block)', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Total Delay (ms)', fontsize=FONT_SIZE_LABEL)
     ax.set_title('Total Processing Delay vs Block Size',
-                 fontsize=14, fontweight='bold')
+                 fontsize=FONT_SIZE_TITLE, fontweight='bold')
     ax.grid(True, alpha=0.3)
 
     # Highlight block_size = 1 (baseline)
@@ -292,7 +293,7 @@ def plot_block_size_delays(block_size_stats):
         baseline_delay = block_size_stats[1]['mean_total_delay_ms']
         ax.axhline(y=baseline_delay, color='r', linestyle='--', alpha=0.5,
                    label=f'Block size 1 baseline: {baseline_delay:.2f} ms')
-        ax.legend()
+        # ax.legend()  # Legend removed
 
     plt.tight_layout()
     plt.savefig(BLOCK_DIR / 'block_size_delays.png', dpi=300)
@@ -317,10 +318,10 @@ def plot_max_block_delay(block_size_stats):
 
     ax.errorbar(block_sizes, mean_max_delays, yerr=std_max_delays, marker='o',
                 capsize=5, linewidth=2, markersize=6, color='darkorange')
-    ax.set_xlabel('Block Size (layers per block)', fontsize=12)
-    ax.set_ylabel('Max Per-Block Delay (ms)', fontsize=12)
+    ax.set_xlabel('Block Size (layers per block)', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Max Per-Block Delay (ms)', fontsize=FONT_SIZE_LABEL)
     ax.set_title('Worst-Case Per-Block Delay vs Block Size',
-                 fontsize=14, fontweight='bold')
+                 fontsize=FONT_SIZE_TITLE, fontweight='bold')
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -343,10 +344,10 @@ def plot_num_blocks_vs_block_size(block_size_stats):
 
     ax.plot(block_sizes, mean_num_blocks, marker='o',
             linewidth=2, markersize=6, color='green')
-    ax.set_xlabel('Block Size (layers per block)', fontsize=12)
-    ax.set_ylabel('Average Number of Blocks', fontsize=12)
+    ax.set_xlabel('Block Size (layers per block)', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Average Number of Blocks', fontsize=FONT_SIZE_LABEL)
     ax.set_title('Number of Blocks Needed vs Block Size',
-                 fontsize=14, fontweight='bold')
+                 fontsize=FONT_SIZE_TITLE, fontweight='bold')
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -384,20 +385,20 @@ def plot_per_block_delay_distribution(block_size_stats, selected_block_sizes=[1,
                        linewidth=2, label=f"Mean: {np.mean(all_block_delays):.2f} ms")
             ax.axvline(np.median(all_block_delays), color='g', linestyle='--',
                        linewidth=2, label=f"Median: {np.median(all_block_delays):.2f} ms")
-            ax.set_xlabel('Block Delay (ms)', fontsize=10)
-            ax.set_ylabel('Frequency', fontsize=10)
+            ax.set_xlabel('Block Delay (ms)', fontsize=FONT_SIZE_LABEL)
+            ax.set_ylabel('Frequency', fontsize=FONT_SIZE_LABEL)
             ax.set_title(f'Block Size {block_size}',
-                         fontsize=12, fontweight='bold')
-            ax.legend(fontsize=9)
+                         fontsize=FONT_SIZE_TITLE, fontweight='bold')
+            # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
             ax.grid(True, alpha=0.3, axis='y')
         else:
             ax.text(0.5, 0.5, 'No data', ha='center',
-                    va='center', transform=ax.transAxes)
+                    va='center', transform=ax.transAxes, fontsize=FONT_SIZE_LABEL)
             ax.set_title(f'Block Size {block_size}',
-                         fontsize=12, fontweight='bold')
+                         fontsize=FONT_SIZE_TITLE, fontweight='bold')
 
     fig.suptitle('Per-Block Delay Distribution for Different Block Sizes',
-                 fontsize=16, fontweight='bold', y=0.995)
+                 fontsize=FONT_SIZE_TITLE, fontweight='bold', y=0.995)
     plt.tight_layout()
     plt.savefig(BLOCK_DIR / 'per_block_delay_distribution.png', dpi=300)
     plt.close()
@@ -424,9 +425,9 @@ def plot_detailed_block_breakdown(block_size_stats, selected_block_sizes=[1, 4, 
 
         if not img_data['blocks']:
             ax.text(0.5, 0.5, 'No data', ha='center',
-                    va='center', transform=ax.transAxes)
+                    va='center', transform=ax.transAxes, fontsize=FONT_SIZE_LABEL)
             ax.set_title(f'Block Size {block_size}',
-                         fontsize=12, fontweight='bold')
+                         fontsize=FONT_SIZE_TITLE, fontweight='bold')
             continue
 
         block_nums = [b['block_num'] for b in img_data['blocks']]
@@ -442,11 +443,11 @@ def plot_detailed_block_breakdown(block_size_stats, selected_block_sizes=[1, 4, 
         ax2.plot(block_nums, cumulative_delays, marker='o', linewidth=2,
                  markersize=6, color='red', label='Cumulative Delay')
 
-        ax.set_xlabel('Block Number', fontsize=10)
-        ax.set_ylabel('Block Delay (ms)', fontsize=10, color='skyblue')
-        ax2.set_ylabel('Cumulative Delay (ms)', fontsize=10, color='red')
+        ax.set_xlabel('Block Number', fontsize=FONT_SIZE_LABEL)
+        ax.set_ylabel('Block Delay (ms)', fontsize=FONT_SIZE_LABEL, color='skyblue')
+        ax2.set_ylabel('Cumulative Delay (ms)', fontsize=FONT_SIZE_LABEL, color='red')
         ax.set_title(f'Block Size {block_size} (Image {img_data["image_id"]})',
-                     fontsize=12, fontweight='bold')
+                     fontsize=FONT_SIZE_TITLE, fontweight='bold')
         ax.tick_params(axis='y', labelcolor='skyblue')
         ax2.tick_params(axis='y', labelcolor='red')
         ax.grid(True, alpha=0.3, axis='y')
@@ -454,11 +455,11 @@ def plot_detailed_block_breakdown(block_size_stats, selected_block_sizes=[1, 4, 
         # Add legends
         lines1, labels1 = ax.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
-        ax.legend(lines1 + lines2, labels1 + labels2,
-                  loc='upper left', fontsize=9)
+        # ax.legend(lines1 + lines2, labels1 + labels2,
+        #           loc='upper left', fontsize=LEGEND_SIZE)  # Legend removed
 
     fig.suptitle('Detailed Block Breakdown: Individual and Cumulative Delays',
-                 fontsize=16, fontweight='bold', y=0.995)
+                 fontsize=FONT_SIZE_TITLE, fontweight='bold', y=0.995)
     plt.tight_layout()
     plt.savefig(BLOCK_DIR / 'detailed_block_breakdown.png', dpi=300)
     plt.close()

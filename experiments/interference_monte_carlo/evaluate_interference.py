@@ -37,10 +37,11 @@ PLOT_WIDTH = 12
 PLOT_HEIGHT = 8
 PLOT_HEIGHT_SMALL = 8
 PLOT_DPI = 300
+# ── Plot font sizes (adjust these to rescale all text) ──
 FONT_SIZE_TITLE = 30
 FONT_SIZE_LABEL = 30
-FONT_SIZE_LEGEND = 30
 FONT_SIZE_TICK_LABELS = 30
+FONT_SIZE_OFFSET = 30   # scientific notation offset text (e.g. "×1e6")
 LEGEND_SIZE = 30
 MARKER_SIZE = 12
 CAPSIZE = 5

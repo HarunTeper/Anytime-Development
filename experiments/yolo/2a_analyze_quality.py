@@ -52,10 +52,11 @@ PLOT_WIDTH = 12
 PLOT_HEIGHT = 8
 PLOT_HEIGHT_SMALL = 8
 PLOT_DPI = 300
+# ── Plot font sizes (adjust these to rescale all text) ──
 FONT_SIZE_TITLE = 30
 FONT_SIZE_LABEL = 30
-FONT_SIZE_LEGEND = 30
 FONT_SIZE_TICK_LABELS = 30
+FONT_SIZE_OFFSET = 30   # scientific notation offset text (e.g. "×1e6")
 LEGEND_SIZE = 30
 MARKER_SIZE = 12
 CAPSIZE = 5
@@ -447,7 +448,7 @@ def plot_quality_ratio_progression(metrics):
         title = 'YOLO Detection Quality Progression Across Layers (All Classes)'
     # ax.set_title(title, fontsize=FONT_SIZE_TITLE)
     ax.set_ylim([0, 1.05])
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout(pad=0)
@@ -491,7 +492,7 @@ def plot_cancellation_histogram(metrics):
         ax.set_title(f'{threshold_pct}% Quality Threshold',
                      fontsize=FONT_SIZE_TITLE)
         ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-        ax.legend(fontsize=LEGEND_SIZE)
+        # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
         ax.grid(True, alpha=0.3, axis='y')
 
     # Remove extra subplot
@@ -555,7 +556,7 @@ def plot_layer_wise_boxplot(metrics):
         title = 'Quality Distribution at Each Layer (All Classes)'
     ax.set_title(title, fontsize=FONT_SIZE_TITLE)
     ax.set_ylim([0, 1.05])
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout(pad=0)
@@ -672,7 +673,7 @@ def plot_combined_timing(metrics):
     ax1.set_xticks(x)
     ax1.set_xticklabels(common_layers, fontsize=FONT_SIZE_TICK_LABELS)
     ax1.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax1.legend(fontsize=LEGEND_SIZE)
+    # ax1.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax1.grid(True, alpha=0.3, axis='y')
 
     # Plot 2: Stacked view showing total time per layer
@@ -687,7 +688,7 @@ def plot_combined_timing(metrics):
     ax2.set_ylabel('Time (ms)', fontsize=FONT_SIZE_LABEL)
     ax2.set_title('Total Time per Layer (Stacked)', fontsize=FONT_SIZE_TITLE)
     ax2.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-    ax2.legend(fontsize=LEGEND_SIZE)
+    # ax2.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax2.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout(pad=0)
@@ -742,7 +743,7 @@ def plot_cumulative_timing(metrics):
     ax1.set_title('Cumulative Processing Time Up To Each Layer',
                   fontsize=FONT_SIZE_TITLE)
     ax1.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-    ax1.legend(fontsize=LEGEND_SIZE)
+    # ax1.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax1.grid(True, alpha=0.3)
 
     # Plot 2: Stacked area showing cumulative contribution
@@ -757,7 +758,7 @@ def plot_cumulative_timing(metrics):
     ax2.set_title(
         'Total Runtime if Cancelled at Each Layer (Stacked Area)', fontsize=FONT_SIZE_TITLE)
     ax2.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-    ax2.legend(fontsize=LEGEND_SIZE)
+    # ax2.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax2.grid(True, alpha=0.3)
 
     plt.tight_layout(pad=0)

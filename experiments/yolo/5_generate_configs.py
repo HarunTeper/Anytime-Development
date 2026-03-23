@@ -3,7 +3,7 @@
 Step 5: Generate Cancellation Experiment Configurations
 
 Creates configuration files for all combinations:
-- Block sizes: 1, 4, 5, 8, 15, 22
+- Block sizes: 1, 4, 8, 11, 16, 22
 - Mode: proactive
 - Sync modes: sync, async
 - Threading: single, multi
@@ -30,7 +30,7 @@ WORKSPACE_DIR = SCRIPT_DIR.parent.parent
 CONFIG_DIR.mkdir(exist_ok=True)
 
 # Configuration parameters
-BLOCK_SIZES = [1, 4, 5, 8, 15, 22]
+BLOCK_SIZES = [1, 4, 8, 11, 16, 22]
 MODES = ["proactive"]
 SYNC_MODES = ["sync", "async"]
 THREADING_MODES = ["single", "multi"]

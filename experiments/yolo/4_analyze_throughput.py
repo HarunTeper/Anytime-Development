@@ -43,6 +43,13 @@ WARMUP_IMAGES = 5
 RESULTS_DIR.mkdir(exist_ok=True)
 RUNTIME_DIR.mkdir(exist_ok=True)
 
+# ── Plot font sizes (adjust these to rescale all text) ──
+FONT_SIZE_TITLE = 30
+FONT_SIZE_LABEL = 30
+FONT_SIZE_TICK_LABELS = 30
+FONT_SIZE_OFFSET = 30   # scientific notation offset text (e.g. "×1e6")
+LEGEND_SIZE = 30
+
 
 def parse_config_from_trace_name(trace_name):
     """
@@ -340,9 +347,9 @@ def plot_total_goal_time_comparison(summary):
     bar_colors = [colors[i % len(colors)] for i in range(len(configs))]
     bars = ax.bar(x, means, yerr=stds, capsize=5, alpha=0.7, color=bar_colors)
 
-    ax.set_xlabel('Configuration', fontsize=12)
-    ax.set_ylabel('Average Goal Processing Time (ms)', fontsize=12)
-    ax.set_title('Total Goal Processing Time by Configuration', fontsize=14)
+    ax.set_xlabel('Configuration', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Average Goal Processing Time (ms)', fontsize=FONT_SIZE_LABEL)
+    ax.set_title('Total Goal Processing Time by Configuration', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=45, ha='right')
     ax.grid(True, alpha=0.3, axis='y')
@@ -352,7 +359,7 @@ def plot_total_goal_time_comparison(summary):
         height = bar.get_height()
         ax.text(bar.get_x() + bar.get_width()/2., height,
                 f'{mean:.1f}ms',
-                ha='center', va='bottom', fontsize=10)
+                ha='center', va='bottom', fontsize=FONT_SIZE_LABEL)
 
     plt.tight_layout()
     plt.savefig(RUNTIME_DIR / 'total_goal_time_comparison.png', dpi=300)
@@ -382,9 +389,9 @@ def plot_throughput_comparison(summary):
     bar_colors = [colors[i % len(colors)] for i in range(len(configs))]
     bars = ax.bar(x, throughputs, alpha=0.7, color=bar_colors)
 
-    ax.set_xlabel('Configuration', fontsize=12)
-    ax.set_ylabel('Throughput (images/sec)', fontsize=12)
-    ax.set_title('Processing Throughput by Configuration', fontsize=14)
+    ax.set_xlabel('Configuration', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Throughput (images/sec)', fontsize=FONT_SIZE_LABEL)
+    ax.set_title('Processing Throughput by Configuration', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=45, ha='right')
     ax.grid(True, alpha=0.3, axis='y')
@@ -394,7 +401,7 @@ def plot_throughput_comparison(summary):
         height = bar.get_height()
         ax.text(bar.get_x() + bar.get_width()/2., height,
                 f'{throughput:.2f}',
-                ha='center', va='bottom', fontsize=10)
+                ha='center', va='bottom', fontsize=FONT_SIZE_LABEL)
 
     plt.tight_layout()
     plt.savefig(RUNTIME_DIR / 'throughput_comparison.png', dpi=300)
@@ -428,10 +435,10 @@ def plot_layer_computation_times_by_config(summary):
                     label=label, capsize=3, linewidth=2, markersize=6,
                     color=colors[idx % len(colors)], alpha=0.8)
 
-    ax.set_xlabel('Layer Number', fontsize=12)
-    ax.set_ylabel('Computation Time (ms)', fontsize=12)
-    ax.set_title('Layer Computation Time by Configuration', fontsize=14)
-    ax.legend(loc='best', fontsize=10)
+    ax.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Computation Time (ms)', fontsize=FONT_SIZE_LABEL)
+    ax.set_title('Layer Computation Time by Configuration', fontsize=FONT_SIZE_TITLE)
+    # ax.legend(loc='best', fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -458,7 +465,7 @@ def plot_exit_calculation_times_by_config(summary):
         fig, ax = plt.subplots(figsize=(14, 7))
         ax.text(0.5, 0.5,
                 'Exit Calculation Times\n\nNo exit calculation data available',
-                ha='center', va='center', fontsize=14, transform=ax.transAxes,
+                ha='center', va='center', fontsize=FONT_SIZE_LABEL, transform=ax.transAxes,
                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
@@ -496,15 +503,15 @@ def plot_exit_calculation_times_by_config(summary):
                          label=label, capsize=3, linewidth=2, markersize=6,
                          color=colors[idx % len(colors)], alpha=0.8)
 
-        ax1.set_xlabel('Layer Number', fontsize=12)
-        ax1.set_ylabel('Exit Calculation Time (ms)', fontsize=12)
-        ax1.set_title('Per-Layer Exit Calculation Time', fontsize=14)
-        ax1.legend(loc='best', fontsize=10)
+        ax1.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+        ax1.set_ylabel('Exit Calculation Time (ms)', fontsize=FONT_SIZE_LABEL)
+        ax1.set_title('Per-Layer Exit Calculation Time', fontsize=FONT_SIZE_TITLE)
+        # ax1.legend(loc='best', fontsize=LEGEND_SIZE)  # Legend removed
         ax1.grid(True, alpha=0.3)
     else:
         ax1.text(0.5, 0.5, 'No per-layer exit data\n(Phase 3 block mode)',
-                 ha='center', va='center', transform=ax1.transAxes, fontsize=12)
-        ax1.set_title('Per-Layer Exit Calculation Time', fontsize=14)
+                 ha='center', va='center', transform=ax1.transAxes, fontsize=FONT_SIZE_LABEL)
+        ax1.set_title('Per-Layer Exit Calculation Time', fontsize=FONT_SIZE_TITLE)
 
     # Plot 2: Final exit cost comparison (if available)
     if has_final_exit_data and ax2 is not None:
@@ -530,9 +537,9 @@ def plot_exit_calculation_times_by_config(summary):
             bars = ax2.bar(x, means_final, yerr=stds_final,
                            capsize=5, alpha=0.7, color=bar_colors)
 
-            ax2.set_xlabel('Configuration', fontsize=12)
-            ax2.set_ylabel('Final Exit Cost (ms)', fontsize=12)
-            ax2.set_title('Final Exit Cost (Last Layer → Result)', fontsize=14)
+            ax2.set_xlabel('Configuration', fontsize=FONT_SIZE_LABEL)
+            ax2.set_ylabel('Final Exit Cost (ms)', fontsize=FONT_SIZE_LABEL)
+            ax2.set_title('Final Exit Cost (Last Layer → Result)', fontsize=FONT_SIZE_TITLE)
             ax2.set_xticks(x)
             ax2.set_xticklabels(labels, rotation=45, ha='right')
             ax2.grid(True, alpha=0.3, axis='y')
@@ -542,7 +549,7 @@ def plot_exit_calculation_times_by_config(summary):
                 height = bar.get_height()
                 ax2.text(bar.get_x() + bar.get_width()/2., height,
                          f'{mean:.2f}ms',
-                         ha='center', va='bottom', fontsize=10)
+                         ha='center', va='bottom', fontsize=FONT_SIZE_LABEL)
     elif has_final_exit_data and ax2 is None:
         # Single plot showing just final exit cost
         configs_with_final_exit = []
@@ -567,9 +574,9 @@ def plot_exit_calculation_times_by_config(summary):
             bars = ax1.bar(x, means_final, yerr=stds_final,
                            capsize=5, alpha=0.7, color=bar_colors)
 
-            ax1.set_xlabel('Configuration', fontsize=12)
-            ax1.set_ylabel('Final Exit Cost (ms)', fontsize=12)
-            ax1.set_title('Final Exit Cost (Last Layer → Result)', fontsize=14)
+            ax1.set_xlabel('Configuration', fontsize=FONT_SIZE_LABEL)
+            ax1.set_ylabel('Final Exit Cost (ms)', fontsize=FONT_SIZE_LABEL)
+            ax1.set_title('Final Exit Cost (Last Layer → Result)', fontsize=FONT_SIZE_TITLE)
             ax1.set_xticks(x)
             ax1.set_xticklabels(labels, rotation=45, ha='right')
             ax1.grid(True, alpha=0.3, axis='y')
@@ -579,7 +586,7 @@ def plot_exit_calculation_times_by_config(summary):
                 height = bar.get_height()
                 ax1.text(bar.get_x() + bar.get_width()/2., height,
                          f'{mean:.2f}ms',
-                         ha='center', va='bottom', fontsize=10)
+                         ha='center', va='bottom', fontsize=FONT_SIZE_LABEL)
 
     plt.tight_layout()
     plt.savefig(RUNTIME_DIR / 'exit_calculation_by_config.png', dpi=300)
@@ -663,10 +670,10 @@ def plot_stacked_layer_times_by_config(summary):
         label = config.replace('_', '+').replace('sync', 'Sync').replace(
             'async', 'Async').replace('single', 'Single').replace('multi', 'Multi')
 
-        ax.set_xlabel('Layer Number', fontsize=11)
-        ax.set_ylabel('Time (ms)', fontsize=11)
-        ax.set_title(f'{label}', fontsize=12, fontweight='bold')
-        ax.legend(loc='upper right', fontsize=9)
+        ax.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+        ax.set_ylabel('Time (ms)', fontsize=FONT_SIZE_LABEL)
+        ax.set_title(f'{label}', fontsize=FONT_SIZE_TITLE, fontweight='bold')
+        # ax.legend(loc='upper right', fontsize=LEGEND_SIZE)  # Legend removed
         ax.grid(True, alpha=0.3, axis='y')
 
     # Hide any unused subplots
@@ -674,7 +681,7 @@ def plot_stacked_layer_times_by_config(summary):
         axes[idx].set_visible(False)
 
     plt.suptitle('Layer Processing Time Breakdown (Stacked)',
-                 fontsize=14, fontweight='bold', y=0.995)
+                 fontsize=FONT_SIZE_TITLE, fontweight='bold', y=0.995)
     plt.tight_layout()
     plt.savefig(RUNTIME_DIR / 'stacked_layer_times_by_config.png', dpi=300)
     plt.close()
@@ -738,13 +745,13 @@ def plot_combined_stacked_comparison(summary):
                    label=f'{label} (Exit)',
                    alpha=0.6, color=colors_exit[idx % len(colors_exit)])
 
-    ax.set_xlabel('Layer Number', fontsize=12)
-    ax.set_ylabel('Time (ms)', fontsize=12)
+    ax.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Time (ms)', fontsize=FONT_SIZE_LABEL)
     ax.set_title(
-        'Layer Processing Time Comparison (All Configurations)', fontsize=14)
+        'Layer Processing Time Comparison (All Configurations)', fontsize=FONT_SIZE_TITLE)
     ax.set_xticks(x)
     ax.set_xticklabels(layers)
-    ax.legend(loc='upper right', fontsize=9, ncol=2)
+    # ax.legend(loc='upper right', fontsize=LEGEND_SIZE, ncol=2)  # Legend removed
     ax.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout()
@@ -793,11 +800,11 @@ def plot_cumulative_runtime_by_config(summary):
                      colors)], linestyle=linestyles[idx % len(linestyles)],
                  alpha=0.8)
 
-    ax1.set_xlabel('Layer Number', fontsize=12)
-    ax1.set_ylabel('Cumulative Time (ms)', fontsize=12)
+    ax1.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+    ax1.set_ylabel('Cumulative Time (ms)', fontsize=FONT_SIZE_LABEL)
     ax1.set_title(
-        'Total Cumulative Runtime Up To Each Layer (By Configuration)', fontsize=13)
-    ax1.legend(loc='best', fontsize=10)
+        'Total Cumulative Runtime Up To Each Layer (By Configuration)', fontsize=FONT_SIZE_TITLE)
+    # ax1.legend(loc='best', fontsize=LEGEND_SIZE)  # Legend removed
     ax1.grid(True, alpha=0.3)
 
     # Plot 2: Stacked area showing cumulative contribution for one config (or best config)
@@ -828,11 +835,11 @@ def plot_cumulative_runtime_by_config(summary):
                 ax2.plot(comp_layers, cumulative_total, marker='o',
                          linewidth=2, markersize=6, color='red', label='Total Runtime')
 
-                ax2.set_xlabel('Layer Number', fontsize=12)
-                ax2.set_ylabel('Cumulative Time (ms)', fontsize=12)
+                ax2.set_xlabel('Layer Number', fontsize=FONT_SIZE_LABEL)
+                ax2.set_ylabel('Cumulative Time (ms)', fontsize=FONT_SIZE_LABEL)
                 ax2.set_title(
-                    f'Cumulative Runtime Breakdown: {label}', fontsize=13)
-                ax2.legend(loc='best', fontsize=10)
+                    f'Cumulative Runtime Breakdown: {label}', fontsize=FONT_SIZE_TITLE)
+                # ax2.legend(loc='best', fontsize=LEGEND_SIZE)  # Legend removed
                 ax2.grid(True, alpha=0.3)
             else:
                 ax2.text(0.5, 0.5, 'Insufficient data for breakdown',

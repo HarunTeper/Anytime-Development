@@ -51,7 +51,7 @@ Phase 1 baseline uses fixed block_size=1. Phase 3 throughput uses fixed block_si
 
 | Variable | Values | Rationale |
 |----------|--------|-----------|
-| Block size | 1, 4, 5, 8, 15, 22 | Chosen to align with quality jump boundaries: BS4/8 hit the L8 (80%) and L16 (98%) jumps, BS5 lands on L15 (97% jump), BS15 has one checkpoint at the quality jump, BS1=max granularity, BS22=full block baseline |
+| Block size | 1, 4, 8, 11, 16, 22 | 1=max granularity (22 loops), 4=mid-range (6 loops, hits L8 quality jump), 8=3-loop transition, 11=first 2-loop config ("knee" of runtime curve), 16=2-loop with stable 98% quality (low variance), 22=full block baseline |
 | Sync mode | sync, async | Same as Phase 1 |
 | Threading | single, multi | Same as Phase 1 |
 
@@ -626,7 +626,7 @@ included in timing statistics.
 | # | Decision | Rationale |
 |---|----------|-----------|
 | 1 | Proactive mode only for Phase 2 | Reactive mode does not call `calculate_result()` before `send_feedback()`, making score-based cancellation unreliable |
-| 2 | Block sizes [1, 4, 5, 8, 15, 22] | Aligned with quality jump boundaries: L8 (80%), L15 (97%), L16 (98%). BS4/8 hit L8+L16, BS5 lands on L15, BS15 checkpoints at the quality jump, BS1=max granularity, BS22=full block |
+| 2 | Block sizes [1, 4, 8, 11, 16, 22] | Selected based on full 1-22 sweep: 1=22 loops (overhead reference), 4=6 loops (hits L8 jump), 8=3 loops (transition), 11=2 loops (runtime knee), 16=2 loops (stable 98% quality, low variance vs L15), 22=1 loop (baseline) |
 | 3 | cancel_after_layers = 22 (score-only) | Isolates score-based cancellation behavior without hard-deadline interference |
 | 4 | Score threshold 0.8, class 9 | Simulates targeted detection (traffic light) with high confidence requirement |
 | 5 | 5 warmup images, fixed count | GPU JIT completes within first few inferences; fixed count is simple and reproducible |

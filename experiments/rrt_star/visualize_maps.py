@@ -21,6 +21,13 @@ import matplotlib.patches as mpatches
 import numpy as np
 
 
+# ── Plot font sizes (adjust these to rescale all text) ──
+FONT_SIZE_TITLE = 30
+FONT_SIZE_LABEL = 30
+FONT_SIZE_TICK_LABELS = 30
+FONT_SIZE_OFFSET = 30   # scientific notation offset text (e.g. "×1e6")
+LEGEND_SIZE = 30
+
 # Default map configurations (matching evaluation_plan.md Section 4.1)
 MAP_CONFIGS = {
     "depot": {
@@ -168,18 +175,18 @@ def visualize_map(yaml_path, map_name, config, output_dir, fmt='png'):
     offset = max((x_max - x_min), (y_max - y_min)) * 0.02
     ax.annotate(f'Start ({start[0]}, {start[1]})',
                 xy=start, xytext=(start[0] + offset, start[1] + offset),
-                fontsize=12, fontweight='bold', color='darkgreen',
+                fontsize=FONT_SIZE_LABEL, fontweight='bold', color='darkgreen',
                 arrowprops=dict(arrowstyle='->', color='darkgreen', lw=1.5))
     ax.annotate(f'Goal ({goal[0]}, {goal[1]})',
                 xy=goal, xytext=(goal[0] + offset, goal[1] + offset),
-                fontsize=12, fontweight='bold', color='darkred',
+                fontsize=FONT_SIZE_LABEL, fontweight='bold', color='darkred',
                 arrowprops=dict(arrowstyle='->', color='darkred', lw=1.5))
 
-    ax.set_xlabel('X (meters)', fontsize=14)
-    ax.set_ylabel('Y (meters)', fontsize=14)
-    ax.set_title(f'{map_name.capitalize()} Map — Start & Goal Positions', fontsize=16)
-    ax.legend(fontsize=13, loc='best')
-    ax.tick_params(labelsize=12)
+    ax.set_xlabel('X (meters)', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Y (meters)', fontsize=FONT_SIZE_LABEL)
+    ax.set_title(f'{map_name.capitalize()} Map — Start & Goal Positions', fontsize=FONT_SIZE_TITLE)
+    # ax.legend(fontsize=LEGEND_SIZE, loc='best')  # Legend removed
+    ax.tick_params(labelsize=FONT_SIZE_TICK_LABELS)
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()

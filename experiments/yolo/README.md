@@ -72,7 +72,7 @@ python3 4_analyze_throughput.py
 python3 5_generate_configs.py
 ```
 - Creates configs for 24 combinations:
-  - Block sizes: 1, 4, 5, 8, 15, 22
+  - Block sizes: 1, 4, 8, 11, 16, 22
   - Mode: proactive
   - Sync: sync, async
   - Threading: single, multi
@@ -193,7 +193,7 @@ python3 7_analyze_cancellation.py
 
 ### Configuration Files (YAML)
 Located in `configs/`, these specify:
-- **block_size**: Number of layers processed per block (1, 4, 5, 8, 15, or 22)
+- **block_size**: Number of layers processed per block (1, 4, 8, 11, 16, or 22)
 - **is_reactive_proactive**: Mode ("reactive" or "proactive")
 - **is_sync_async**: Executor type ("sync" or "async")
 - **multi_threading**: Threading mode (true/false)

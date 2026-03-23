@@ -37,9 +37,11 @@ CONVERGENCE_DIR = RESULTS_DIR / "convergence_data"
 PLOT_WIDTH = 12
 PLOT_HEIGHT = 8
 PLOT_DPI = 300
+# ── Plot font sizes (adjust these to rescale all text) ──
+FONT_SIZE_TITLE = 30
 FONT_SIZE_LABEL = 30
 FONT_SIZE_TICK_LABELS = 30
-FONT_SIZE_OFFSET = 30
+FONT_SIZE_OFFSET = 30   # scientific notation offset text (e.g. "×1e6")
 LEGEND_SIZE = 30
 CAPSIZE = 5
 
@@ -587,7 +589,7 @@ def make_grouped_bar_chart(df, y_col, ylabel, filename, yerr_col=None,
     ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE_OFFSET)
-    ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
+    # ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')  # Legend removed
     ax.grid(True, axis='y')
 
     plt.tight_layout(pad=0)
@@ -857,7 +859,7 @@ def generate_plots(aggregated_metrics, all_metrics):
             ax.set_xlabel('Block Number', fontsize=FONT_SIZE_LABEL)
             ax.set_ylabel('Block Compute Time (ms)', fontsize=FONT_SIZE_LABEL)
             ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-            ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
+            # ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')  # Legend removed
             ax.grid(True)
             plt.tight_layout(pad=0)
             plt.savefig(OVERHEAD_PLOTS_DIR / f'block_time_trend_{map_name}.pdf',
@@ -930,7 +932,7 @@ def generate_plots(aggregated_metrics, all_metrics):
             ax.set_xlabel('Iteration', fontsize=FONT_SIZE_LABEL)
             ax.set_ylabel('Best Path Cost', fontsize=FONT_SIZE_LABEL)
             ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-            ax.legend(fontsize=min(LEGEND_SIZE, 14), loc='best')
+            # ax.legend(fontsize=min(LEGEND_SIZE, 14), loc='best')  # Legend removed
             ax.grid(True)
             plt.tight_layout(pad=0)
             plt.savefig(RRT_STAR_PLOTS_DIR / f'convergence_curve_{map_name}.pdf',
@@ -981,7 +983,7 @@ def generate_plots(aggregated_metrics, all_metrics):
         if has_data:
             legend_elements = [Patch(facecolor=map_colors.get(m, 'C2'), label=m)
                                for m in all_maps]
-            ax.legend(handles=legend_elements, fontsize=LEGEND_SIZE)
+            # ax.legend(handles=legend_elements, fontsize=LEGEND_SIZE)  # Legend removed
             ax.set_xlabel('Iteration', fontsize=FONT_SIZE_LABEL)
             ax.set_ylabel('Best Path Cost', fontsize=FONT_SIZE_LABEL)
             ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
@@ -1042,7 +1044,7 @@ def generate_plots(aggregated_metrics, all_metrics):
             ax.set_xticks(x)
             ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
             ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-            ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
+            # ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')  # Legend removed
             ax.grid(True, axis='y')
             plt.tight_layout(pad=0)
             plt.savefig(RRT_STAR_PLOTS_DIR / f'first_solution_iteration_{map_name}.pdf',
@@ -1093,7 +1095,7 @@ def generate_plots(aggregated_metrics, all_metrics):
             ax.set_xlabel('Iteration', fontsize=FONT_SIZE_LABEL)
             ax.set_ylabel('Tree Size (nodes)', fontsize=FONT_SIZE_LABEL)
             ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-            ax.legend(fontsize=min(LEGEND_SIZE, 14), loc='best')
+            # ax.legend(fontsize=min(LEGEND_SIZE, 14), loc='best')  # Legend removed
             ax.grid(True)
             plt.tight_layout(pad=0)
             plt.savefig(RRT_STAR_PLOTS_DIR / f'tree_size_vs_iterations_{map_name}.pdf',

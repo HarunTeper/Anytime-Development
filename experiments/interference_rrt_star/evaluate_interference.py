@@ -35,10 +35,11 @@ PLOT_WIDTH = 12
 PLOT_HEIGHT = 8
 PLOT_HEIGHT_SMALL = 8
 PLOT_DPI = 300
+# ── Plot font sizes (adjust these to rescale all text) ──
 FONT_SIZE_TITLE = 30
 FONT_SIZE_LABEL = 30
-FONT_SIZE_LEGEND = 30
 FONT_SIZE_TICK_LABELS = 30
+FONT_SIZE_OFFSET = 30   # scientific notation offset text (e.g. "×1e6")
 LEGEND_SIZE = 30
 MARKER_SIZE = 12
 CAPSIZE = 5
@@ -438,7 +439,7 @@ def generate_plots(aggregated_metrics):
                label=f'Expected ({EXPECTED_TIMER_PERIOD_MS} ms)')
     ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Average Timer Period (ms)', fontsize=FONT_SIZE_LABEL)
-    ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
+    # ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')  # Legend removed
     plt.tight_layout(pad=0)
     plt.savefig(PLOTS_DIR / 'timer_period_vs_block_size.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
@@ -450,7 +451,7 @@ def generate_plots(aggregated_metrics):
     _bar_plot(df, ax, all_block_sizes, 'max_abs_jitter', 'max_abs_jitter_std')
     ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Mean Max Absolute Jitter (ms)', fontsize=FONT_SIZE_LABEL)
-    ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
+    # ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')  # Legend removed
     plt.tight_layout(pad=0)
     plt.savefig(PLOTS_DIR / 'jitter_vs_block_size.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
@@ -462,7 +463,7 @@ def generate_plots(aggregated_metrics):
     _bar_plot(df, ax, all_block_sizes, 'skipped_firings_percent')
     ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Skipped Firings (%)', fontsize=FONT_SIZE_LABEL)
-    ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
+    # ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')  # Legend removed
     plt.tight_layout(pad=0)
     plt.savefig(PLOTS_DIR / 'skipped_firings_percentage.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
@@ -474,7 +475,7 @@ def generate_plots(aggregated_metrics):
     _bar_plot(df, ax, all_block_sizes, 'avg_compute_time', 'std_compute_time')
     ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Average Compute Block Time (ms)', fontsize=FONT_SIZE_LABEL)
-    ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')
+    # ax.legend(fontsize=min(LEGEND_SIZE, 16), loc='best')  # Legend removed
     plt.tight_layout(pad=0)
     plt.savefig(PLOTS_DIR / 'compute_time_vs_block_size.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
