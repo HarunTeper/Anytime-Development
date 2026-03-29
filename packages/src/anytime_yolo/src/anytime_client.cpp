@@ -158,8 +158,8 @@ void AnytimeActionClient::process_feedback(
       this->get_logger(), "[Goal ID: %s] No detections in feedback", goal_id_str.c_str());
   }
 
+  // Check 1: Score-based early exit (if enabled)
   if (cancel_layer_score_) {
-    // Cancel if high score for target class is detected
     if (!feedback->detections.empty()) {
       const auto & detections = feedback->detections;
       for (size_t i = 0; i < detections.size(); ++i) {
@@ -183,14 +183,14 @@ void AnytimeActionClient::process_feedback(
         }
       }
     }
-  } else {
-    // Cancel after cancel_after_layers
-    if (feedback->processed_layers >= cancel_after_layers_ && !is_cancelling_) {
-      RCLCPP_DEBUG(
-        this->get_logger(), "Notifying cancel waitable after %d layers",
-        feedback->processed_layers);
-      cancel_waitable_->trigger();
-    }
+  }
+
+  // Check 2: Layer-count hard deadline (ALWAYS active as safety net)
+  if (feedback->processed_layers >= cancel_after_layers_ && !is_cancelling_) {
+    RCLCPP_DEBUG(
+      this->get_logger(), "Canceling goal due to layer count hard deadline after %d layers",
+      feedback->processed_layers);
+    cancel_waitable_->trigger();
   }
 }
 

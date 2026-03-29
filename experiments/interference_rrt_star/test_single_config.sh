@@ -3,6 +3,20 @@
 
 set -e
 
+# Cleanup on interrupt
+cleanup() {
+    echo ""
+    echo "Interrupted — cleaning up..."
+    lttng stop 2>/dev/null || true
+    pkill -9 -f 'component_container' 2>/dev/null || true
+    pkill -9 -f 'interference_timer' 2>/dev/null || true
+    pkill -9 -f 'anytime_rrt_star' 2>/dev/null || true
+    pkill -9 -f 'ros2' 2>/dev/null || true
+    sleep 1
+    lttng destroy test_interference 2>/dev/null || true
+}
+trap cleanup INT TERM
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
 EXPERIMENT_DIR="${SCRIPT_DIR}"
@@ -11,7 +25,7 @@ TRACE_DIR="${EXPERIMENT_DIR}/traces"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 
 # Test configuration
-TEST_CONFIG="batch_1_reactive_multi"
+TEST_CONFIG="block_256_reactive_single"
 RUN_DURATION=10
 
 # Interference timer parameters
@@ -19,7 +33,7 @@ TIMER_PERIOD_MS=100
 EXECUTION_TIME_MS=10
 
 echo "========================================="
-echo "Interference Single Configuration Test"
+echo "Interference RRT* Single Configuration Test"
 echo "========================================="
 echo ""
 echo "Testing configuration: ${TEST_CONFIG}"
@@ -28,16 +42,33 @@ echo "Timer period: ${TIMER_PERIOD_MS} ms"
 echo "Timer execution time: ${EXECUTION_TIME_MS} ms"
 echo ""
 
-# Verify configs exist
-if [ ! -f "${CONFIG_DIR}/${TEST_CONFIG}_server.yaml" ]; then
-    echo "Error: Configuration files not found!"
-    echo "Please run: python3 generate_configs.py"
-    exit 1
-fi
+# Restart lttng-sessiond to ensure clean tracing state
+pkill lttng-sessiond 2>/dev/null || true
+sleep 2
+lttng-sessiond --daemonize 2>/dev/null || true
+sleep 1
 
 # Source workspace
 cd "${PACKAGES_DIR}"
 source install/setup.bash
+
+# Resolve map directory from installed package
+MAPS_DIR="$(ros2 pkg prefix anytime_rrt_star)/share/anytime_rrt_star/maps"
+
+# Regenerate configs to ensure fresh MAPS_DIR placeholders (idempotent)
+rm -rf "${CONFIG_DIR}"
+cd "${EXPERIMENT_DIR}"
+python3 generate_configs.py
+cd "${PACKAGES_DIR}"
+
+# Replace MAPS_DIR placeholder with actual installed path
+find "${CONFIG_DIR}" -name "*_server.yaml" -exec sed -i "s|MAPS_DIR|${MAPS_DIR}|g" {} \;
+
+# Verify configs exist
+if [ ! -f "${CONFIG_DIR}/${TEST_CONFIG}_server.yaml" ]; then
+    echo "Error: Configuration files not found after generation!"
+    exit 1
+fi
 
 # Create test trace directory
 test_trace="${TRACE_DIR}/test_${TEST_CONFIG}"
@@ -51,7 +82,7 @@ echo "[2/5] Creating LTTng session..."
 lttng create test_interference --output="${test_trace}"
 
 echo "[3/5] Enabling tracepoints..."
-# Monte Carlo compute timing
+# Compute timing
 lttng enable-event --userspace anytime:anytime_compute_entry
 lttng enable-event --userspace anytime:anytime_compute_exit
 
@@ -63,6 +94,7 @@ lttng enable-event --userspace anytime:interference_timer_callback_exit
 # Add context
 lttng add-context --userspace --type=vpid
 lttng add-context --userspace --type=vtid
+lttng add-context --userspace --type=procname
 
 echo "[4/5] Starting trace and launching experiment..."
 lttng start
@@ -71,12 +103,11 @@ lttng start
 server_config="${CONFIG_DIR}/${TEST_CONFIG}_server.yaml"
 client_config="${CONFIG_DIR}/${TEST_CONFIG}_client.yaml"
 
-timeout ${RUN_DURATION} ros2 launch experiments interference.launch.py \
+timeout ${RUN_DURATION} ros2 launch experiments interference_rrt_star.launch.py \
     server_config:="${server_config}" \
     client_config:="${client_config}" \
-    use_multi_threaded:=true \
-    timer_period_ms:=${TIMER_PERIOD_MS} \
-    execution_time_ms:=${EXECUTION_TIME_MS} \
+    interference_config:="${CONFIG_DIR}/${TEST_CONFIG}_interference.yaml" \
+    use_multi_threaded:=false \
     log_level:=info &
 
 LAUNCH_PID=$!
@@ -96,7 +127,7 @@ kill -9 ${LAUNCH_PID} 2>/dev/null || true
 
 # Kill any remaining interference processes
 pkill -9 -f 'component_container' 2>/dev/null || true
-pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
+pkill -9 -f 'anytime_rrt_star' 2>/dev/null || true
 pkill -9 -f 'interference_timer' 2>/dev/null || true
 pkill -9 -f 'ros2' 2>/dev/null || true
 sleep 1
@@ -112,25 +143,25 @@ echo ""
 
 if [ -d "${test_trace}" ] && [ "$(ls -A ${test_trace})" ]; then
     echo "✓ Trace directory created: ${test_trace}"
-    
+
     # Count events
     total_events=$(babeltrace "${test_trace}" | grep -c "anytime:" || true)
     timer_events=$(babeltrace "${test_trace}" | grep -c "interference_timer_callback" || true)
     compute_events=$(babeltrace "${test_trace}" | grep -c "anytime_compute" || true)
-    
+
     echo "✓ Total events: ${total_events}"
     echo "✓ Timer callback events: ${timer_events}"
     echo "✓ Compute events: ${compute_events}"
-    
+
     if [ ${timer_events} -gt 0 ]; then
         echo ""
         echo "Sample timer events:"
         babeltrace "${test_trace}" | grep "interference_timer_callback" | head -5
-        
+
         echo ""
         echo "Sample compute events:"
         babeltrace "${test_trace}" | grep "anytime_compute" | head -5
-        
+
         echo ""
         echo "========================================="
         echo "Test PASSED! ✓"

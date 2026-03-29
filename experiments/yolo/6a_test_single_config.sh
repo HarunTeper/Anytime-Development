@@ -17,7 +17,7 @@ EXPERIMENT_DIR="${SCRIPT_DIR}"
 TRACE_BASE_DIR="${EXPERIMENT_DIR}/traces"
 
 # Get config name from argument or use default
-CONFIG_NAME=${1:-bs1_reactive_sync_single}
+CONFIG_NAME=${1:-bs1_proactive_sync_single}
 
 # Colors for output
 RED='\033[0;31m'
@@ -149,7 +149,7 @@ echo ""
 # Quick verification
 echo -e "${BLUE}Verifying trace...${NC}"
 if [ -d "${TRACE_DIR}" ]; then
-    EVENT_COUNT=$(babeltrace2 "${TRACE_DIR}" 2>/dev/null | grep -c "anytime:" || true)
+    EVENT_COUNT=$(babeltrace "${TRACE_DIR}" 2>/dev/null | grep -c "anytime:" || true)
     echo -e "  Events captured: ${EVENT_COUNT}"
     
     if [ "${EVENT_COUNT}" -gt 0 ]; then
@@ -158,7 +158,7 @@ if [ -d "${TRACE_DIR}" ]; then
         # Show some sample events
         echo ""
         echo "Sample events:"
-        babeltrace2 "${TRACE_DIR}" 2>/dev/null | grep "anytime:" | head -10
+        babeltrace "${TRACE_DIR}" 2>/dev/null | grep "anytime:" | head -10
     else
         echo -e "${RED}✗${NC} No events captured!"
     fi

@@ -30,6 +30,10 @@ echo ""
 echo -e "${BLUE}Sourcing ROS2 environment...${NC}"
 source "${WORKSPACE_DIR}/packages/install/setup.bash"
 
+# Generate baseline configs (creates phase1 configs with correct absolute weights path)
+echo -e "${BLUE}Generating baseline configs...${NC}"
+python3 "${EXPERIMENT_DIR}/0_generate_baseline_configs.py"
+
 # Pre-build TensorRT engines (skip if already cached)
 echo -e "${BLUE}Warming up TensorRT engines...${NC}"
 "${WORKSPACE_DIR}/scripts/warmup_yolo_engines.sh"
@@ -53,10 +57,12 @@ lttng start
 
 # Launch YOLO server and client components
 echo -e "${BLUE}Launching YOLO server and client...${NC}"
-echo "  - Batch size: 1 (default)"
+echo "  - Block size: 1 (default)"
 echo "  - Mode: Proactive (default)"
 
-ros2 launch experiments yolo.launch.py &
+ros2 launch experiments yolo.launch.py \
+    server_config:=${EXPERIMENT_DIR}/configs/phase1_server.yaml \
+    client_config:=${EXPERIMENT_DIR}/configs/phase1_client.yaml &
 YOLO_PID=$!
 
 # Wait for components to initialize
@@ -115,7 +121,7 @@ echo ""
 echo "Trace saved to: ${TRACE_DIR}"
 echo ""
 echo "To verify trace data:"
-echo "  babeltrace2 ${TRACE_DIR} | grep 'anytime:yolo' | head -20"
+echo "  babeltrace ${TRACE_DIR} | grep 'anytime:yolo' | head -20"
 echo ""
 echo "If you see YOLO tracepoints, the setup is working correctly!"
 echo ""

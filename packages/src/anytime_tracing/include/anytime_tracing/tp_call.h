@@ -36,10 +36,10 @@
 TRACEPOINT_EVENT(
   TRACEPOINT_PROVIDER, anytime_base_init,
   TP_ARGS(
-    const void *, node_handle_arg, const int, batch_size_arg, const bool,
+    const void *, node_handle_arg, const int, block_size_arg, const bool,
     is_reactive_proactive_arg),
   TP_FIELDS(ctf_integer_hex(const void *, node_handle, node_handle_arg)
-              ctf_integer(int, batch_size, batch_size_arg)
+              ctf_integer(int, block_size, block_size_arg)
                 ctf_integer(bool, is_reactive_proactive, is_reactive_proactive_arg)
                   ctf_string(version, anytime_tracing_VERSION)))
 
@@ -90,9 +90,9 @@ TRACEPOINT_EVENT(
 // Compute operations
 TRACEPOINT_EVENT(
   TRACEPOINT_PROVIDER, anytime_compute_entry,
-  TP_ARGS(const void *, node_handle_arg, const int, batch_size_arg),
+  TP_ARGS(const void *, node_handle_arg, const int, block_size_arg),
   TP_FIELDS(ctf_integer_hex(const void *, node_handle, node_handle_arg)
-              ctf_integer(int, batch_size, batch_size_arg)
+              ctf_integer(int, block_size, block_size_arg)
                 ctf_string(version, anytime_tracing_VERSION)))
 
 TRACEPOINT_EVENT(
@@ -231,10 +231,10 @@ TRACEPOINT_EVENT(
 TRACEPOINT_EVENT(
   TRACEPOINT_PROVIDER, monte_carlo_init,
   TP_ARGS(
-    const void *, node_handle_arg, const int, batch_size_arg, const bool,
+    const void *, node_handle_arg, const int, block_size_arg, const bool,
     is_reactive_proactive_arg),
   TP_FIELDS(ctf_integer_hex(const void *, node_handle, node_handle_arg)
-              ctf_integer(int, batch_size, batch_size_arg)
+              ctf_integer(int, block_size, block_size_arg)
                 ctf_integer(bool, is_reactive_proactive, is_reactive_proactive_arg)
                   ctf_string(version, anytime_tracing_VERSION)))
 
@@ -271,10 +271,10 @@ TRACEPOINT_EVENT(
 TRACEPOINT_EVENT(
   TRACEPOINT_PROVIDER, yolo_init,
   TP_ARGS(
-    const void *, node_handle_arg, const int, batch_size_arg, const bool, is_reactive_proactive_arg,
+    const void *, node_handle_arg, const int, block_size_arg, const bool, is_reactive_proactive_arg,
     const bool, is_sync_async_arg, const char *, weights_path_arg),
   TP_FIELDS(ctf_integer_hex(const void *, node_handle, node_handle_arg)
-              ctf_integer(int, batch_size, batch_size_arg)
+              ctf_integer(int, block_size, block_size_arg)
                 ctf_integer(bool, is_reactive_proactive, is_reactive_proactive_arg)
                   ctf_integer(bool, is_sync_async, is_sync_async_arg)
                     ctf_string(weights_path, weights_path_arg)
@@ -355,6 +355,55 @@ TRACEPOINT_EVENT(
   TP_FIELDS(ctf_integer_hex(const void *, node_handle, node_handle_arg)
               ctf_integer(int, processed_layers, processed_layers_arg)
                 ctf_string(version, anytime_tracing_VERSION)))
+
+// ==================== RRT* ====================
+
+TRACEPOINT_EVENT(
+  TRACEPOINT_PROVIDER, rrt_star_init,
+  TP_ARGS(
+    const void *, node_handle_arg,
+    const int, block_size_arg,
+    const bool, is_reactive_proactive_arg),
+  TP_FIELDS(
+    ctf_integer_hex(const void *, node_handle, node_handle_arg)
+    ctf_integer(int, block_size, block_size_arg)
+    ctf_integer(bool, is_reactive_proactive, is_reactive_proactive_arg)
+    ctf_string(version, anytime_tracing_VERSION)))
+
+TRACEPOINT_EVENT(
+  TRACEPOINT_PROVIDER, rrt_star_iteration,
+  TP_ARGS(
+    const void *, node_handle_arg,
+    const int, iteration_num_arg,
+    const int, tree_size_arg,
+    const double, best_cost_arg),
+  TP_FIELDS(
+    ctf_integer_hex(const void *, node_handle, node_handle_arg)
+    ctf_integer(int, iteration_num, iteration_num_arg)
+    ctf_integer(int, tree_size, tree_size_arg)
+    ctf_float(double, best_cost, best_cost_arg)
+    ctf_string(version, anytime_tracing_VERSION)))
+
+TRACEPOINT_EVENT(
+  TRACEPOINT_PROVIDER, rrt_star_result,
+  TP_ARGS(
+    const void *, node_handle_arg,
+    const double, best_cost_arg,
+    const int, total_iterations_arg,
+    const int, tree_size_arg),
+  TP_FIELDS(
+    ctf_integer_hex(const void *, node_handle, node_handle_arg)
+    ctf_float(double, best_cost, best_cost_arg)
+    ctf_integer(int, total_iterations, total_iterations_arg)
+    ctf_integer(int, tree_size, tree_size_arg)
+    ctf_string(version, anytime_tracing_VERSION)))
+
+TRACEPOINT_EVENT(
+  TRACEPOINT_PROVIDER, rrt_star_reset,
+  TP_ARGS(const void *, node_handle_arg),
+  TP_FIELDS(
+    ctf_integer_hex(const void *, node_handle, node_handle_arg)
+    ctf_string(version, anytime_tracing_VERSION)))
 
 // ==================== Interference ====================
 

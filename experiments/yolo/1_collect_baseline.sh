@@ -3,8 +3,8 @@
 # Step 1: Collect Baseline Data
 #
 # Purpose: Run baseline configuration to collect layer-wise detection and timing data
-# Configuration: batch_size=1, proactive, single-threaded, all 25 layers
-# Output: traces/phase1_baseline_trial{1,2,3}/
+# Configuration: block_size=1, proactive, single-threaded, all 22 layers
+# Output: traces/phase1_baseline_trial{1,2,3,4,5}/
 #
 
 set -e  # Exit on error
@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
 EXPERIMENT_DIR="${SCRIPT_DIR}"
 TRACE_DIR="${EXPERIMENT_DIR}/traces/phase1_baseline"
-NUM_TRIALS=3
+NUM_TRIALS=5
 
 # Check prerequisites
 "${WORKSPACE_DIR}/scripts/check_yolo_prerequisites.sh"
@@ -31,10 +31,10 @@ echo -e "${GREEN}Step 1: Collect Baseline Data${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Configuration:"
-echo "  - Batch size: 1 (layer-by-layer)"
+echo "  - Block size: 1 (layer-by-layer)"
 echo "  - Mode: Proactive"
 echo "  - Threading: Single"
-echo "  - Layers: All 25 layers"
+echo "  - Layers: All 22 layers"
 echo "  - Trials: ${NUM_TRIALS}"
 echo "  - Trace output: ${TRACE_DIR}"
 echo ""
@@ -75,7 +75,7 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     
     # Launch YOLO server and client components with Phase 1 config
     echo -e "${BLUE}Launching YOLO server and client with baseline configuration...${NC}"
-    echo "  - Batch size: 1"
+    echo "  - Block size: 1"
     echo "  - Mode: Proactive"
     echo "  - Sync: sync"
     echo "  - Multi-threading: disabled"
@@ -127,7 +127,7 @@ for trial in $(seq 1 ${NUM_TRIALS}); do
     # Wait between trials
     if [ ${trial} -lt ${NUM_TRIALS} ]; then
         echo ""
-        echo -e "${YELLOW}Waiting 10 seconds before next trial...${NC}"
+        echo -e "${YELLOW}Waiting 5 seconds before next trial...${NC}"
         sleep 5
     fi
 done

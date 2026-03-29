@@ -1,6 +1,7 @@
 #!/bin/bash
-# Interference Experimental Evaluation Script
+# Interference RRT* Experimental Evaluation Script
 # This script runs all Interference configurations with LTTng tracing
+# using RRT* as the anytime algorithm instead of Monte Carlo
 
 set -e  # Exit on error
 
@@ -11,7 +12,7 @@ cleanup() {
     lttng stop 2>/dev/null || true
     pkill -9 -f 'component_container' 2>/dev/null || true
     pkill -9 -f 'interference_timer' 2>/dev/null || true
-    pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
+    pkill -9 -f 'anytime_rrt_star' 2>/dev/null || true
     pkill -9 -f 'ros2' 2>/dev/null || true
     sleep 1
     lttng destroy interference_exp 2>/dev/null || true
@@ -41,24 +42,24 @@ RESULTS_DIR="${EXPERIMENT_DIR}/results"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 
 # Experiment parameters
-BATCH_SIZES=(1024 2048 4096 8192 16384 32768 65536 131072 262144)
+BLOCK_SIZES=(1 64 256 1024 4096)
 MODES=("reactive" "proactive")
-THREADING=("single")
-NUM_RUNS=1  # Number of trials per configuration
+THREADING=("single" "multi")
+NUM_RUNS=10  # Number of trials per configuration
 
 # Duration for each experiment run (in seconds)
-RUN_DURATION=10
+RUN_DURATION=30
 
 # Interference timer parameters (fixed)
 TIMER_PERIOD_MS=100
 EXECUTION_TIME_MS=10
 
 echo "========================================="
-echo "Interference Experimental Evaluation"
+echo "Interference RRT* Experimental Evaluation"
 echo "========================================="
 echo ""
 echo "Configuration:"
-echo "  - Batch sizes: ${BATCH_SIZES[*]}"
+echo "  - Block sizes: ${BLOCK_SIZES[*]}"
 echo "  - Modes: ${MODES[*]}"
 echo "  - Threading: ${THREADING[*]}"
 echo "  - Runs per config: ${NUM_RUNS}"
@@ -73,30 +74,50 @@ echo ""
 cd "${PACKAGES_DIR}"
 source install/setup.bash
 
+# Resolve map directory from installed package
+MAPS_DIR="$(ros2 pkg prefix anytime_rrt_star)/share/anytime_rrt_star/maps"
+echo "Maps directory: ${MAPS_DIR}"
+
+# Regenerate configs to ensure fresh MAPS_DIR placeholders (idempotent)
+echo "Regenerating configs..."
+rm -rf "${CONFIG_DIR}"
+cd "${EXPERIMENT_DIR}"
+python3 generate_configs.py
+cd "${PACKAGES_DIR}"
+
+# Replace MAPS_DIR placeholder with actual installed path
+echo "Updating map paths in config files..."
+find "${CONFIG_DIR}" -name "*_server.yaml" -exec sed -i "s|MAPS_DIR|${MAPS_DIR}|g" {} \;
+
+# Clean old output from previous runs
+echo "Cleaning old traces and results..."
+rm -rf "${TRACE_DIR}"
+rm -rf "${RESULTS_DIR}"
+
 # Create directories
 mkdir -p "${TRACE_DIR}"
 mkdir -p "${RESULTS_DIR}"
 
 # Counter for progress
-total_configs=$((${#BATCH_SIZES[@]} * ${#MODES[@]} * ${#THREADING[@]} * NUM_RUNS))
+total_configs=$((${#BLOCK_SIZES[@]} * ${#MODES[@]} * ${#THREADING[@]} * NUM_RUNS))
 current_config=0
 
 # Iterate through all configurations
-for batch_size in "${BATCH_SIZES[@]}"; do
+for block_size in "${BLOCK_SIZES[@]}"; do
     for mode in "${MODES[@]}"; do
         for thread_mode in "${THREADING[@]}"; do
             for run in $(seq 1 ${NUM_RUNS}); do
                 current_config=$((current_config + 1))
-                
+
                 # Create config name
-                config_name="batch_${batch_size}_${mode}_${thread_mode}"
+                config_name="block_${block_size}_${mode}_${thread_mode}"
                 run_name="${config_name}_run${run}"
-                
+
                 echo ""
                 echo "========================================="
                 echo "Running ${current_config}/${total_configs}: ${run_name}"
                 echo "========================================="
-                
+
                 # Create trace directory for this run (remove old traces first)
                 trace_output="${TRACE_DIR}/${run_name}"
                 rm -rf "${trace_output}"
@@ -104,60 +125,59 @@ for batch_size in "${BATCH_SIZES[@]}"; do
 
                 # Cleanup any existing LTTng session
                 lttng destroy interference_exp 2>/dev/null || true
-                
+
                 # Create LTTng session
                 echo "  [1/5] Creating LTTng session..."
                 lttng create interference_exp --output="${trace_output}"
-                
+
                 # Enable selective tracepoints
                 echo "  [2/5] Enabling tracepoints..."
-                
-                # Monte Carlo compute timing (only entry/exit for full compute batch)
+
+                # Compute timing (only entry/exit for full compute block)
                 lttng enable-event --userspace anytime:anytime_compute_entry
                 lttng enable-event --userspace anytime:anytime_compute_exit
-                
+
                 # Interference timer events (MAIN FOCUS)
                 lttng enable-event --userspace anytime:interference_timer_init
                 lttng enable-event --userspace anytime:interference_timer_callback_entry
                 lttng enable-event --userspace anytime:interference_timer_callback_exit
-                
+
                 # Add context information
                 lttng add-context --userspace --type=vpid
                 lttng add-context --userspace --type=vtid
                 lttng add-context --userspace --type=procname
-                
+
                 # Start tracing
                 echo "  [3/5] Starting trace..."
                 lttng start
-                
+
                 # Run the experiment
                 echo "  [4/5] Running experiment for ${RUN_DURATION}s..."
-                
+
                 # Launch Interference experiment
                 server_config="${CONFIG_DIR}/${config_name}_server.yaml"
                 client_config="${CONFIG_DIR}/${config_name}_client.yaml"
-                
+
                 # Determine executor type
                 if [ "${thread_mode}" = "multi" ]; then
                     use_multi_threaded="true"
                 else
                     use_multi_threaded="false"
                 fi
-                
+
                 # Launch the experiment in background
-                ros2 launch experiments interference.launch.py \
+                ros2 launch experiments interference_rrt_star.launch.py \
                     server_config:="${server_config}" \
                     client_config:="${client_config}" \
+                    interference_config:="${CONFIG_DIR}/${config_name}_interference.yaml" \
                     use_multi_threaded:=${use_multi_threaded} \
-                    timer_period_ms:=${TIMER_PERIOD_MS} \
-                    execution_time_ms:=${EXECUTION_TIME_MS} \
                     log_level:=info  &
-                
+
                 LAUNCH_PID=$!
-                
+
                 # Wait for experiment duration
                 sleep ${RUN_DURATION}
-                
+
                 # Stop tracing (before killing processes to flush trace buffers)
                 echo "  [5/5] Stopping trace and saving..."
                 lttng stop
@@ -171,18 +191,19 @@ for batch_size in "${BATCH_SIZES[@]}"; do
                 # Kill any remaining interference processes
                 pkill -9 -f 'component_container' 2>/dev/null || true
                 pkill -9 -f 'interference_timer' 2>/dev/null || true
+                pkill -9 -f 'anytime_rrt_star' 2>/dev/null || true
                 pkill -9 -f 'ros2' 2>/dev/null || true
                 sleep 1
 
                 lttng destroy interference_exp
-                
+
                 # Verify trace was created
                 if [ -d "${trace_output}" ] && [ "$(ls -A ${trace_output})" ]; then
                     echo "  ✓ Trace saved to: ${trace_output}"
                 else
                     echo "  ✗ Warning: No trace data generated for ${run_name}"
                 fi
-                
+
                 # Small delay between runs
                 sleep 1
             done

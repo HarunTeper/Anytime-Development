@@ -3,9 +3,9 @@
 # Step 6: Run Cancellation Experiments
 #
 # Purpose: Test cancellation performance across different configurations
-# Configurations: 3 block sizes × 1 mode × 2 sync × 2 threading = 12 configs
-# Client cancellation: After 16 layers OR score threshold ≥ 0.8
-# Output: traces/phase4_bs{1,8,25}_proactive_{sync|async}_{single|multi}_trial{1,2,3}/
+# Configurations: 6 block sizes × 1 mode × 2 sync × 2 threading = 24 configs
+# Client cancellation: Score-based early exit OR hard deadline (values read from config)
+# Output: traces/phase4_bs{1,4,8,11,16,22}_proactive_{sync|async}_{single|multi}_trial{1,2,3,4,5}/
 #
 
 set -e  # Exit on error
@@ -15,13 +15,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
 EXPERIMENT_DIR="${SCRIPT_DIR}"
 TRACE_BASE_DIR="${EXPERIMENT_DIR}/traces"
-NUM_TRIALS=1
+NUM_TRIALS=5
 
 # Check prerequisites
 "${WORKSPACE_DIR}/scripts/check_yolo_prerequisites.sh"
 
 # Test parameters
-BLOCK_SIZES=(1 8 16 25)
+BLOCK_SIZES=(1 4 8 11 16 22)
 MODES=("proactive")
 SYNC_MODES=("sync" "async")
 THREADING_MODES=("single" "multi")
@@ -46,10 +46,17 @@ echo "  - Sync modes: ${SYNC_MODES[@]}"
 echo "  - Threading modes: ${THREADING_MODES[@]}"
 echo "  - Trials per config: ${NUM_TRIALS}"
 echo ""
-echo "Client cancellation settings:"
-echo "  - Cancel after: 16 layers"
-echo "  - Score threshold: ≥ 0.8"
-echo "  - Target class: 9 (traffic light)"
+echo "Client cancellation settings (from config):"
+# Read values from client config for display
+if [ -f "${EXPERIMENT_DIR}/configs/phase4_client.yaml" ]; then
+    CANCEL_LAYERS=$(grep 'cancel_after_layers' "${EXPERIMENT_DIR}/configs/phase4_client.yaml" | awk '{print $2}')
+    SCORE_THRESH=$(grep 'score_threshold' "${EXPERIMENT_DIR}/configs/phase4_client.yaml" | awk '{print $2}')
+    echo "  - Cancel after: ${CANCEL_LAYERS} layers (hard deadline)"
+    echo "  - Score threshold: >= ${SCORE_THRESH} (early exit)"
+    echo "  - Target class: 9 (traffic light)"
+else
+    echo "  - (config not yet generated, run step 5 first)"
+fi
 echo ""
 
 # Calculate total configurations
@@ -73,13 +80,17 @@ echo "Phase 4: Final Cancellation Experiment Results" > "${RESULTS_FILE}"
 echo "========================================" >> "${RESULTS_FILE}"
 echo "Date: $(date)" >> "${RESULTS_FILE}"
 echo "" >> "${RESULTS_FILE}"
-echo "Client Configuration:" >> "${RESULTS_FILE}"
-echo "  - Cancel after layers: 16" >> "${RESULTS_FILE}"
-echo "  - Score threshold: 0.8" >> "${RESULTS_FILE}"
-echo "  - Target class: 9 (traffic light)" >> "${RESULTS_FILE}"
-echo "" >> "${RESULTS_FILE}"
-
 CLIENT_CONFIG="${EXPERIMENT_DIR}/configs/phase4_client.yaml"
+
+echo "Client Configuration:" >> "${RESULTS_FILE}"
+if [ -f "${CLIENT_CONFIG}" ]; then
+    CANCEL_LAYERS=$(grep 'cancel_after_layers' "${CLIENT_CONFIG}" | awk '{print $2}')
+    SCORE_THRESH=$(grep 'score_threshold' "${CLIENT_CONFIG}" | awk '{print $2}')
+    echo "  - Cancel after layers: ${CANCEL_LAYERS}" >> "${RESULTS_FILE}"
+    echo "  - Score threshold: ${SCORE_THRESH}" >> "${RESULTS_FILE}"
+    echo "  - Target class: 9 (traffic light)" >> "${RESULTS_FILE}"
+fi
+echo "" >> "${RESULTS_FILE}"
 
 if [ ! -f "${CLIENT_CONFIG}" ]; then
     echo -e "${RED}Error: Client config not found: ${CLIENT_CONFIG}${NC}"

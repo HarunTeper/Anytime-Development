@@ -2,8 +2,8 @@ int32 goal
 ---
 float32 result
 int32 iterations
-int32 batch_size
-builtin_interfaces/Duration batch_time
+int32 block_size
+builtin_interfaces/Duration block_time
 builtin_interfaces/Time action_server_receive
 builtin_interfaces/Time action_server_accept
 builtin_interfaces/Time action_server_start

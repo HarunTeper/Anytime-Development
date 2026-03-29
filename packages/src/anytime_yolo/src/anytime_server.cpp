@@ -16,7 +16,7 @@ AnytimeActionServer::AnytimeActionServer(rclcpp::NodeOptions options)
   // Read the ros2 parameters
   std::string reactive_proactive_str = this->declare_parameter("is_reactive_proactive", "reactive");
   std::string sync_async_str = this->declare_parameter("is_sync_async", "sync");
-  int batch_size = this->declare_parameter("batch_size", 1);
+  int block_size = this->declare_parameter("block_size", 1);
   std::string weights_path = this->declare_parameter("weights_path", "");
 
   // Convert strings to booleans
@@ -26,18 +26,18 @@ AnytimeActionServer::AnytimeActionServer(rclcpp::NodeOptions options)
   RCLCPP_INFO(this->get_logger(), "YOLO Action Server initialized with parameters:");
   RCLCPP_INFO(this->get_logger(), "  is_reactive_proactive: %s", reactive_proactive_str.c_str());
   RCLCPP_INFO(this->get_logger(), "  is_sync_async: %s", sync_async_str.c_str());
-  RCLCPP_INFO(this->get_logger(), "  batch_size: %d", batch_size);
+  RCLCPP_INFO(this->get_logger(), "  block_size: %d", block_size);
   RCLCPP_INFO(this->get_logger(), "  weights_path: %s", weights_path.c_str());
 
   RCLCPP_DEBUG(
     this->get_logger(), "is_reactive_proactive: %s",
     is_reactive_proactive ? "proactive" : "reactive");
   RCLCPP_DEBUG(this->get_logger(), "is_sync_async: %s", is_sync_async ? "async" : "sync");
-  RCLCPP_DEBUG(this->get_logger(), "batch_size: %d", batch_size);
+  RCLCPP_DEBUG(this->get_logger(), "block_size: %d", block_size);
   RCLCPP_DEBUG(this->get_logger(), "weights_path: %s", weights_path.c_str());
 
   this->anytime_management_ =
-    create_anytime_management(this, is_reactive_proactive, is_sync_async, batch_size, weights_path);
+    create_anytime_management(this, is_reactive_proactive, is_sync_async, block_size, weights_path);
 }
 
 // Destructor for the AnytimeActionServer class
@@ -47,20 +47,20 @@ AnytimeActionServer::~AnytimeActionServer() {}
 std::shared_ptr<
   anytime_core::AnytimeBase<AnytimeActionServer::Anytime, AnytimeActionServer::GoalHandleType>>
 AnytimeActionServer::create_anytime_management(
-  rclcpp::Node * node, bool is_reactive_proactive, bool is_sync_async, int batch_size,
+  rclcpp::Node * node, bool is_reactive_proactive, bool is_sync_async, int block_size,
   const std::string & weights_path)
 {
   if (is_reactive_proactive) {
     if (is_sync_async) {
-      return std::make_shared<AnytimeManagement<true, true>>(node, batch_size, weights_path);
+      return std::make_shared<AnytimeManagement<true, true>>(node, block_size, weights_path);
     } else {
-      return std::make_shared<AnytimeManagement<true, false>>(node, batch_size, weights_path);
+      return std::make_shared<AnytimeManagement<true, false>>(node, block_size, weights_path);
     }
   } else {
     if (is_sync_async) {
-      return std::make_shared<AnytimeManagement<false, true>>(node, batch_size, weights_path);
+      return std::make_shared<AnytimeManagement<false, true>>(node, block_size, weights_path);
     } else {
-      return std::make_shared<AnytimeManagement<false, false>>(node, batch_size, weights_path);
+      return std::make_shared<AnytimeManagement<false, false>>(node, block_size, weights_path);
     }
   }
 }

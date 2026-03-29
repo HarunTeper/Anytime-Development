@@ -30,21 +30,21 @@ class AnytimeManagement : public anytime_core::AnytimeBase<Anytime, AnytimeGoalH
 {
 public:
   // Constants
-  static constexpr int MAX_NETWORK_LAYERS = 25;
   static constexpr int IMAGE_SIZE = 640;
 
   // Constructor
-  AnytimeManagement(rclcpp::Node * node, int batch_size = 1, const std::string & weights_path = "")
+  AnytimeManagement(rclcpp::Node * node, int block_size = 1, const std::string & weights_path = "")
   : weights_path_(weights_path),
     yolo_(weights_path, false),
+    max_network_layers_(yolo_.getLayerCount()),
     yolo_state_(std::make_unique<InferenceState>(yolo_.createInferenceState())),
     input_cuda_buffer_(
       IMAGE_SIZE * IMAGE_SIZE * 3 * (halfPrecision ? sizeof(__half) : sizeof(float)))
   {
     // Initialize common base class functionality
-    this->template initialize_anytime_base<isReactiveProactive>(node, batch_size);
+    this->template initialize_anytime_base<isReactiveProactive>(node, block_size);
 
-    TRACE_YOLO_INIT(node, batch_size, isReactiveProactive, isSyncAsync, weights_path.c_str());
+    TRACE_YOLO_INIT(node, block_size, isReactiveProactive, isSyncAsync, weights_path.c_str());
   }
 
   // ----------------- Domain-Specific Implementations -----------------
@@ -57,7 +57,7 @@ public:
       // Async mode: only attach callback when actually submitting a GPU layer
       bool is_layer_submission =
         (yolo_state_->currentStage == InferenceState::LAYER_PROCESSING &&
-         yolo_state_->currentIndex < MAX_NETWORK_LAYERS);
+         yolo_state_->currentIndex < max_network_layers_);
 
       // Trace layer start only for actual layer submissions, using submitted_layers_
       // which is the correct sequential index (0..24) before increment
@@ -73,35 +73,31 @@ public:
         submitted_layers_++;
       }
     } else {
-      // Sync mode: trace with processed_layers_ before increment (0..24)
-      TRACE_YOLO_LAYER_START(this->node_, processed_layers_);
+      // Sync mode: only trace and count actual GPU layer computations
+      bool is_layer = (yolo_state_->currentStage == InferenceState::LAYER_PROCESSING &&
+                       yolo_state_->currentIndex < max_network_layers_);
+      if (is_layer) {
+        TRACE_YOLO_LAYER_START(this->node_, processed_layers_);
+      }
       yolo_.inferStep(*yolo_state_, false, nullptr, nullptr);
-      processed_layers_++;
-      TRACE_YOLO_LAYER_END(this->node_, processed_layers_);
-      RCLCPP_DEBUG(this->node_->get_logger(), "Processed layers: %d", processed_layers_);
-      this->send_feedback();
+      if (is_layer) {
+        processed_layers_++;
+        TRACE_YOLO_LAYER_END(this->node_, processed_layers_);
+        RCLCPP_DEBUG(this->node_->get_logger(), "Processed layers: %d", processed_layers_);
+        this->send_feedback();
+      }
     }
   }
 
   // Override to limit iterations by remaining layers
-  int get_batch_iterations() const override
+  int get_block_iterations() const override
   {
     if constexpr (isSyncAsync) {
-      // Async mode: handle stage-progress transitions
-      if (yolo_state_->isCompleted()) {
-        return 0;
-      }
-      int layers_left_to_submit = MAX_NETWORK_LAYERS - submitted_layers_;
-      if (layers_left_to_submit > 0) {
-        return std::min(this->batch_size_, layers_left_to_submit);
-      }
-      // All layers submitted but not completed — need EXIT/NMS transitions
-      // Return 1 to drive the state machine forward (avoids deadlock)
-      return 1;
+      int layers_left = static_cast<int>(max_network_layers_) - submitted_layers_;
+      return std::max(0, std::min(this->block_size_, layers_left));
     } else {
-      // Sync mode: original behavior
-      int layers_left = MAX_NETWORK_LAYERS - processed_layers_;
-      return std::min(this->batch_size_, layers_left);
+      int layers_left = static_cast<int>(max_network_layers_) - processed_layers_;
+      return std::max(0, std::min(this->block_size_, layers_left));
     }
   }
 
@@ -122,11 +118,7 @@ public:
   {
     RCLCPP_DEBUG(this->node_->get_logger(), "YOLO result populated");
 
-    result_processed_layers_ = processed_layers_;
     std::vector<float> yolo_result;
-
-    // Trace exit calculation start
-    TRACE_YOLO_EXIT_CALCULATION_START(this->node_, processed_layers_);
 
     if constexpr (isReactiveProactive) {
       RCLCPP_DEBUG(this->node_->get_logger(), "Calculating latest exit");
@@ -135,6 +127,14 @@ public:
       RCLCPP_DEBUG(this->node_->get_logger(), "Finishing early");
       yolo_result = yolo_.finishEarly(*yolo_state_);
     }
+
+    // After calculateLatestExit/finishEarly, the CUDA stream is synchronized.
+    // Drain any remaining GPU completion signals so processed_layers_ is accurate.
+    process_gpu_completions();
+    result_processed_layers_ = processed_layers_;
+
+    // Trace exit calculation start (after drain so layer_num matches end event)
+    TRACE_YOLO_EXIT_CALCULATION_START(this->node_, processed_layers_);
 
     // Count valid detections (confidence > 0)
     int detection_count = 0;
@@ -200,8 +200,8 @@ public:
     }
 
     // Add additional information to result
-    result->average_batch_time = this->average_computation_time_;
-    result->batch_size = this->batch_size_;
+    result->average_block_time = this->average_computation_time_;
+    result->block_size = this->block_size_;
     result->processed_layers = processed_layers_;
     result->result_processed_layers = result_processed_layers_;
 
@@ -283,7 +283,14 @@ public:
     result_processed_layers_ = 0;
   }
 
-  bool should_finish() const override { return yolo_state_->isCompleted(); }
+  bool should_finish() const override
+  {
+    if constexpr (isSyncAsync) {
+      return submitted_layers_ >= static_cast<int>(max_network_layers_);
+    } else {
+      return processed_layers_ >= static_cast<int>(max_network_layers_);
+    }
+  }
 
   // ---------------- CUDA Callback Function -----------------
   // Minimal signal-only callback — runs on CUDA host thread.
@@ -324,6 +331,7 @@ protected:
   std::string weights_path_;  // Path to YOLO weights
 
   AnytimeYOLO yolo_;
+  size_t max_network_layers_;                     // Actual layer count from model
   std::unique_ptr<InferenceState> yolo_state_;  // YOLO inference state as pointer
   bool halfPrecision = false;                   // Flag for half precision
   CudaHostBuffer input_cuda_buffer_;            // Input image buffer

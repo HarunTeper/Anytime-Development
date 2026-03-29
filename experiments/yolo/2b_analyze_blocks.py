@@ -4,18 +4,17 @@ Step 2b: Block Size Analysis
 
 Analyzes baseline traces (from Step 1) to determine total delay for different block sizes.
 
-For each block size (1-25 layers), calculates total delay by summing:
+For each block size (1-22 layers), calculates total delay by summing:
 - Layer computation times within each block
 - Exit calculation time at the end of each block
 
 This helps choose optimal block sizes for Step 6 (cancellation experiments).
 
-Input:  traces/phase1_baseline_trial{1,2,3}/
+Input:  traces/phase1_baseline_trial{1,2,3,4,5}/
 Output: results/block_analysis/
 """
 
 import sys
-import subprocess
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -25,6 +24,8 @@ from collections import defaultdict
 import json
 from datetime import datetime
 
+from trace_utils import TraceEvent, parse_fields, parse_trace_directory
+
 # Configuration
 SCRIPT_DIR = Path(__file__).resolve().parent
 EXPERIMENT_DIR = SCRIPT_DIR
@@ -33,15 +34,19 @@ RESULTS_DIR = EXPERIMENT_DIR / "results"
 PLOTS_DIR = RESULTS_DIR / "plots"
 BLOCK_DIR = RESULTS_DIR / "block_analysis"
 
+# Number of warmup images to skip per trial (GPU JIT overhead)
+WARMUP_IMAGES = 5
+
 # Plot configuration
 PLOT_WIDTH = 14
 PLOT_HEIGHT = 7
 PLOT_DPI = 300
-FONT_SIZE_TITLE = 20
-FONT_SIZE_LABEL = 20
-FONT_SIZE_LEGEND = 20
-FONT_SIZE_TICK_LABELS = 18
-LEGEND_SIZE = 20
+# ── Plot font sizes (adjust these to rescale all text) ──
+FONT_SIZE_TITLE = 30
+FONT_SIZE_LABEL = 30
+FONT_SIZE_TICK_LABELS = 30
+FONT_SIZE_OFFSET = 30   # scientific notation offset text (e.g. "×1e6")
+LEGEND_SIZE = 30
 MARKER_SIZE = 8
 CAPSIZE = 5
 LINE_WIDTH = 2
@@ -51,151 +56,7 @@ RESULTS_DIR.mkdir(exist_ok=True)
 PLOTS_DIR.mkdir(exist_ok=True)
 BLOCK_DIR.mkdir(exist_ok=True)
 
-MAX_LAYER = 25  # Maximum layer number (0-indexed, so 0-24 = 25 layers total)
-
-
-class TraceEvent:
-    """Represents a single trace event"""
-
-    def __init__(self, timestamp, event_name, fields):
-        self.timestamp = timestamp
-        self.event_name = event_name
-        self.fields = fields
-
-    def __repr__(self):
-        return f"TraceEvent({self.timestamp}, {self.event_name})"
-
-
-def parse_trace_directory(trace_dir):
-    """
-    Parse a single trace directory using babeltrace
-    """
-    print(f"  Parsing trace: {trace_dir.name}")
-
-    # Use babeltrace2 (without --names none to preserve all fields)
-    try:
-        result = subprocess.run(
-            ['babeltrace2', str(trace_dir)],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        try:
-            result = subprocess.run(
-                ['babeltrace', str(trace_dir)],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-        except subprocess.CalledProcessError as e:
-            print(f"    Error running babeltrace: {e}")
-            return []
-        except FileNotFoundError:
-            print("    Error: babeltrace not found. Please install lttng-tools.")
-            return []
-
-    # Pre-filter lines to only process anytime events
-    anytime_lines = [line for line in result.stdout.split(
-        '\n') if 'anytime:' in line]
-
-    events = []
-    for line in anytime_lines:
-        if not line.strip() or not 'anytime:' in line:
-            continue
-
-        try:
-            # Extract timestamp (in brackets)
-            ts_start = line.find('[')
-            ts_end = line.find(']')
-            if ts_start == -1 or ts_end == -1:
-                continue
-
-            timestamp_str = line[ts_start+1:ts_end]
-            # Convert HH:MM:SS.nanoseconds to nanoseconds
-            parts = timestamp_str.split(':')
-            try:
-                if len(parts) == 3:
-                    hh = int(parts[0])
-                    mm = int(parts[1])
-                    ss = float(parts[2])
-                    seconds_total = hh * 3600 + mm * 60 + ss
-                    timestamp = seconds_total * 1e9
-                else:
-                    timestamp = float(timestamp_str) * 1e9
-            except ValueError:
-                continue
-
-            # Extract event name
-            event_start = line.find('anytime:')
-            if event_start == -1:
-                continue
-
-            event_name_part = line[event_start:]
-            event_name_end = event_name_part.find(
-                ':', 8)  # Find colon after 'anytime:'
-            if event_name_end == -1:
-                continue
-
-            event_name = event_name_part[8:event_name_end]
-
-            # Extract fields (in braces)
-            fields_start = line.find('{', event_start)
-            fields_end = line.rfind('}')
-            if fields_start == -1 or fields_end == -1:
-                fields = {}
-            else:
-                fields_str = line[fields_start+1:fields_end]
-                fields = parse_fields(fields_str)
-
-            events.append(TraceEvent(timestamp, event_name, fields))
-
-        except Exception as e:
-            continue
-
-    print(f"    Parsed {len(events)} events")
-    return events
-
-
-def parse_fields(fields_str):
-    """Parse the fields string into a dictionary"""
-    fields = {}
-
-    parts = []
-    current = []
-    in_string = False
-
-    for char in fields_str + ',':
-        if char == '"':
-            in_string = not in_string
-        elif char == ',' and not in_string:
-            parts.append(''.join(current).strip())
-            current = []
-            continue
-        current.append(char)
-
-    for part in parts:
-        if not part or '=' not in part:
-            continue
-
-        key, value = part.split('=', 1)
-        key = key.strip()
-        value = value.strip()
-
-        if value.startswith('"') and value.endswith('"'):
-            value = value[1:-1]
-        else:
-            try:
-                if '.' in value:
-                    value = float(value)
-                else:
-                    value = int(value)
-            except ValueError:
-                pass
-
-        fields[key] = value
-
-    return fields
+MAX_LAYER = 22  # Actual model layer count (22 layer chunks, indices 0-21)
 
 
 def extract_timing_data(trace_dir):
@@ -222,7 +83,7 @@ def extract_timing_data(trace_dir):
     image_counter = 0
 
     for event in events:
-        if event.event_name == 'anytime_base_activate':
+        if event.event_name == 'anytime:anytime_base_activate':
             # New goal/image started
             if current_image['layer_computation_times']:
                 images.append(current_image)
@@ -236,11 +97,11 @@ def extract_timing_data(trace_dir):
                 'exit_calc_start_times': {},
             }
 
-        elif event.event_name == 'yolo_layer_start':
+        elif event.event_name == 'anytime:yolo_layer_start':
             layer_num = event.fields.get('layer_num', 0)
             current_image['layer_start_times'][layer_num] = event.timestamp
 
-        elif event.event_name == 'yolo_layer_end':
+        elif event.event_name == 'anytime:yolo_layer_end':
             layer_num = event.fields.get('layer_num', 0)
 
             # Calculate layer computation time
@@ -251,11 +112,11 @@ def extract_timing_data(trace_dir):
                     current_image['layer_start_times'][start_layer_num]
                 current_image['layer_computation_times'][layer_num] = comp_time
 
-        elif event.event_name == 'yolo_exit_calculation_start':
+        elif event.event_name == 'anytime:yolo_exit_calculation_start':
             layer_num = event.fields.get('layer_num', 0)
             current_image['exit_calc_start_times'][layer_num] = event.timestamp
 
-        elif event.event_name == 'yolo_exit_calculation_end':
+        elif event.event_name == 'anytime:yolo_exit_calculation_end':
             layer_num = event.fields.get('layer_num', 0)
             # Calculate exit calculation time
             if layer_num in current_image['exit_calc_start_times']:
@@ -367,6 +228,12 @@ def analyze_all_block_sizes(all_images):
         num_blocks = [len(img['blocks'])
                       for img in all_image_data if img['blocks']]
 
+        # Max per-block delay: worst-case time before system can respond to cancel
+        max_block_delays = [
+            max(b['total_delay'] for b in img['blocks'])
+            for img in all_image_data if img['blocks']
+        ]
+
         if total_delays:
             stats = {
                 # Convert ns to ms
@@ -375,6 +242,8 @@ def analyze_all_block_sizes(all_images):
                 'min_total_delay_ms': np.min(total_delays) / 1e6,
                 'max_total_delay_ms': np.max(total_delays) / 1e6,
                 'median_total_delay_ms': np.median(total_delays) / 1e6,
+                'mean_max_block_delay_ms': np.mean(max_block_delays) / 1e6 if max_block_delays else 0,
+                'std_max_block_delay_ms': np.std(max_block_delays) / 1e6 if max_block_delays else 0,
                 'mean_num_blocks': np.mean(num_blocks) if num_blocks else 0,
                 'all_image_data': all_image_data,
             }
@@ -385,6 +254,8 @@ def analyze_all_block_sizes(all_images):
                 'min_total_delay_ms': 0,
                 'max_total_delay_ms': 0,
                 'median_total_delay_ms': 0,
+                'mean_max_block_delay_ms': 0,
+                'std_max_block_delay_ms': 0,
                 'mean_num_blocks': 0,
                 'all_image_data': all_image_data,
             }
@@ -411,10 +282,10 @@ def plot_block_size_delays(block_size_stats):
 
     ax.errorbar(block_sizes, mean_delays, yerr=std_delays, marker='o',
                 capsize=5, linewidth=2, markersize=6)
-    ax.set_xlabel('Block Size (layers per block)', fontsize=12)
-    ax.set_ylabel('Total Delay (ms)', fontsize=12)
+    ax.set_xlabel('Block Size (layers per block)', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Total Delay (ms)', fontsize=FONT_SIZE_LABEL)
     ax.set_title('Total Processing Delay vs Block Size',
-                 fontsize=14, fontweight='bold')
+                 fontsize=FONT_SIZE_TITLE, fontweight='bold')
     ax.grid(True, alpha=0.3)
 
     # Highlight block_size = 1 (baseline)
@@ -422,12 +293,41 @@ def plot_block_size_delays(block_size_stats):
         baseline_delay = block_size_stats[1]['mean_total_delay_ms']
         ax.axhline(y=baseline_delay, color='r', linestyle='--', alpha=0.5,
                    label=f'Block size 1 baseline: {baseline_delay:.2f} ms')
-        ax.legend()
+        # ax.legend()  # Legend removed
 
     plt.tight_layout()
     plt.savefig(BLOCK_DIR / 'block_size_delays.png', dpi=300)
     plt.close()
     print(f"    Saved: {BLOCK_DIR / 'block_size_delays.png'}")
+
+
+def plot_max_block_delay(block_size_stats):
+    """
+    Plot maximum per-block delay vs block size.
+    This shows worst-case cancellation responsiveness for each block size.
+    """
+    print("\n  Creating max block delay plot...")
+
+    block_sizes = sorted(block_size_stats.keys())
+    mean_max_delays = [block_size_stats[bs]['mean_max_block_delay_ms']
+                       for bs in block_sizes]
+    std_max_delays = [block_size_stats[bs]['std_max_block_delay_ms']
+                      for bs in block_sizes]
+
+    fig, ax = plt.subplots(figsize=(14, 7))
+
+    ax.errorbar(block_sizes, mean_max_delays, yerr=std_max_delays, marker='o',
+                capsize=5, linewidth=2, markersize=6, color='darkorange')
+    ax.set_xlabel('Block Size (layers per block)', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Max Per-Block Delay (ms)', fontsize=FONT_SIZE_LABEL)
+    ax.set_title('Worst-Case Per-Block Delay vs Block Size',
+                 fontsize=FONT_SIZE_TITLE, fontweight='bold')
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(BLOCK_DIR / 'max_block_delay.png', dpi=300)
+    plt.close()
+    print(f"    Saved: {BLOCK_DIR / 'max_block_delay.png'}")
 
 
 def plot_num_blocks_vs_block_size(block_size_stats):
@@ -444,10 +344,10 @@ def plot_num_blocks_vs_block_size(block_size_stats):
 
     ax.plot(block_sizes, mean_num_blocks, marker='o',
             linewidth=2, markersize=6, color='green')
-    ax.set_xlabel('Block Size (layers per block)', fontsize=12)
-    ax.set_ylabel('Average Number of Blocks', fontsize=12)
+    ax.set_xlabel('Block Size (layers per block)', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Average Number of Blocks', fontsize=FONT_SIZE_LABEL)
     ax.set_title('Number of Blocks Needed vs Block Size',
-                 fontsize=14, fontweight='bold')
+                 fontsize=FONT_SIZE_TITLE, fontweight='bold')
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -456,7 +356,7 @@ def plot_num_blocks_vs_block_size(block_size_stats):
     print(f"    Saved: {BLOCK_DIR / 'num_blocks_vs_block_size.png'}")
 
 
-def plot_per_block_delay_distribution(block_size_stats, selected_block_sizes=[1, 3, 5, 8, 16, 25]):
+def plot_per_block_delay_distribution(block_size_stats, selected_block_sizes=[1, 3, 5, 8, 16, 22]):
     """
     Plot distribution of per-block delays for selected block sizes
     """
@@ -485,20 +385,20 @@ def plot_per_block_delay_distribution(block_size_stats, selected_block_sizes=[1,
                        linewidth=2, label=f"Mean: {np.mean(all_block_delays):.2f} ms")
             ax.axvline(np.median(all_block_delays), color='g', linestyle='--',
                        linewidth=2, label=f"Median: {np.median(all_block_delays):.2f} ms")
-            ax.set_xlabel('Block Delay (ms)', fontsize=10)
-            ax.set_ylabel('Frequency', fontsize=10)
+            ax.set_xlabel('Block Delay (ms)', fontsize=FONT_SIZE_LABEL)
+            ax.set_ylabel('Frequency', fontsize=FONT_SIZE_LABEL)
             ax.set_title(f'Block Size {block_size}',
-                         fontsize=12, fontweight='bold')
-            ax.legend(fontsize=9)
+                         fontsize=FONT_SIZE_TITLE, fontweight='bold')
+            # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
             ax.grid(True, alpha=0.3, axis='y')
         else:
             ax.text(0.5, 0.5, 'No data', ha='center',
-                    va='center', transform=ax.transAxes)
+                    va='center', transform=ax.transAxes, fontsize=FONT_SIZE_LABEL)
             ax.set_title(f'Block Size {block_size}',
-                         fontsize=12, fontweight='bold')
+                         fontsize=FONT_SIZE_TITLE, fontweight='bold')
 
     fig.suptitle('Per-Block Delay Distribution for Different Block Sizes',
-                 fontsize=16, fontweight='bold', y=0.995)
+                 fontsize=FONT_SIZE_TITLE, fontweight='bold', y=0.995)
     plt.tight_layout()
     plt.savefig(BLOCK_DIR / 'per_block_delay_distribution.png', dpi=300)
     plt.close()
@@ -525,9 +425,9 @@ def plot_detailed_block_breakdown(block_size_stats, selected_block_sizes=[1, 4, 
 
         if not img_data['blocks']:
             ax.text(0.5, 0.5, 'No data', ha='center',
-                    va='center', transform=ax.transAxes)
+                    va='center', transform=ax.transAxes, fontsize=FONT_SIZE_LABEL)
             ax.set_title(f'Block Size {block_size}',
-                         fontsize=12, fontweight='bold')
+                         fontsize=FONT_SIZE_TITLE, fontweight='bold')
             continue
 
         block_nums = [b['block_num'] for b in img_data['blocks']]
@@ -543,11 +443,11 @@ def plot_detailed_block_breakdown(block_size_stats, selected_block_sizes=[1, 4, 
         ax2.plot(block_nums, cumulative_delays, marker='o', linewidth=2,
                  markersize=6, color='red', label='Cumulative Delay')
 
-        ax.set_xlabel('Block Number', fontsize=10)
-        ax.set_ylabel('Block Delay (ms)', fontsize=10, color='skyblue')
-        ax2.set_ylabel('Cumulative Delay (ms)', fontsize=10, color='red')
+        ax.set_xlabel('Block Number', fontsize=FONT_SIZE_LABEL)
+        ax.set_ylabel('Block Delay (ms)', fontsize=FONT_SIZE_LABEL, color='skyblue')
+        ax2.set_ylabel('Cumulative Delay (ms)', fontsize=FONT_SIZE_LABEL, color='red')
         ax.set_title(f'Block Size {block_size} (Image {img_data["image_id"]})',
-                     fontsize=12, fontweight='bold')
+                     fontsize=FONT_SIZE_TITLE, fontweight='bold')
         ax.tick_params(axis='y', labelcolor='skyblue')
         ax2.tick_params(axis='y', labelcolor='red')
         ax.grid(True, alpha=0.3, axis='y')
@@ -555,11 +455,11 @@ def plot_detailed_block_breakdown(block_size_stats, selected_block_sizes=[1, 4, 
         # Add legends
         lines1, labels1 = ax.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
-        ax.legend(lines1 + lines2, labels1 + labels2,
-                  loc='upper left', fontsize=9)
+        # ax.legend(lines1 + lines2, labels1 + labels2,
+        #           loc='upper left', fontsize=LEGEND_SIZE)  # Legend removed
 
     fig.suptitle('Detailed Block Breakdown: Individual and Cumulative Delays',
-                 fontsize=16, fontweight='bold', y=0.995)
+                 fontsize=FONT_SIZE_TITLE, fontweight='bold', y=0.995)
     plt.tight_layout()
     plt.savefig(BLOCK_DIR / 'detailed_block_breakdown.png', dpi=300)
     plt.close()
@@ -600,6 +500,8 @@ def export_block_results(block_size_stats):
             'min_total_delay_ms': convert_numpy(stats['min_total_delay_ms']),
             'max_total_delay_ms': convert_numpy(stats['max_total_delay_ms']),
             'median_total_delay_ms': convert_numpy(stats['median_total_delay_ms']),
+            'mean_max_block_delay_ms': convert_numpy(stats['mean_max_block_delay_ms']),
+            'std_max_block_delay_ms': convert_numpy(stats['std_max_block_delay_ms']),
             'mean_num_blocks': convert_numpy(stats['mean_num_blocks']),
         }
 
@@ -623,14 +525,15 @@ def export_block_results(block_size_stats):
         f.write("BLOCK SIZE STATISTICS:\n")
         f.write("-" * 80 + "\n")
         f.write(
-            f"{'Block Size':>12} {'Mean Delay (ms)':>16} {'Std Dev (ms)':>14} {'Median (ms)':>13} {'Avg # Blocks':>14}\n")
-        f.write("-" * 80 + "\n")
+            f"{'Block Size':>12} {'Mean Delay (ms)':>16} {'Std Dev (ms)':>14} {'Median (ms)':>13} {'Max Block (ms)':>16} {'Avg # Blocks':>14}\n")
+        f.write("-" * 96 + "\n")
 
         for block_size in sorted(block_size_stats.keys()):
             stats = block_size_stats[block_size]
             f.write(f"{block_size:>12} {stats['mean_total_delay_ms']:>16.2f} "
                     f"{stats['std_total_delay_ms']:>14.2f} "
                     f"{stats['median_total_delay_ms']:>13.2f} "
+                    f"{stats['mean_max_block_delay_ms']:>16.2f} "
                     f"{stats['mean_num_blocks']:>14.1f}\n")
 
         f.write("\n" + "="*80 + "\n")
@@ -691,6 +594,9 @@ def main():
         print(f"\n  Processing: {trace_dir.name}")
         images = extract_timing_data(trace_dir)
         if images:
+            if WARMUP_IMAGES > 0 and len(images) > WARMUP_IMAGES:
+                images = images[WARMUP_IMAGES:]
+                print(f"    Skipped {WARMUP_IMAGES} warmup images")
             all_images.extend(images)
             print(f"    Extracted data for {len(images)} images")
 
@@ -706,6 +612,7 @@ def main():
     # Generate plots
     print("\nGenerating plots...")
     plot_block_size_delays(block_size_stats)
+    plot_max_block_delay(block_size_stats)
     plot_num_blocks_vs_block_size(block_size_stats)
     plot_per_block_delay_distribution(block_size_stats)
     plot_detailed_block_breakdown(block_size_stats)

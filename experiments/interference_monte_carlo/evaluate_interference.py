@@ -4,8 +4,8 @@ Interference Experiment Evaluation Script
 
 This script parses LTTng traces from Interference experiments and generates:
 - Primary Metrics: Timer period jitter (deviation from expected 100ms)
-- Secondary Metrics: Monte Carlo compute batch timing
-- Plots: Timer jitter vs batch size, mode comparison, threading comparison
+- Secondary Metrics: Monte Carlo compute block timing
+- Plots: Timer jitter vs block size, mode comparison, threading comparison
 - CSV/JSON exports of results
 """
 
@@ -37,10 +37,11 @@ PLOT_WIDTH = 12
 PLOT_HEIGHT = 8
 PLOT_HEIGHT_SMALL = 8
 PLOT_DPI = 300
+# ── Plot font sizes (adjust these to rescale all text) ──
 FONT_SIZE_TITLE = 30
 FONT_SIZE_LABEL = 30
-FONT_SIZE_LEGEND = 30
 FONT_SIZE_TICK_LABELS = 30
+FONT_SIZE_OFFSET = 30   # scientific notation offset text (e.g. "×1e6")
 LEGEND_SIZE = 30
 MARKER_SIZE = 12
 CAPSIZE = 5
@@ -69,7 +70,7 @@ def parse_trace_directory(trace_dir):
     """
     print(f"  Parsing trace: {trace_dir.name}")
 
-    # Use babeltrace2 to parse traces
+    # Use babeltrace to parse traces
     try:
         result = subprocess.run(
             ['babeltrace', str(trace_dir)],
@@ -150,18 +151,18 @@ def extract_metrics_from_events(events, config_name):
 
     Focus:
     - Timer period jitter (time between consecutive timer callback entries)
-    - Monte Carlo compute batch timing
+    - Monte Carlo compute block timing
 
     Returns:
         Dictionary with metrics
     """
-    # Parse batch_size from config_name
+    # Parse block_size from config_name
     config_parts = config_name.split('_')
-    batch_size = int(config_parts[1])
+    block_size = int(config_parts[1])
 
     metrics = {
         'config': config_name,
-        'batch_size': batch_size,
+        'block_size': block_size,
 
         # Timer metrics (PRIMARY FOCUS)
         'timer_periods': [],  # Time between consecutive timer starts (ms)
@@ -171,8 +172,8 @@ def extract_metrics_from_events(events, config_name):
         'missed_periods': 0,  # Number of periods > 150% of expected
 
         # Monte Carlo compute metrics (SECONDARY)
-        'compute_times': [],  # Time per compute batch (ms)
-        'total_compute_batches': 0,
+        'compute_times': [],  # Time per compute block (ms)
+        'total_compute_blocks': 0,
     }
 
     # Track state
@@ -217,7 +218,7 @@ def extract_metrics_from_events(events, config_name):
                 compute_ns = event.timestamp - current_compute_entry_time
                 compute_ms = compute_ns / 1_000_000.0
                 metrics['compute_times'].append(compute_ms)
-                metrics['total_compute_batches'] += 1
+                metrics['total_compute_blocks'] += 1
                 current_compute_entry_time = None
 
     # Compute summary statistics for timer metrics
@@ -285,7 +286,7 @@ def aggregate_runs(all_metrics):
     for base_config, runs in config_groups.items():
         agg = {
             'config': base_config,
-            'batch_size': runs[0]['batch_size'],
+            'block_size': runs[0]['block_size'],
             'num_runs': len(runs),
 
             # Timer metrics - averages across runs
@@ -312,7 +313,7 @@ def aggregate_runs(all_metrics):
             'std_compute_time': np.mean([r['std_compute_time'] for r in runs]),
             'min_compute_time': np.min([r['min_compute_time'] for r in runs if r['min_compute_time'] > 0] or [0]),
             'max_compute_time': np.max([r['max_compute_time'] for r in runs]),
-            'total_compute_batches': np.mean([r['total_compute_batches'] for r in runs]),
+            'total_compute_blocks': np.mean([r['total_compute_blocks'] for r in runs]),
         }
 
         aggregated[base_config] = agg
@@ -322,14 +323,14 @@ def aggregate_runs(all_metrics):
 
 def parse_config_name(config_name):
     """Parse configuration name into components"""
-    # Format: batch_<size>_<mode>_<threading>
+    # Format: block_<size>_<mode>_<threading>
     parts = config_name.split('_')
 
     # Skip 'test' prefix if present
     offset = 1 if parts[0] == 'test' else 0
 
     return {
-        'batch_size': int(parts[1 + offset]),
+        'block_size': int(parts[1 + offset]),
         'mode': parts[2 + offset],
         'threading': parts[3 + offset]
     }
@@ -347,32 +348,35 @@ def generate_plots(aggregated_metrics):
     ])
 
     # Set plot style
-    plt.style.use('seaborn-darkgrid')
+    try:
+        plt.style.use('seaborn-v0_8-darkgrid')
+    except OSError:
+        plt.style.use('seaborn-darkgrid')
 
-    # Plot 1: Timer Period vs Batch Size
-    print("  - Timer period vs batch size")
+    # Plot 1: Timer Period vs Block Size
+    print("  - Timer period vs block size")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes (reversed: high to low)
-    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes (reversed: high to low)
+    all_block_sizes = sorted(df['block_size'].unique(), reverse=True)
+    x = np.arange(len(all_block_sizes))
     width = 0.35
 
     for i, mode in enumerate(['reactive', 'proactive']):
         threading = 'single'  # Only single-threaded
         offset = (i - 0.5) * width
         mask = (df['mode'] == mode) & (df['threading'] == threading)
-        data = df[mask].sort_values('batch_size')
+        data = df[mask].sort_values('block_size')
 
         if len(data) > 0:
             label = f"{mode.capitalize()}"
-            # Align with all_batch_sizes
-            y_values = [data[data['batch_size'] == bs]['avg_timer_period'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
-            y_errors = [data[data['batch_size'] == bs]['std_timer_period'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
+            # Align with all_block_sizes
+            y_values = [data[data['block_size'] == bs]['avg_timer_period'].values[0]
+                        if bs in data['block_size'].values else 0
+                        for bs in all_block_sizes]
+            y_errors = [data[data['block_size'] == bs]['std_timer_period'].values[0]
+                        if bs in data['block_size'].values else 0
+                        for bs in all_block_sizes]
 
             ax.bar(x + offset, y_values, width, yerr=y_errors,
                    label=label, capsize=CAPSIZE)
@@ -381,61 +385,61 @@ def generate_plots(aggregated_metrics):
     ax.axhline(y=EXPECTED_TIMER_PERIOD_MS, color='red',
                linestyle=':', linewidth=LINE_WIDTH, label=f'Expected ({EXPECTED_TIMER_PERIOD_MS} ms)')
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Average Timer Period (ms)', fontsize=FONT_SIZE_LABEL)
-    # ax.set_title('Timer Period vs Batch Size\n(Deviation indicates interference)',
+    # ax.set_title('Timer Period vs Block Size\n(Deviation indicates interference)',
     #              fontsize=FONT_SIZE_TITLE, fontweight='bold')
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     # ax.legend(fontsize=LEGEND_SIZE)
     ax.grid(True, axis='y', alpha=0.3)
 
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / 'timer_period_vs_batch_size.pdf',
+    plt.savefig(PLOTS_DIR / 'timer_period_vs_block_size.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
-    # Plot 2: Absolute Jitter vs Batch Size
-    print("  - Jitter vs batch size")
+    # Plot 2: Absolute Jitter vs Block Size
+    print("  - Jitter vs block size")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes (reversed: high to low)
-    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes (reversed: high to low)
+    all_block_sizes = sorted(df['block_size'].unique(), reverse=True)
+    x = np.arange(len(all_block_sizes))
     width = 0.35
 
     for i, mode in enumerate(['reactive', 'proactive']):
         threading = 'single'  # Only single-threaded
         offset = (i - 0.5) * width
         mask = (df['mode'] == mode) & (df['threading'] == threading)
-        data = df[mask].sort_values('batch_size')
+        data = df[mask].sort_values('block_size')
 
         if len(data) > 0:
             label = f"{mode.capitalize()}"
-            # Align with all_batch_sizes
-            y_values = [data[data['batch_size'] == bs]['max_abs_jitter'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
-            y_errors = [data[data['batch_size'] == bs]['std_jitter'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
+            # Align with all_block_sizes
+            y_values = [data[data['block_size'] == bs]['max_abs_jitter'].values[0]
+                        if bs in data['block_size'].values else 0
+                        for bs in all_block_sizes]
+            y_errors = [data[data['block_size'] == bs]['std_jitter'].values[0]
+                        if bs in data['block_size'].values else 0
+                        for bs in all_block_sizes]
 
             ax.bar(x + offset, y_values, width, yerr=y_errors,
                    label=label, capsize=CAPSIZE)
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Maximum Absolute Jitter (ms)', fontsize=FONT_SIZE_LABEL)
-    # ax.set_title('Timer Jitter vs Batch Size\n(Higher jitter = more interference)',
+    # ax.set_title('Timer Jitter vs Block Size\n(Higher jitter = more interference)',
     #              fontsize=FONT_SIZE_TITLE, fontweight='bold')
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     # ax.legend(fontsize=LEGEND_SIZE)
     ax.grid(True, axis='y', alpha=0.3)
 
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / 'jitter_vs_batch_size.pdf',
+    plt.savefig(PLOTS_DIR / 'jitter_vs_block_size.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
@@ -443,32 +447,32 @@ def generate_plots(aggregated_metrics):
     print("  - Missed periods analysis")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT_SMALL))
 
-    # Get all unique batch sizes (reversed: high to low)
-    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes (reversed: high to low)
+    all_block_sizes = sorted(df['block_size'].unique(), reverse=True)
+    x = np.arange(len(all_block_sizes))
     width = 0.35
 
     for i, mode in enumerate(['reactive', 'proactive']):
         threading = 'single'  # Only single-threaded
         offset = (i - 0.5) * width
         mask = (df['mode'] == mode) & (df['threading'] == threading)
-        data = df[mask].sort_values('batch_size')
+        data = df[mask].sort_values('block_size')
 
         if len(data) > 0:
             label = f"{mode.capitalize()}"
-            # Align with all_batch_sizes
-            y_values = [data[data['batch_size'] == bs]['missed_periods_percent'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
+            # Align with all_block_sizes
+            y_values = [data[data['block_size'] == bs]['missed_periods_percent'].values[0]
+                        if bs in data['block_size'].values else 0
+                        for bs in all_block_sizes]
 
             ax.bar(x + offset, y_values, width, label=label)
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
     ax.set_ylabel('Missed Periods (%)', fontsize=FONT_SIZE_LABEL)
     # ax.set_title('Percentage of Timer Periods Missed\n(Period > 150% of expected)',
     #              fontsize=FONT_SIZE_TITLE, fontweight='bold')
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     # ax.legend(fontsize=LEGEND_SIZE)
     ax.grid(True, axis='y', alpha=0.3)
@@ -478,46 +482,46 @@ def generate_plots(aggregated_metrics):
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
-    # Plot 4: Compute Time vs Batch Size
-    print("  - Compute time vs batch size")
+    # Plot 4: Compute Time vs Block Size
+    print("  - Compute time vs block size")
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
-    # Get all unique batch sizes (reversed: high to low)
-    all_batch_sizes = sorted(df['batch_size'].unique(), reverse=True)
-    x = np.arange(len(all_batch_sizes))
+    # Get all unique block sizes (reversed: high to low)
+    all_block_sizes = sorted(df['block_size'].unique(), reverse=True)
+    x = np.arange(len(all_block_sizes))
     width = 0.35
 
     for i, mode in enumerate(['reactive', 'proactive']):
         threading = 'single'  # Only single-threaded
         offset = (i - 0.5) * width
         mask = (df['mode'] == mode) & (df['threading'] == threading)
-        data = df[mask].sort_values('batch_size')
+        data = df[mask].sort_values('block_size')
 
         if len(data) > 0:
             label = f"{mode.capitalize()}"
-            # Align with all_batch_sizes
-            y_values = [data[data['batch_size'] == bs]['avg_compute_time'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
-            y_errors = [data[data['batch_size'] == bs]['std_compute_time'].values[0]
-                        if bs in data['batch_size'].values else 0
-                        for bs in all_batch_sizes]
+            # Align with all_block_sizes
+            y_values = [data[data['block_size'] == bs]['avg_compute_time'].values[0]
+                        if bs in data['block_size'].values else 0
+                        for bs in all_block_sizes]
+            y_errors = [data[data['block_size'] == bs]['std_compute_time'].values[0]
+                        if bs in data['block_size'].values else 0
+                        for bs in all_block_sizes]
 
             ax.bar(x + offset, y_values, width, yerr=y_errors,
                    label=label, capsize=CAPSIZE)
 
-    ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
-    ax.set_ylabel('Average Compute Batch Time (ms)', fontsize=FONT_SIZE_LABEL)
-    # ax.set_title('Monte Carlo Compute Batch Time vs Batch Size',
+    ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
+    ax.set_ylabel('Average Compute Block Time (ms)', fontsize=FONT_SIZE_LABEL)
+    # ax.set_title('Monte Carlo Compute Block Time vs Block Size',
     #              fontsize=FONT_SIZE_TITLE, fontweight='bold')
     ax.set_xticks(x)
-    ax.set_xticklabels(all_batch_sizes, fontsize=FONT_SIZE_TICK_LABELS)
+    ax.set_xticklabels(all_block_sizes, fontsize=FONT_SIZE_TICK_LABELS)
     ax.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
     # ax.legend(fontsize=LEGEND_SIZE)
     ax.grid(True, axis='y', alpha=0.3)
 
     plt.tight_layout(pad=0)
-    plt.savefig(PLOTS_DIR / 'compute_time_vs_batch_size.pdf',
+    plt.savefig(PLOTS_DIR / 'compute_time_vs_block_size.pdf',
                 dpi=PLOT_DPI, bbox_inches='tight', pad_inches=0)
     plt.close()
 
@@ -532,20 +536,20 @@ def generate_plots(aggregated_metrics):
         ax = axes[j]
 
         mask = (df['mode'] == mode) & (df['threading'] == threading)
-        data = df[mask].sort_values('batch_size')
+        data = df[mask].sort_values('block_size')
 
         if len(data) > 0:
             # Create box plot data
-            batch_labels = []
+            block_labels = []
             period_data = []
 
             for _, row in data.iterrows():
-                batch_labels.append(str(row['batch_size']))
+                block_labels.append(str(row['block_size']))
                 # Simulate distribution from mean and std
                 # (In reality, you'd want to preserve raw period data)
                 period_data.append([row['avg_timer_period']])
 
-            bp = ax.boxplot(period_data, labels=batch_labels,
+            bp = ax.boxplot(period_data, labels=block_labels,
                             patch_artist=True, showmeans=True)
 
             # Color boxes
@@ -556,7 +560,7 @@ def generate_plots(aggregated_metrics):
             ax.axhline(y=EXPECTED_TIMER_PERIOD_MS, color='red',
                        linestyle=':', linewidth=LINE_WIDTH, label='Expected')
 
-        ax.set_xlabel('Batch Size', fontsize=FONT_SIZE_LABEL)
+        ax.set_xlabel('Block Size', fontsize=FONT_SIZE_LABEL)
         ax.set_ylabel('Timer Period (ms)', fontsize=FONT_SIZE_LABEL)
         # ax.set_title(f'{mode.capitalize()}',
         #              fontsize=FONT_SIZE_TITLE, fontweight='bold')
@@ -660,13 +664,13 @@ def main():
 
     # Select key columns for CSV export
     csv_columns = [
-        'config', 'batch_size',
+        'config', 'block_size',
         'avg_timer_period', 'std_timer_period', 'min_timer_period',
         'max_timer_period', 'median_timer_period',
         'avg_jitter', 'std_jitter', 'max_abs_jitter',
         'avg_timer_execution', 'std_timer_execution',
         'total_timer_callbacks', 'missed_periods',
-        'avg_compute_time', 'std_compute_time', 'total_compute_batches'
+        'avg_compute_time', 'std_compute_time', 'total_compute_blocks'
     ]
 
     individual_df[csv_columns].to_csv(
@@ -687,20 +691,20 @@ def main():
         json.dump(aggregated, f, indent=2, default=str)
     print(f"  Saved: {RESULTS_DIR / 'aggregated_results.json'}")
 
-    # Save condensed Table I: missed periods % by mode and batch size
-    table_batch_sizes = [1024, 2048, 4096, 16384, 32768, 65536, 131072, 262144]
+    # Save condensed Table I: missed periods % by mode and block size
+    table_block_sizes = [1024, 2048, 4096, 16384, 32768, 65536, 131072, 262144]
     table_rows = {}
     for config, metrics in aggregated.items():
         parsed = parse_config_name(config)
         mode = parsed['mode'].capitalize()
-        bs = parsed['batch_size']
-        if bs in table_batch_sizes:
+        bs = parsed['block_size']
+        if bs in table_block_sizes:
             table_rows.setdefault(mode, {})[bs] = metrics['missed_periods_percent']
     table1_rows = []
     for mode in ['Proactive', 'Reactive']:
         if mode in table_rows:
             row = {'Configuration': mode}
-            for bs in table_batch_sizes:
+            for bs in table_block_sizes:
                 row[str(bs)] = f"{table_rows[mode].get(bs, 0):.2f}%"
             table1_rows.append(row)
     table1_df = pd.DataFrame(table1_rows)
@@ -718,7 +722,7 @@ def main():
     for config, metrics in sorted(aggregated.items()):
         parsed = parse_config_name(config)
         print(f"\n{config}:")
-        print(f"  Batch Size: {parsed['batch_size']}")
+        print(f"  Block Size: {parsed['block_size']}")
         print(f"  Mode: {parsed['mode']}")
         print(f"  Threading: {parsed['threading']}")
         print(f"  Timer Callbacks: {metrics['total_timer_callbacks']:.0f}")

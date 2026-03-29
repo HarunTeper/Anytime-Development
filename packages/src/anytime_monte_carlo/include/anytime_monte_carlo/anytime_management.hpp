@@ -36,10 +36,10 @@ class AnytimeManagement : public anytime_core::AnytimeBase<Anytime, AnytimeGoalH
 {
 public:
   // Constructor
-  explicit AnytimeManagement(rclcpp::Node * node, int batch_size = 1)
+  explicit AnytimeManagement(rclcpp::Node * node, int block_size = 1)
   {
     // Initialize common base class functionality
-    this->template initialize_anytime_base<isReactiveProactive>(node, batch_size);
+    this->template initialize_anytime_base<isReactiveProactive>(node, block_size);
 
     // Initialize reproducible RNG from ROS parameter
     if (!node->has_parameter("random_seed")) {
@@ -48,7 +48,7 @@ public:
     int seed = node->get_parameter("random_seed").as_int();
     rng_ = std::mt19937(static_cast<unsigned int>(seed));
 
-    TRACE_MONTE_CARLO_INIT(node, batch_size, isReactiveProactive);
+    TRACE_MONTE_CARLO_INIT(node, block_size, isReactiveProactive);
   }
 
   // ----------------- Domain-Specific Implementations -----------------
@@ -85,8 +85,8 @@ public:
     result->iterations = loop_count_;
 
     // Add additional information to result
-    result->batch_time = this->average_computation_time_;
-    result->batch_size = this->batch_size_;
+    result->block_time = this->average_computation_time_;
+    result->block_size = this->block_size_;
 
     TRACE_MONTE_CARLO_RESULT(
       this->node_, result->result, result->iterations, count_inside_, count_total_);

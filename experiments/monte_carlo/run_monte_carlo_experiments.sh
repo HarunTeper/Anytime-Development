@@ -40,10 +40,10 @@ RESULTS_DIR="${EXPERIMENT_DIR}/results"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
 
 # Experiment parameters
-BATCH_SIZES=(1024 2048 4096 8192 16384 32768 65536)
+BLOCK_SIZES=(1024 2048 4096 8192 16384 32768 65536)
 MODES=("reactive" "proactive")
 THREADING=("single" "multi")
-NUM_RUNS=1  # Number of trials per configuration
+NUM_RUNS=5  # Number of trials per configuration
 
 # Duration for each experiment run (in seconds)
 RUN_DURATION=10
@@ -53,7 +53,7 @@ echo "Monte Carlo Experimental Evaluation"
 echo "========================================="
 echo ""
 echo "Configuration:"
-echo "  - Batch sizes: ${BATCH_SIZES[*]}"
+echo "  - Block sizes: ${BLOCK_SIZES[*]}"
 echo "  - Modes: ${MODES[*]}"
 echo "  - Threading: ${THREADING[*]}"
 echo "  - Runs per config: ${NUM_RUNS}"
@@ -69,18 +69,18 @@ mkdir -p "${TRACE_DIR}"
 mkdir -p "${RESULTS_DIR}"
 
 # Counter for progress
-total_configs=$((${#BATCH_SIZES[@]} * ${#MODES[@]} * ${#THREADING[@]} * NUM_RUNS))
+total_configs=$((${#BLOCK_SIZES[@]} * ${#MODES[@]} * ${#THREADING[@]} * NUM_RUNS))
 current_config=0
 
 # Iterate through all configurations
-for batch_size in "${BATCH_SIZES[@]}"; do
+for block_size in "${BLOCK_SIZES[@]}"; do
     for mode in "${MODES[@]}"; do
         for thread_mode in "${THREADING[@]}"; do
             for run in $(seq 1 ${NUM_RUNS}); do
                 current_config=$((current_config + 1))
                 
                 # Create config name
-                config_name="batch_${batch_size}_${mode}_${thread_mode}"
+                config_name="block_${block_size}_${mode}_${thread_mode}"
                 run_name="${config_name}_run${run}"
                 
                 echo ""
@@ -108,7 +108,7 @@ for batch_size in "${BATCH_SIZES[@]}"; do
                 echo "Enabling selective tracepoints..."
                 lttng enable-event --userspace anytime:anytime_compute_entry
                 lttng enable-event --userspace anytime:anytime_compute_exit
-                # lttng enable-event --userspace anytime:anytime_compute_iteration  # Commented: calculate from batch_count * batch_size
+                # lttng enable-event --userspace anytime:anytime_compute_iteration  # Commented: calculate from block_count * block_size
                 lttng enable-event --userspace anytime:anytime_server_handle_cancel
                 lttng enable-event --userspace anytime:anytime_base_deactivate
                 lttng enable-event --userspace anytime:anytime_client_goal_sent

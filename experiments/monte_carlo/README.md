@@ -1,6 +1,6 @@
 # Monte Carlo Experiments
 
-Evaluate Monte Carlo batch size scaling and threading impact.
+Evaluate Monte Carlo block size scaling and threading impact.
 
 ## Quick Start
 
@@ -21,15 +21,15 @@ ls results/plots/
 
 ## Configuration
 
-- **Batch sizes**: 1, 64, 4096, 16384, 65536, 262144
+- **Block sizes**: 1024, 2048, 4096, 8192, 16384, 32768, 65536
 - **Modes**: reactive, proactive
 - **Threading**: single, multi
-- **Total**: 24 configs × 3 runs = 72 experiments
+- **Total**: 28 configs × 5 runs = 140 experiments
 
 ## Metrics
 
-- Iterations per batch
-- Time per batch
+- Iterations per block
+- Time per block
 - Throughput (iterations/second)
 - Cancellation delay
 
@@ -40,9 +40,9 @@ ls results/plots/
 ```
 
 This will:
-- Run all 72 experiments (24 configs × 3 runs)
-- Each run lasts 30 seconds
-- Total time: ~10 minutes (including setup/teardown)
+- Run all 140 experiments (28 configs × 5 runs)
+- Each run lasts 10 seconds
+- Total time: ~30 minutes (including setup/teardown)
 - Automatically call the evaluation script when done
 
 ### 4. Run Only Evaluation (if traces already exist)
@@ -59,7 +59,7 @@ anytime_server:
   ros__parameters:
     is_reactive_proactive: "reactive"  # or "proactive"
     multi_threading: true              # or false
-    batch_size: 1                      # 1, 64, 4096, 16384, 65536, 262144
+    block_size: 1024                   # 1024, 2048, 4096, 8192, 16384, 32768, 65536
     log_level: "info"
 ```
 
@@ -76,28 +76,28 @@ anytime_client:
 
 The evaluation script extracts and analyzes:
 
-### Per-Batch Metrics
-- **Iterations per batch**: Number of Monte Carlo iterations in each batch
-- **Time per batch**: Duration of each batch computation (ms)
+### Per-Block Metrics
+- **Iterations per block**: Number of Monte Carlo iterations in each block
+- **Time per block**: Duration of each block computation (ms)
 - **Compute time**: Time spent in actual computation
 - **Feedback time**: Time spent sending feedback to client
 - **Result time**: Time spent calculating final result
 
 ### Overall Metrics
-- **Total batches completed**: Number of batches finished in 30s
+- **Total blocks completed**: Number of blocks finished in 10s
 - **Total Segments**: Total Monte Carlo iterations executed
 - **Cancellation delay**: Time from cancel request to deactivation (ms)
 - **Throughput**: Iterations per second
 
 ### Aggregation
-- Metrics are averaged across the 3 runs for each configuration
+- Metrics are averaged across the 5 runs for each configuration
 - Standard deviations are computed for variability analysis
 
 ## Generated Plots
 
-1. **batch_size_vs_iterations.png**: Shows how many iterations are completed per batch for different batch sizes
-2. **batch_size_vs_time.png**: Shows computation time per batch vs. batch size
-3. **cancellation_delay.png**: Compares cancellation delays across configurations
+1. **block_size_vs_iterations.png**: Shows how many iterations are completed per block for different block sizes
+2. **block_size_vs_time.png**: Shows computation time per block vs. block size
+3. **server_cancel_response.pdf**: Compares server cancel response delays across configurations
 4. **threading_comparison.png**: Compares single vs. multi-threaded performance
 5. **throughput.png**: Overall throughput (iterations/second) for each configuration
 
@@ -108,8 +108,8 @@ All plots compare:
 ## Output Files
 
 ### CSV Files
-- `individual_runs.csv`: Raw metrics from each of the 72 runs
-- `aggregated_results.csv`: Averaged metrics for each of 24 configurations
+- `individual_runs.csv`: Raw metrics from each of the 140 runs
+- `aggregated_results.csv`: Averaged metrics for each of 28 configurations
 
 ### JSON File
 - `aggregated_results.json`: Complete results in JSON format for further processing
@@ -119,19 +119,19 @@ All plots compare:
 ### Modify Experiment Duration
 Edit `run_monte_carlo_experiments.sh`:
 ```bash
-RUN_DURATION=30  # Change to desired duration in seconds
+RUN_DURATION=10  # Change to desired duration in seconds
 ```
 
 ### Modify Number of Runs
 Edit `run_monte_carlo_experiments.sh`:
 ```bash
-NUM_RUNS=3  # Change to desired number of runs per config
+NUM_RUNS=5  # Change to desired number of runs per config
 ```
 
-### Modify Batch Sizes
+### Modify Block Sizes
 Edit `generate_configs.py`:
 ```python
-batch_sizes = [1, 64, 4096, 16384, 65536, 262144]  # Add or remove values
+block_sizes = [1024, 2048, 4096, 8192, 16384, 32768, 65536]  # Add or remove values
 ```
 Then regenerate configs:
 ```bash
@@ -141,7 +141,7 @@ python3 generate_configs.py
 ## Tracepoints Used
 
 The experiments rely on these LTTng tracepoints:
-- `anytime:anytime_compute_entry/exit` - Batch boundaries
+- `anytime:anytime_compute_entry/exit` - Block boundaries
 - `anytime:anytime_compute_iteration` - Individual iterations
 - `anytime:monte_carlo_iteration` - Monte Carlo specific iterations
 - `anytime:anytime_send_feedback_entry/exit` - Feedback timing
@@ -184,7 +184,7 @@ pip3 install pandas numpy matplotlib
 ## Expected Runtime
 
 - Single configuration test: ~15 seconds
-- Full experiment suite (72 runs × 30s): ~40-45 minutes
+- Full experiment suite (140 runs × 10s): ~30 minutes
 - Evaluation script: ~1-2 minutes
 
 ## Contact

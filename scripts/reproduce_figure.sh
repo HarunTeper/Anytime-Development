@@ -6,8 +6,8 @@
 # Usage: ./scripts/reproduce_figure.sh <figure> [--quick]
 #
 # Figures:
-#   5a    Fig 5a: Monte Carlo total iterations                (CPU, ~10m / ~3m quick)
-#   5b    Fig 5b: Monte Carlo cancel-to-finish latency        (CPU, ~10m / ~3m quick)
+#   5a    Fig 5a: RRT* total iterations                       (CPU, ~10m / ~3m quick)
+#   5b    Fig 5b: RRT* cancel-to-finish latency              (CPU, ~10m / ~3m quick)
 #   5     Both Fig 5a + 5b                                    (CPU, ~10m / ~3m quick)
 #   6     Fig 6a+6b + Table I: Interference results           (CPU, ~7m / ~3m quick)
 #   7a    Fig 7a: YOLO quality progression                    (GPU, ~15m)
@@ -15,15 +15,15 @@
 #   7     Both Fig 7a + 7b                                    (GPU, ~35m)
 #
 # Options:
-#   --quick   Use quick experiments for CPU figures (fewer batch sizes, shorter runs)
+#   --quick   Use quick experiments for CPU figures (fewer block sizes, shorter runs)
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
-MC_DIR="${WORKSPACE_DIR}/experiments/monte_carlo"
-IF_DIR="${WORKSPACE_DIR}/experiments/interference"
+RRT_DIR="${WORKSPACE_DIR}/experiments/rrt_star"
+IF_DIR="${WORKSPACE_DIR}/experiments/interference_rrt_star"
 YOLO_DIR="${WORKSPACE_DIR}/experiments/yolo"
 
 # Parse arguments
@@ -41,8 +41,8 @@ print_usage() {
     echo "Usage: $0 <figure> [--quick]"
     echo ""
     echo "Figures:"
-    echo "  5a    Fig 5a: Monte Carlo total iterations           (CPU)"
-    echo "  5b    Fig 5b: Monte Carlo cancel-to-finish latency (CPU)"
+    echo "  5a    Fig 5a: RRT* total iterations                  (CPU)"
+    echo "  5b    Fig 5b: RRT* cancel-to-finish latency        (CPU)"
     echo "  5     Both Fig 5a + 5b                           (CPU)"
     echo "  6     Fig 6a+6b + Table I: Interference          (CPU)"
     echo "  7a    Fig 7a: YOLO quality progression           (GPU)"
@@ -63,41 +63,41 @@ cd "${PACKAGES_DIR}"
 source install/setup.bash
 
 # ─────────────────────────────────────────────
-# Monte Carlo experiments (Figures 5a, 5b)
+# RRT* experiments (Figures 5a, 5b)
 # ─────────────────────────────────────────────
-run_monte_carlo() {
+run_rrt_star() {
     echo "========================================="
-    echo "Reproducing Monte Carlo results"
+    echo "Reproducing RRT* results"
     echo "========================================="
     echo ""
 
     if [ "${USE_QUICK}" = true ]; then
-        echo "Mode: quick (3 batch sizes, 5s runs)"
-        "${MC_DIR}/run_quick.sh"
+        echo "Mode: quick (4 block sizes, 5s runs)"
+        "${RRT_DIR}/run_quick.sh"
     else
-        echo "Mode: full (7 batch sizes, 10s runs)"
-        "${MC_DIR}/run_monte_carlo_experiments.sh"
+        echo "Mode: full (7 block sizes, 10s runs)"
+        "${RRT_DIR}/run_rrt_star_experiments.sh"
     fi
 
     echo ""
     echo "========================================="
     echo "Output files:"
     echo "========================================="
-    MC_PLOTS="${MC_DIR}/results/plots"
+    RRT_PLOTS="${RRT_DIR}/results/plots/framework"
     case "${FIGURE}" in
         5a)
-            echo "  Figure 5a: ${MC_PLOTS}/total_iterations.pdf"
+            echo "  Figure 5a: ${RRT_PLOTS}/total_iterations.pdf"
             ;;
         5b)
-            echo "  Figure 5b: ${MC_PLOTS}/cancel_to_finish_latency.pdf"
+            echo "  Figure 5b: ${RRT_PLOTS}/cancellation_latency.pdf"
             ;;
         5)
-            echo "  Figure 5a: ${MC_PLOTS}/total_iterations.pdf"
-            echo "  Figure 5b: ${MC_PLOTS}/cancel_to_finish_latency.pdf"
+            echo "  Figure 5a: ${RRT_PLOTS}/total_iterations.pdf"
+            echo "  Figure 5b: ${RRT_PLOTS}/cancellation_latency.pdf"
             ;;
     esac
-    echo "  All plots: ${MC_PLOTS}/"
-    echo "  CSV data:  ${MC_DIR}/results/aggregated_results.csv"
+    echo "  All plots: ${RRT_PLOTS}/"
+    echo "  CSV data:  ${RRT_DIR}/results/aggregated_results.csv"
 }
 
 # ─────────────────────────────────────────────
@@ -110,10 +110,10 @@ run_interference() {
     echo ""
 
     if [ "${USE_QUICK}" = true ]; then
-        echo "Mode: quick (3 batch sizes, 5s runs)"
+        echo "Mode: quick (4 block sizes, 5s runs)"
         "${IF_DIR}/run_quick.sh"
     else
-        echo "Mode: full (7 batch sizes, 10s runs)"
+        echo "Mode: full (7 block sizes, 10s runs)"
         "${IF_DIR}/run_interference_experiments.sh"
     fi
 
@@ -122,9 +122,9 @@ run_interference() {
     echo "Output files:"
     echo "========================================="
     IF_PLOTS="${IF_DIR}/results/plots"
-    echo "  Figure 6a: ${IF_PLOTS}/compute_time_vs_batch_size.pdf"
-    echo "  Figure 6b: ${IF_PLOTS}/timer_period_vs_batch_size.pdf"
-    echo "  Table I:   ${IF_DIR}/results/table_1_missed_periods.csv"
+    echo "  Figure 6a: ${IF_PLOTS}/compute_time_vs_block_size.pdf"
+    echo "  Figure 6b: ${IF_PLOTS}/timer_period_vs_block_size.pdf"
+    echo "  Table I:   ${IF_DIR}/results/table_1_skipped_firings.csv"
     echo "  All plots: ${IF_PLOTS}/"
 }
 
@@ -253,7 +253,7 @@ run_yolo_all() {
 # ─────────────────────────────────────────────
 case "${FIGURE}" in
     5a|5b|5)
-        run_monte_carlo
+        run_rrt_star
         ;;
     6)
         run_interference

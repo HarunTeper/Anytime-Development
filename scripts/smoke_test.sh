@@ -11,7 +11,7 @@ cleanup() {
     echo "Interrupted — cleaning up..."
     lttng stop 2>/dev/null || true
     pkill -9 -f 'component_container' 2>/dev/null || true
-    pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
+    pkill -9 -f 'anytime_rrt_star' 2>/dev/null || true
     pkill -9 -f 'ros2' 2>/dev/null || true
     sleep 1
     lttng destroy smoke_test 2>/dev/null || true
@@ -21,8 +21,8 @@ trap cleanup INT TERM
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 PACKAGES_DIR="${WORKSPACE_DIR}/packages"
-MC_EXPERIMENT_DIR="${WORKSPACE_DIR}/experiments/monte_carlo"
-INTERFERENCE_EXPERIMENT_DIR="${WORKSPACE_DIR}/experiments/interference"
+RRT_EXPERIMENT_DIR="${WORKSPACE_DIR}/experiments/rrt_star"
+INTERFERENCE_EXPERIMENT_DIR="${WORKSPACE_DIR}/experiments/interference_rrt_star"
 
 echo "========================================="
 echo "Anytime ROS 2 — Smoke Test"
@@ -68,7 +68,7 @@ echo "-----------------------------------------"
 echo "Phase 2/6: Running unit tests"
 echo "-----------------------------------------"
 
-if colcon test --packages-select anytime_core anytime_monte_carlo 2>&1; then
+if colcon test --packages-select anytime_core anytime_rrt_star 2>&1; then
     # Check results
     if colcon test-result --verbose 2>&1; then
         pass_phase
@@ -80,14 +80,14 @@ else
 fi
 
 # ─────────────────────────────────────────────
-# Phase 3: Generate Monte Carlo configs
+# Phase 3: Generate RRT* configs
 # ─────────────────────────────────────────────
 echo ""
 echo "-----------------------------------------"
-echo "Phase 3/6: Generating Monte Carlo configs"
+echo "Phase 3/6: Generating RRT* configs"
 echo "-----------------------------------------"
 
-cd "${MC_EXPERIMENT_DIR}"
+cd "${RRT_EXPERIMENT_DIR}"
 if python3 generate_configs.py 2>&1; then
     pass_phase
 else
@@ -110,25 +110,57 @@ else
 fi
 
 # ─────────────────────────────────────────────
-# Phase 5: Run 5-second Monte Carlo experiment
+# Phase 5: Run 5-second RRT* experiment
 # ─────────────────────────────────────────────
 echo ""
 echo "-----------------------------------------"
-echo "Phase 5/6: Running 5-second Monte Carlo experiment"
+echo "Phase 5/6: Running 5-second RRT* experiment"
 echo "-----------------------------------------"
 
-CONFIG_DIR="${MC_EXPERIMENT_DIR}/configs"
-TRACE_DIR="${MC_EXPERIMENT_DIR}/traces"
-TEST_CONFIG="batch_1024_reactive_single"
+CONFIG_DIR="${RRT_EXPERIMENT_DIR}/configs"
+TRACE_DIR="${RRT_EXPERIMENT_DIR}/traces"
+TEST_CONFIG="block_256_reactive_single_depot"
 RUN_DURATION=5
 
 test_trace="${TRACE_DIR}/smoke_test"
 rm -rf "${test_trace}"
-mkdir -p "${test_trace}"
+mkdir -p "${test_trace}" "${CONFIG_DIR}"
 
 # Source workspace again (we changed directory)
 cd "${PACKAGES_DIR}"
 source install/setup.bash
+
+# Resolve map directory and generate smoke test configs
+MAPS_DIR="$(ros2 pkg prefix anytime_rrt_star)/share/anytime_rrt_star/maps"
+
+cat > "${CONFIG_DIR}/${TEST_CONFIG}_server.yaml" <<EOF
+anytime_server:
+  ros__parameters:
+    is_reactive_proactive: "reactive"
+    multi_threading: false
+    block_size: 256
+    random_seed: 42
+    log_level: "info"
+    map_yaml_path: "${MAPS_DIR}/depot.yaml"
+    start_x: 5.0
+    start_y: 12.0
+    goal_x: 25.0
+    goal_y: 2.0
+    step_size: 0.5
+    goal_threshold: 0.5
+    goal_bias: 0.05
+    gamma_rrt_star: 0.0
+    prune_interval: 1000
+    convergence_log_interval: 100
+EOF
+
+cat > "${CONFIG_DIR}/${TEST_CONFIG}_client.yaml" <<EOF
+anytime_client:
+  ros__parameters:
+    goal_timer_period_ms: 500
+    cancel_timeout_period_ms: 200
+    log_level: "info"
+EOF
 
 # Restart lttng-sessiond to ensure clean tracing state
 pkill lttng-sessiond 2>/dev/null || true
@@ -149,7 +181,7 @@ lttng start
 server_config="${CONFIG_DIR}/${TEST_CONFIG}_server.yaml"
 client_config="${CONFIG_DIR}/${TEST_CONFIG}_client.yaml"
 
-ros2 launch experiments monte_carlo.launch.py \
+ros2 launch experiments rrt_star.launch.py \
     server_config:="${server_config}" \
     client_config:="${client_config}" \
     use_multi_threaded:=false \
@@ -169,7 +201,7 @@ kill ${LAUNCH_PID} 2>/dev/null || true
 sleep 1
 kill -9 ${LAUNCH_PID} 2>/dev/null || true
 pkill -9 -f 'component_container' 2>/dev/null || true
-pkill -9 -f 'anytime_monte_carlo' 2>/dev/null || true
+pkill -9 -f 'anytime_rrt_star' 2>/dev/null || true
 pkill -9 -f 'ros2' 2>/dev/null || true
 sleep 1
 
@@ -215,8 +247,8 @@ if [ ${failed} -eq 0 ]; then
     echo "ALL PHASES PASSED"
     echo ""
     echo "Next steps:"
-    echo "  - Run quick experiments:  ./experiments/monte_carlo/run_quick.sh"
-    echo "  - Run full experiments:   ./experiments/monte_carlo/run_monte_carlo_experiments.sh"
+    echo "  - Run quick experiments:  ./experiments/rrt_star/run_quick.sh"
+    echo "  - Run full experiments:   ./experiments/rrt_star/run_rrt_star_experiments.sh"
     exit 0
 else
     echo "SOME PHASES FAILED"

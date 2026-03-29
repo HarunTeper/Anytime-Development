@@ -26,22 +26,22 @@ AnytimeActionServer::AnytimeActionServer(rclcpp::NodeOptions options)
 
   // Read the ros2 parameters
   std::string reactive_proactive_str = this->declare_parameter("is_reactive_proactive", "reactive");
-  int batch_size = this->declare_parameter("batch_size", 1);
+  int block_size = this->declare_parameter("block_size", 1);
 
   // Convert strings to booleans
   bool is_reactive_proactive = (reactive_proactive_str == "proactive");
 
   RCLCPP_INFO(this->get_logger(), "Monte Carlo Action Server initialized with parameters:");
   RCLCPP_INFO(this->get_logger(), "  is_reactive_proactive: %s", reactive_proactive_str.c_str());
-  RCLCPP_INFO(this->get_logger(), "  batch_size: %d", batch_size);
+  RCLCPP_INFO(this->get_logger(), "  block_size: %d", block_size);
 
   RCLCPP_DEBUG(
     this->get_logger(), "is_reactive_proactive: %s",
     is_reactive_proactive ? "proactive" : "reactive");
-  RCLCPP_DEBUG(this->get_logger(), "batch_size: %d", batch_size);
+  RCLCPP_DEBUG(this->get_logger(), "block_size: %d", block_size);
 
   // Create the Anytime management object based on the parameters
-  this->anytime_management_ = create_anytime_management(this, is_reactive_proactive, batch_size);
+  this->anytime_management_ = create_anytime_management(this, is_reactive_proactive, block_size);
 }
 
 // Destructor for the AnytimeActionServer class
@@ -51,12 +51,12 @@ AnytimeActionServer::~AnytimeActionServer() {}
 std::shared_ptr<
   anytime_core::AnytimeBase<AnytimeActionServer::Anytime, AnytimeActionServer::GoalHandleType>>
 AnytimeActionServer::create_anytime_management(
-  rclcpp::Node * node, bool is_reactive_proactive, int batch_size)
+  rclcpp::Node * node, bool is_reactive_proactive, int block_size)
 {
   if (is_reactive_proactive) {
-    return std::make_shared<AnytimeManagement<true>>(node, batch_size);
+    return std::make_shared<AnytimeManagement<true>>(node, block_size);
   } else {
-    return std::make_shared<AnytimeManagement<false>>(node, batch_size);
+    return std::make_shared<AnytimeManagement<false>>(node, block_size);
   }
 }
 

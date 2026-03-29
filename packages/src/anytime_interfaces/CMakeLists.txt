@@ -9,6 +9,7 @@ find_package(sensor_msgs REQUIRED)
 
 set(msg_files
   "action/MonteCarlo.action"
+  "action/RrtStar.action"
   "action/Yolo.action"
 )
 

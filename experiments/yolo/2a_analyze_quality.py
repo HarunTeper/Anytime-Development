@@ -13,13 +13,12 @@ Configuration:
 - FILTER_BY_CLASS: Set to True to filter by TARGET_CLASS_ID, False for all detections
 - TARGET_CLASS_ID: 9 = traffic light in COCO dataset
 
-Input:  traces/phase1_baseline_trial{1,2,3}/
+Input:  traces/phase1_baseline_trial{1,2,3,4,5}/
 Output: results/quality_analysis/
 """
 
 import sys
 import json
-import subprocess
 from pathlib import Path
 from collections import defaultdict
 import pandas as pd
@@ -28,6 +27,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from datetime import datetime
+
+from trace_utils import TraceEvent, parse_fields, parse_trace_directory
 
 # Configuration
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -43,15 +44,19 @@ FILTER_BY_CLASS = True
 # Target class ID to filter for (9 = traffic light in COCO dataset)
 TARGET_CLASS_ID = 9
 
+# Number of warmup images to skip per trial (GPU JIT overhead)
+WARMUP_IMAGES = 5
+
 # Plot configuration
 PLOT_WIDTH = 12
 PLOT_HEIGHT = 8
 PLOT_HEIGHT_SMALL = 8
 PLOT_DPI = 300
+# ── Plot font sizes (adjust these to rescale all text) ──
 FONT_SIZE_TITLE = 30
 FONT_SIZE_LABEL = 30
-FONT_SIZE_LEGEND = 30
 FONT_SIZE_TICK_LABELS = 30
+FONT_SIZE_OFFSET = 30   # scientific notation offset text (e.g. "×1e6")
 LEGEND_SIZE = 30
 MARKER_SIZE = 12
 CAPSIZE = 5
@@ -63,150 +68,6 @@ X_LABEL_SKIP = 2
 RESULTS_DIR.mkdir(exist_ok=True)
 PLOTS_DIR.mkdir(exist_ok=True)
 QUALITY_DIR.mkdir(exist_ok=True)
-
-
-class TraceEvent:
-    """Represents a single trace event"""
-
-    def __init__(self, timestamp, event_name, fields):
-        self.timestamp = timestamp
-        self.event_name = event_name
-        self.fields = fields
-
-    def __repr__(self):
-        return f"TraceEvent({self.timestamp}, {self.event_name})"
-
-
-def parse_trace_directory(trace_dir):
-    """
-    Parse a single trace directory using babeltrace
-    """
-    print(f"  Parsing trace: {trace_dir.name}")
-
-    # Use babeltrace2 (without --names none to preserve all fields)
-    try:
-        result = subprocess.run(
-            ['babeltrace2', str(trace_dir)],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        try:
-            result = subprocess.run(
-                ['babeltrace', str(trace_dir)],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-        except subprocess.CalledProcessError as e:
-            print(f"    Error running babeltrace: {e}")
-            return []
-        except FileNotFoundError:
-            print("    Error: babeltrace not found. Please install lttng-tools.")
-            return []
-
-    # Pre-filter lines to only process anytime events
-    anytime_lines = [line for line in result.stdout.split(
-        '\n') if 'anytime:' in line]
-
-    events = []
-    for line in anytime_lines:
-        if not line.strip() or not 'anytime:' in line:
-            continue
-
-        try:
-            # Extract timestamp (in brackets)
-            ts_start = line.find('[')
-            ts_end = line.find(']')
-            if ts_start == -1 or ts_end == -1:
-                continue
-
-            timestamp_str = line[ts_start+1:ts_end]
-            # Convert HH:MM:SS.nanoseconds to nanoseconds
-            parts = timestamp_str.split(':')
-            try:
-                if len(parts) == 3:
-                    hh = int(parts[0])
-                    mm = int(parts[1])
-                    ss = float(parts[2])
-                    seconds_total = hh * 3600 + mm * 60 + ss
-                    timestamp = seconds_total * 1e9
-                else:
-                    timestamp = float(timestamp_str) * 1e9
-            except ValueError:
-                continue
-
-            # Extract event name
-            event_start = line.find('anytime:')
-            if event_start == -1:
-                continue
-
-            event_name_part = line[event_start:]
-            event_name_end = event_name_part.find(
-                ':', 8)  # Find colon after 'anytime:'
-            if event_name_end == -1:
-                continue
-
-            event_name = event_name_part[8:event_name_end]
-
-            # Extract fields (in braces)
-            fields_start = line.find('{', event_start)
-            fields_end = line.rfind('}')
-            if fields_start == -1 or fields_end == -1:
-                fields = {}
-            else:
-                fields_str = line[fields_start+1:fields_end]
-                fields = parse_fields(fields_str)
-
-            events.append(TraceEvent(timestamp, event_name, fields))
-
-        except Exception as e:
-            continue
-
-    print(f"    Parsed {len(events)} events")
-    return events
-
-
-def parse_fields(fields_str):
-    """Parse the fields string into a dictionary"""
-    fields = {}
-
-    parts = []
-    current = []
-    in_string = False
-
-    for char in fields_str + ',':
-        if char == '"':
-            in_string = not in_string
-        elif char == ',' and not in_string:
-            parts.append(''.join(current).strip())
-            current = []
-            continue
-        current.append(char)
-
-    for part in parts:
-        if not part or '=' not in part:
-            continue
-
-        key, value = part.split('=', 1)
-        key = key.strip()
-        value = value.strip()
-
-        if value.startswith('"') and value.endswith('"'):
-            value = value[1:-1]
-        else:
-            try:
-                if '.' in value:
-                    value = float(value)
-                else:
-                    value = int(value)
-            except ValueError:
-                pass
-
-        fields[key] = value
-
-    return fields
 
 
 def analyze_quality_progression(trace_dir):
@@ -239,7 +100,7 @@ def analyze_quality_progression(trace_dir):
     image_counter = 0
 
     for event in events:
-        if event.event_name == 'anytime_base_activate':
+        if event.event_name == 'anytime:anytime_base_activate':
             # New goal/image started
             if current_image['layer_detections']:
                 images.append(current_image)
@@ -257,12 +118,12 @@ def analyze_quality_progression(trace_dir):
                 'max_layer': 0,
             }
 
-        elif event.event_name == 'yolo_layer_start':
+        elif event.event_name == 'anytime:yolo_layer_start':
             layer_num = event.fields.get('layer_num', 0)
             # Store with the start layer number for matching later
             current_image['layer_start_times'][layer_num] = event.timestamp
 
-        elif event.event_name == 'yolo_layer_end':
+        elif event.event_name == 'anytime:yolo_layer_end':
             layer_num = event.fields.get('layer_num', 0)
             current_image['layer_times'][layer_num] = event.timestamp
             current_image['max_layer'] = max(
@@ -276,13 +137,13 @@ def analyze_quality_progression(trace_dir):
                 computation_time = event.timestamp - start_time
                 current_image['layer_computation_times'][layer_num] = computation_time
 
-        elif event.event_name == 'yolo_exit_calculation_start':
+        elif event.event_name == 'anytime:yolo_exit_calculation_start':
             # Mark that we're starting exit calculation for this layer
             layer_num = event.fields.get('layer_num', 0)
             current_image['current_exit_layer'] = layer_num
             current_image['exit_calc_start_times'][layer_num] = event.timestamp
 
-        elif event.event_name == 'yolo_exit_calculation_end':
+        elif event.event_name == 'anytime:yolo_exit_calculation_end':
             layer_num = event.fields.get('layer_num', 0)
             # Calculate exit calculation time
             if layer_num in current_image['exit_calc_start_times']:
@@ -290,7 +151,7 @@ def analyze_quality_progression(trace_dir):
                 calc_time = event.timestamp - start_time
                 current_image['exit_calculation_times'][layer_num] = calc_time
 
-        elif event.event_name == 'yolo_detection':
+        elif event.event_name == 'anytime:yolo_detection':
             # Track individual detections for this specific layer
             # Detections come AFTER yolo_exit_calculation_end and belong to layer_num in the event
             layer_num = event.fields.get('layer_num', 0)
@@ -308,7 +169,7 @@ def analyze_quality_progression(trace_dir):
                 # Count all detections
                 current_image['layer_detections'][layer_num] += 1
 
-        elif event.event_name == 'yolo_result':
+        elif event.event_name == 'anytime:yolo_result':
             # yolo_result is emitted after every layer, so we keep updating final_detections
             # The last one (highest processed_layers) will be the true final result
             processed_layers = event.fields.get('processed_layers', 0)
@@ -399,7 +260,10 @@ def calculate_quality_metrics(images):
             metrics['exit_calculation_times'][layer_num].append(
                 calc_time / 1e6)
 
-        # Find first layer where we reach each quality threshold
+    # Find first layer where we reach each quality threshold
+    # Only for images with detections (quality ratio is undefined without them)
+    for img in images_with_detections:
+        final_count = img['final_detections']
         for threshold_pct in [50, 60, 70, 80, 90, 95, 99]:
             threshold = threshold_pct / 100.0
             for layer_num in sorted(img['layer_detections'].keys()):
@@ -545,11 +409,18 @@ def plot_quality_ratio_progression(metrics):
     means = [np.mean(metrics['layer_quality_ratio'][l]) for l in layers]
     stds = [np.std(metrics['layer_quality_ratio'][l]) for l in layers]
 
+    # Cap error bars so they don't exceed 1.0 (100% quality)
+    means_arr = np.array(means)
+    stds_arr = np.array(stds)
+    upper_err = np.minimum(stds_arr, 1.0 - means_arr)
+    lower_err = stds_arr  # lower bars are fine as-is
+    yerr_capped = [lower_err, upper_err]
+
     fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
 
     # Use bar chart instead of line plot
     x = np.arange(len(layers))
-    ax.bar(x, means, yerr=stds, capsize=CAPSIZE, alpha=0.8,
+    ax.bar(x, means, yerr=yerr_capped, capsize=CAPSIZE, alpha=0.8,
            color='#1f77b4', error_kw={'linewidth': LINE_WIDTH})
 
     # Add threshold lines
@@ -577,7 +448,7 @@ def plot_quality_ratio_progression(metrics):
         title = 'YOLO Detection Quality Progression Across Layers (All Classes)'
     # ax.set_title(title, fontsize=FONT_SIZE_TITLE)
     ax.set_ylim([0, 1.05])
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout(pad=0)
@@ -621,7 +492,7 @@ def plot_cancellation_histogram(metrics):
         ax.set_title(f'{threshold_pct}% Quality Threshold',
                      fontsize=FONT_SIZE_TITLE)
         ax.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-        ax.legend(fontsize=LEGEND_SIZE)
+        # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
         ax.grid(True, alpha=0.3, axis='y')
 
     # Remove extra subplot
@@ -685,7 +556,7 @@ def plot_layer_wise_boxplot(metrics):
         title = 'Quality Distribution at Each Layer (All Classes)'
     ax.set_title(title, fontsize=FONT_SIZE_TITLE)
     ax.set_ylim([0, 1.05])
-    ax.legend(fontsize=LEGEND_SIZE)
+    # ax.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout(pad=0)
@@ -802,7 +673,7 @@ def plot_combined_timing(metrics):
     ax1.set_xticks(x)
     ax1.set_xticklabels(common_layers, fontsize=FONT_SIZE_TICK_LABELS)
     ax1.tick_params(axis='y', labelsize=FONT_SIZE_TICK_LABELS)
-    ax1.legend(fontsize=LEGEND_SIZE)
+    # ax1.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax1.grid(True, alpha=0.3, axis='y')
 
     # Plot 2: Stacked view showing total time per layer
@@ -817,7 +688,7 @@ def plot_combined_timing(metrics):
     ax2.set_ylabel('Time (ms)', fontsize=FONT_SIZE_LABEL)
     ax2.set_title('Total Time per Layer (Stacked)', fontsize=FONT_SIZE_TITLE)
     ax2.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-    ax2.legend(fontsize=LEGEND_SIZE)
+    # ax2.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax2.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout(pad=0)
@@ -872,7 +743,7 @@ def plot_cumulative_timing(metrics):
     ax1.set_title('Cumulative Processing Time Up To Each Layer',
                   fontsize=FONT_SIZE_TITLE)
     ax1.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-    ax1.legend(fontsize=LEGEND_SIZE)
+    # ax1.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax1.grid(True, alpha=0.3)
 
     # Plot 2: Stacked area showing cumulative contribution
@@ -887,7 +758,7 @@ def plot_cumulative_timing(metrics):
     ax2.set_title(
         'Total Runtime if Cancelled at Each Layer (Stacked Area)', fontsize=FONT_SIZE_TITLE)
     ax2.tick_params(axis='both', labelsize=FONT_SIZE_TICK_LABELS)
-    ax2.legend(fontsize=LEGEND_SIZE)
+    # ax2.legend(fontsize=LEGEND_SIZE)  # Legend removed
     ax2.grid(True, alpha=0.3)
 
     plt.tight_layout(pad=0)
@@ -1092,6 +963,9 @@ def main():
         print(f"\n  Analyzing: {trace_dir.name}")
         images = analyze_quality_progression(trace_dir)
         if images:
+            if WARMUP_IMAGES > 0 and len(images) > WARMUP_IMAGES:
+                images = images[WARMUP_IMAGES:]
+                print(f"    Skipped {WARMUP_IMAGES} warmup images")
             all_images.extend(images)
             print(f"    Found {len(images)} images")
 

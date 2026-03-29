@@ -1,0 +1,264 @@
+# Copyright 2025 Anytime System
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+from launch.launch_context import LaunchContext
+import os
+from ament_index_python.packages import get_package_share_directory
+
+
+def include_launch_description(context: LaunchContext):
+    """Include launch description."""
+    is_reactive_proactive = LaunchConfiguration("is_reactive_proactive")
+    block_size = LaunchConfiguration("block_size")
+
+    config_path = context.launch_configurations.get('config_file', '')
+
+    print("\n" + "="*60)
+    print("RRT* Action Server Launch Configuration")
+    print("="*60)
+
+    multi_threading_value = context.launch_configurations.get(
+        "multi_threading", "")
+
+    if (
+        (not multi_threading_value or multi_threading_value == '')
+        and config_path and os.path.exists(config_path)
+    ):
+        import yaml
+        try:
+            with open(config_path, 'r') as f:
+                config_data = yaml.safe_load(f)
+                if config_data and 'anytime_server' in config_data:
+                    params = config_data['anytime_server'].get(
+                        'ros__parameters', {})
+                    multi_threading_from_config = params.get(
+                        'multi_threading', False)
+                    multi_threading_value = (
+                        "true" if multi_threading_from_config else "false"
+                    )
+                    print(f"Loading config from: {config_path}")
+        except Exception as e:
+            print(
+                f"Warning: Could not read multi_threading from config file: {e}")
+            multi_threading_value = "false"
+    elif not multi_threading_value or multi_threading_value == '':
+        multi_threading_value = "false"
+
+    if multi_threading_value.lower() == "false":
+        is_single_multi = "single"
+    elif multi_threading_value.lower() == "true":
+        is_single_multi = "multi"
+    else:
+        raise ValueError("Invalid threading type")
+
+    if context.launch_configurations.get("multi_threading", "") != "":
+        print(
+            f"  [Override] multi_threading: {multi_threading_value}"
+            f" -> is_single_multi: {is_single_multi} (from command line)")
+    else:
+        print(
+            f"  multi_threading: {multi_threading_value}"
+            f" -> is_single_multi: {is_single_multi} (from config file)")
+
+    if config_path and os.path.exists(config_path):
+        parameters = [config_path]
+        overrides = {}
+        reactive_proactive_value = context.launch_configurations.get(
+            'is_reactive_proactive', '')
+        block_size_value = context.launch_configurations.get('block_size', '')
+
+        if reactive_proactive_value and reactive_proactive_value != '':
+            overrides['is_reactive_proactive'] = reactive_proactive_value
+            print(
+                f"  [Override] is_reactive_proactive:"
+                f" {reactive_proactive_value} (from command line)")
+        if block_size_value and block_size_value != '':
+            overrides['block_size'] = int(block_size_value)
+            print(
+                f"  [Override] block_size: {block_size_value} (from command line)")
+
+        # RRT*-specific parameter overrides
+        rrt_str_params = ['map_yaml_path']
+        rrt_float_params = [
+            'start_x', 'start_y', 'goal_x', 'goal_y',
+            'step_size', 'goal_threshold', 'goal_bias', 'gamma_rrt_star']
+        rrt_int_params = ['prune_interval', 'convergence_log_interval']
+
+        for param in rrt_str_params:
+            val = context.launch_configurations.get(param, '')
+            if val and val != '':
+                overrides[param] = val
+                print(f"  [Override] {param}: {val} (from command line)")
+        for param in rrt_float_params:
+            val = context.launch_configurations.get(param, '')
+            if val and val != '':
+                overrides[param] = float(val)
+                print(f"  [Override] {param}: {val} (from command line)")
+        for param in rrt_int_params:
+            val = context.launch_configurations.get(param, '')
+            if val and val != '':
+                overrides[param] = int(val)
+                print(f"  [Override] {param}: {val} (from command line)")
+
+        overrides['is_single_multi'] = is_single_multi
+        if overrides:
+            parameters.append(overrides)
+    else:
+        print("Using command line arguments (no config file)")
+        parameters = [{
+            "is_reactive_proactive": is_reactive_proactive,
+            "block_size": block_size,
+            "is_single_multi": is_single_multi,
+        }]
+
+    logger = context.launch_configurations.get('log_level', '')
+
+    if (not logger or logger == '') and config_path and os.path.exists(config_path):
+        import yaml
+        try:
+            with open(config_path, 'r') as f:
+                config_data = yaml.safe_load(f)
+                if config_data and 'anytime_server' in config_data:
+                    params = config_data['anytime_server'].get(
+                        'ros__parameters', {})
+                    logger = params.get('log_level', 'info')
+                    print(f"  log_level: {logger} (from config file)")
+        except Exception as e:
+            print(f"Warning: Could not read log_level from config file: {e}")
+            logger = 'info'
+            print(f"  log_level: {logger} (default)")
+    elif logger and logger != '':
+        print(f"  [Override] log_level: {logger} (from command line)")
+    else:
+        logger = 'info'
+        print(f"  log_level: {logger} (default)")
+
+    print("="*60 + "\n")
+
+    arguments = ["--is_single_multi", is_single_multi,
+                 "--ros-args", "--log-level", logger]
+
+    anytime_cmd = Node(
+        package="anytime_rrt_star",
+        executable="anytime_rrt_server",
+        name="anytime_server",
+        parameters=parameters,
+        arguments=arguments
+    )
+
+    return [anytime_cmd]
+
+
+def generate_launch_description():
+    """Return launch description."""
+    try:
+        package_dir = get_package_share_directory('anytime_rrt_star')
+        default_config_file = os.path.join(
+            package_dir, 'config', 'server_params.yaml')
+    except Exception as e:
+        print(f"Warning: Could not get package directory: {e}")
+        default_config_file = ""
+
+    config_file_arg = DeclareLaunchArgument(
+        'config_file',
+        default_value=default_config_file,
+        description='Path to the server configuration YAML file'
+    )
+
+    threading_type_arg = DeclareLaunchArgument(
+        "multi_threading",
+        default_value="",
+        description="Threading type (overrides config file)"
+    )
+
+    anytime_reactive_proactive_arg = DeclareLaunchArgument(
+        "is_reactive_proactive",
+        default_value="",
+        description="Anytime reactive (overrides config file)"
+    )
+
+    block_size_arg = DeclareLaunchArgument(
+        "block_size",
+        default_value="",
+        description="Block size for compute iterations (overrides config)"
+    )
+
+    log_level_arg = DeclareLaunchArgument(
+        "log_level",
+        default_value="",
+        description="Logging level (debug, info, warn, error, fatal)"
+    )
+
+    # RRT*-specific launch arguments
+    map_yaml_path_arg = DeclareLaunchArgument(
+        "map_yaml_path", default_value="",
+        description="Path to Nav2 YAML map file (overrides config)")
+    start_x_arg = DeclareLaunchArgument(
+        "start_x", default_value="",
+        description="Start X position in meters (overrides config)")
+    start_y_arg = DeclareLaunchArgument(
+        "start_y", default_value="",
+        description="Start Y position in meters (overrides config)")
+    goal_x_arg = DeclareLaunchArgument(
+        "goal_x", default_value="",
+        description="Goal X position in meters (overrides config)")
+    goal_y_arg = DeclareLaunchArgument(
+        "goal_y", default_value="",
+        description="Goal Y position in meters (overrides config)")
+    step_size_arg = DeclareLaunchArgument(
+        "step_size", default_value="",
+        description="RRT* step size in meters (overrides config)")
+    goal_threshold_arg = DeclareLaunchArgument(
+        "goal_threshold", default_value="",
+        description="Distance to consider goal reached (overrides config)")
+    goal_bias_arg = DeclareLaunchArgument(
+        "goal_bias", default_value="",
+        description="Goal sampling bias probability (overrides config)")
+    gamma_rrt_star_arg = DeclareLaunchArgument(
+        "gamma_rrt_star", default_value="",
+        description="Near radius constant, 0=auto (overrides config)")
+    prune_interval_arg = DeclareLaunchArgument(
+        "prune_interval", default_value="",
+        description="Branch-and-bound prune interval (overrides config)")
+    convergence_log_interval_arg = DeclareLaunchArgument(
+        "convergence_log_interval", default_value="",
+        description="Emit iteration tracepoint every N iterations (overrides config)")
+
+    launch_description = LaunchDescription()
+
+    launch_description.add_action(config_file_arg)
+    launch_description.add_action(threading_type_arg)
+    launch_description.add_action(anytime_reactive_proactive_arg)
+    launch_description.add_action(block_size_arg)
+    launch_description.add_action(log_level_arg)
+    launch_description.add_action(map_yaml_path_arg)
+    launch_description.add_action(start_x_arg)
+    launch_description.add_action(start_y_arg)
+    launch_description.add_action(goal_x_arg)
+    launch_description.add_action(goal_y_arg)
+    launch_description.add_action(step_size_arg)
+    launch_description.add_action(goal_threshold_arg)
+    launch_description.add_action(goal_bias_arg)
+    launch_description.add_action(gamma_rrt_star_arg)
+    launch_description.add_action(prune_interval_arg)
+    launch_description.add_action(convergence_log_interval_arg)
+
+    launch_description.add_action(OpaqueFunction(
+        function=include_launch_description))
+
+    return launch_description

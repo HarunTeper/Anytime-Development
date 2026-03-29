@@ -1,0 +1,33 @@
+anytime_server:
+  ros__parameters:
+    # Anytime algorithm mode
+    is_reactive_proactive: "reactive"  # Options: "reactive", "proactive"
+
+    # Threading configuration
+    multi_threading: false  # Enable/disable multi-threading
+
+    # Block processing configuration
+    block_size: 1024  # Number of RRT* iterations to compute per block
+
+    # RNG configuration
+    random_seed: 42  # Seed for reproducible experiments
+
+    # Logging configuration
+    log_level: "debug"  # Options: "debug", "info", "warn", "error", "fatal"
+
+    # Map configuration (Nav2 YAML format)
+    map_yaml_path: ""  # Path to Nav2 YAML map file (e.g., "/path/to/depot.yaml")
+
+    # Start/goal positions (world coordinates in meters)
+    start_x: 5.0
+    start_y: 5.0
+    goal_x: 25.0
+    goal_y: 10.0
+
+    # RRT* algorithm parameters
+    step_size: 0.5         # Max extension distance per Steer call (meters)
+    goal_threshold: 0.5    # Distance to consider goal reached (meters)
+    goal_bias: 0.05        # Probability of sampling goal instead of random (0.0-1.0)
+    gamma_rrt_star: 0.0    # Near radius constant (0 = auto-compute from map free area)
+    prune_interval: 1000   # Branch-and-bound pruning every N iterations (0 = disabled)
+    convergence_log_interval: 100  # Emit rrt_star_iteration tracepoint every N iterations (0 = disabled)

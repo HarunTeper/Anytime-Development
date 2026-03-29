@@ -31,9 +31,9 @@ public:
   int reset_count = 0;
   bool finish_flag = false;
 
-  explicit MockAnytimeBase(rclcpp::Node * node, int batch_size = 1)
+  explicit MockAnytimeBase(rclcpp::Node * node, int block_size = 1)
   {
-    this->template initialize_anytime_base<false>(node, batch_size);
+    this->template initialize_anytime_base<false>(node, block_size);
   }
 
   void compute_single_iteration() override {compute_count++;}
@@ -144,15 +144,15 @@ TEST_F(AnytimeBaseTest, ResetMultipleTimes)
   EXPECT_EQ(base.compute_count, 0);
 }
 
-TEST_F(AnytimeBaseTest, DefaultBatchIterations)
+TEST_F(AnytimeBaseTest, DefaultBlockIterations)
 {
-  // Default batch_size = 1
+  // Default block_size = 1
   MockAnytimeBase base1(node_.get(), 1);
-  EXPECT_EQ(base1.get_batch_iterations(), 1);
+  EXPECT_EQ(base1.get_block_iterations(), 1);
 
-  // Custom batch_size
+  // Custom block_size
   MockAnytimeBase base5(node_.get(), 5);
-  EXPECT_EQ(base5.get_batch_iterations(), 5);
+  EXPECT_EQ(base5.get_block_iterations(), 5);
 }
 
 TEST_F(AnytimeBaseTest, DefaultProcessGpuCompletions)

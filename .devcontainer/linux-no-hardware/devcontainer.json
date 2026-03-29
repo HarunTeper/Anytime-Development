@@ -11,6 +11,8 @@
 			"DISPLAY": "${localEnv:DISPLAY}"
 		}
 	},
+	// Cleanup stale containers before creation (prevents stale state)
+	"initializeCommand": "docker rm -f ROS2-Anytime-Linux-No-Hardware 2>/dev/null || true",
 	// Configure container user
 	"remoteUser": "vscode",
 	// Configure workspace mount point

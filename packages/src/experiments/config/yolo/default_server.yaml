@@ -6,8 +6,8 @@ anytime_server:
     # Threading configuration
     multi_threading: true  # Enable/disable multi-threading
     
-    # Batch processing configuration
-    batch_size: 1  # Number of iterations to compute per batch
+    # Block processing configuration
+    block_size: 1  # Number of iterations to compute per block
     
     # Synchronization mode
     is_sync_async: "sync"  # Options: "sync", "async"

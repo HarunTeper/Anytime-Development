@@ -24,7 +24,7 @@ from ament_index_python.packages import get_package_share_directory
 def include_launch_description(context: LaunchContext):
     """Include launch description."""
     is_reactive_proactive = LaunchConfiguration("is_reactive_proactive")
-    batch_size = LaunchConfiguration("batch_size")
+    block_size = LaunchConfiguration("block_size")
 
     # Get the config file path from context
     config_path = context.launch_configurations.get('config_file', '')
@@ -86,17 +86,17 @@ def include_launch_description(context: LaunchContext):
         overrides = {}
         reactive_proactive_value = context.launch_configurations.get(
             'is_reactive_proactive', '')
-        batch_size_value = context.launch_configurations.get('batch_size', '')
+        block_size_value = context.launch_configurations.get('block_size', '')
 
         if reactive_proactive_value and reactive_proactive_value != '':
             overrides['is_reactive_proactive'] = reactive_proactive_value
             print(
                 f"  [Override] is_reactive_proactive:"
                 f" {reactive_proactive_value} (from command line)")
-        if batch_size_value and batch_size_value != '':
-            overrides['batch_size'] = int(batch_size_value)
+        if block_size_value and block_size_value != '':
+            overrides['block_size'] = int(block_size_value)
             print(
-                f"  [Override] batch_size: {batch_size_value} (from command line)")
+                f"  [Override] block_size: {block_size_value} (from command line)")
         overrides['is_single_multi'] = is_single_multi
         if overrides:
             parameters.append(overrides)
@@ -105,7 +105,7 @@ def include_launch_description(context: LaunchContext):
         # Use command line arguments
         parameters = [{
             "is_reactive_proactive": is_reactive_proactive,
-            "batch_size": batch_size,
+            "block_size": block_size,
             "is_single_multi": is_single_multi,
         }]
 
@@ -182,10 +182,10 @@ def generate_launch_description():
         description="Anytime reactive (overrides config file)"
     )
 
-    batch_size_arg = DeclareLaunchArgument(
-        "batch_size",
+    block_size_arg = DeclareLaunchArgument(
+        "block_size",
         default_value="",
-        description="Batch size for compute iterations (overrides config)"
+        description="Block size for compute iterations (overrides config)"
     )
 
     log_level_arg = DeclareLaunchArgument(
@@ -200,7 +200,7 @@ def generate_launch_description():
     launch_description.add_action(config_file_arg)
     launch_description.add_action(threading_type_arg)
     launch_description.add_action(anytime_reactive_proactive_arg)
-    launch_description.add_action(batch_size_arg)
+    launch_description.add_action(block_size_arg)
     launch_description.add_action(log_level_arg)
 
     launch_description.add_action(OpaqueFunction(

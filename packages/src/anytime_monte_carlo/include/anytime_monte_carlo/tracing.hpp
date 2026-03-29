@@ -21,10 +21,10 @@
 
 // Helper macros for tracing in anytime_monte_carlo
 
-#define TRACE_MONTE_CARLO_INIT(node, batch_size, is_reactive_proactive) \
+#define TRACE_MONTE_CARLO_INIT(node, block_size, is_reactive_proactive) \
   ANYTIME_TRACEPOINT( \
     monte_carlo_init, static_cast<const void *>(node->get_node_base_interface().get()), \
-    batch_size, is_reactive_proactive)
+    block_size, is_reactive_proactive)
 
 #define TRACE_MONTE_CARLO_ITERATION(node, iteration_num, count_inside, count_total, x, y) \
   ANYTIME_TRACEPOINT( \
